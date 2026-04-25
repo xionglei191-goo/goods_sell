@@ -1,0 +1,237 @@
+"use client";
+
+import { MapPinned } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import type { DealerMapData } from "@/features/orders/map-queries";
+import { formatCurrency } from "@/features/orders/utils";
+import { cn } from "@/lib/utils";
+
+type DealerMapProps = {
+  data: DealerMapData;
+  amapKey: string;
+  amapSecurityCode?: string;
+};
+
+declare global {
+  interface Window {
+    AMap?: AMapNamespace;
+    _AMapSecurityConfig?: {
+      securityJsCode?: string;
+    };
+  }
+}
+
+type AMapInstance = {
+  addControl(control: unknown): void;
+  destroy(): void;
+};
+
+type AMapMarker = {
+  setMap(map: AMapInstance): void;
+  on(event: string, handler: () => void): void;
+};
+
+type AMapOverlay = {
+  setMap(map: AMapInstance): void;
+};
+
+type AMapInfoWindow = {
+  open(map: AMapInstance, position: [number, number]): void;
+};
+
+type AMapHeatMap = {
+  setDataSet(data: { data: Array<{ lng: number; lat: number; count: number }>; max: number }): void;
+};
+
+type AMapNamespace = {
+  Map: new (container: HTMLDivElement, options: Record<string, unknown>) => AMapInstance;
+  Scale: new () => unknown;
+  ToolBar: new () => unknown;
+  Marker: new (options: Record<string, unknown>) => AMapMarker;
+  Circle: new (options: Record<string, unknown>) => AMapOverlay;
+  InfoWindow: new (options: Record<string, unknown>) => AMapInfoWindow;
+  HeatMap?: new (map: AMapInstance, options: Record<string, unknown>) => AMapHeatMap;
+};
+
+const AMAP_SCRIPT_ID = "amap-js-api-v2";
+
+type LoadState = "idle" | "loading" | "loaded" | "error";
+
+function normalize(value: number, min: number, max: number) {
+  if (max === min) return 50;
+  return ((value - min) / (max - min)) * 80 + 10;
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (char) => {
+    const entities: Record<string, string> = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    };
+    return entities[char] ?? char;
+  });
+}
+
+export function DealerMap({ data, amapKey, amapSecurityCode }: DealerMapProps) {
+  const mapRef = useRef<HTMLDivElement | null>(null);
+  const [loadState, setLoadState] = useState<LoadState>("idle");
+  const bounds = useMemo(() => {
+    const points = [
+      ...data.dealers.map((dealer) => ({ latitude: dealer.latitude, longitude: dealer.longitude })),
+      ...data.heatPoints.map((point) => ({ latitude: point.latitude, longitude: point.longitude })),
+    ];
+    return {
+      minLat: Math.min(...points.map((point) => point.latitude), 27.75),
+      maxLat: Math.max(...points.map((point) => point.latitude), 27.9),
+      minLng: Math.min(...points.map((point) => point.longitude), 112.88),
+      maxLng: Math.max(...points.map((point) => point.longitude), 112.99),
+    };
+  }, [data.dealers, data.heatPoints]);
+
+  useEffect(() => {
+    if (!amapKey || !mapRef.current) return;
+
+    if (amapSecurityCode) {
+      window._AMapSecurityConfig = { securityJsCode: amapSecurityCode };
+    }
+
+    if (window.AMap) {
+      setLoadState("loaded");
+      return;
+    }
+
+    setLoadState("loading");
+    const existingScript = document.getElementById(AMAP_SCRIPT_ID) as HTMLScriptElement | null;
+    const script = existingScript ?? document.createElement("script");
+    const handleLoad = () => setLoadState("loaded");
+    const handleError = () => setLoadState("error");
+
+    script.addEventListener("load", handleLoad);
+    script.addEventListener("error", handleError);
+
+    if (!existingScript) {
+      script.id = AMAP_SCRIPT_ID;
+      script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(amapKey)}&plugin=AMap.Scale,AMap.ToolBar,AMap.HeatMap`;
+      script.async = true;
+      document.head.appendChild(script);
+    }
+
+    return () => {
+      script.removeEventListener("load", handleLoad);
+      script.removeEventListener("error", handleError);
+    };
+  }, [amapKey, amapSecurityCode]);
+
+  useEffect(() => {
+    if (loadState !== "loaded" || !window.AMap || !mapRef.current) return;
+    const AMap = window.AMap;
+    const center = data.dealers[0] ? [data.dealers[0].longitude, data.dealers[0].latitude] : [112.944, 27.829];
+    const map = new AMap.Map(mapRef.current, { zoom: 12, center });
+    map.addControl(new AMap.Scale());
+    map.addControl(new AMap.ToolBar());
+
+    for (const dealer of data.dealers) {
+      const marker = new AMap.Marker({
+        position: [dealer.longitude, dealer.latitude],
+        title: dealer.name,
+      });
+      marker.setMap(map);
+      const circle = new AMap.Circle({
+        center: [dealer.longitude, dealer.latitude],
+        radius: dealer.serviceRadius,
+        strokeColor: dealer.isAccepting ? "#dc2626" : "#64748b",
+        fillColor: dealer.isAccepting ? "#fecaca" : "#cbd5e1",
+        fillOpacity: 0.22,
+      });
+      circle.setMap(map);
+      marker.on("click", () => {
+        const info = new AMap.InfoWindow({
+          content: `<div style="padding:8px 6px"><strong>${escapeHtml(dealer.name)}</strong><br/>${escapeHtml(dealer.zone)}<br/>服务半径 ${dealer.serviceRadius}m</div>`,
+        });
+        info.open(map, [dealer.longitude, dealer.latitude]);
+      });
+    }
+
+    if (AMap.HeatMap && data.heatPoints.length > 0) {
+      const heatmap = new AMap.HeatMap(map, { radius: 24, opacity: [0, 0.75] });
+      heatmap.setDataSet({
+        data: data.heatPoints.map((point) => ({ lng: point.longitude, lat: point.latitude, count: Math.max(1, point.amount / 100) })),
+        max: 20,
+      });
+    }
+
+    return () => map.destroy();
+  }, [data.dealers, data.heatPoints, loadState]);
+
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
+          <p className="text-sm text-slate-500">经销商</p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">{data.dealers.length}</p>
+        </div>
+        <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
+          <p className="text-sm text-slate-500">可接单</p>
+          <p className="mt-2 text-2xl font-bold text-emerald-700">{data.dealers.filter((dealer) => dealer.isAccepting).length}</p>
+        </div>
+        <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
+          <p className="text-sm text-slate-500">热力订单</p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">{data.heatPoints.length}</p>
+        </div>
+      </div>
+
+      <section className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
+        <div className="border-b border-slate-100 px-4 py-3">
+          <h2 className="font-semibold text-slate-900">湘潭经销商地图</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            {amapKey ? "已配置高德地图 Key，加载 JS API 2.0 展示经销商与热力订单。" : "当前未配置高德地图 Key，展示本地坐标示意图。"}
+            {amapKey && !amapSecurityCode ? " 如使用新申请 Key，请同步配置安全密钥。" : null}
+          </p>
+        </div>
+        <div className="relative h-[560px] bg-slate-100" ref={mapRef}>
+          {loadState !== "loaded" ? (
+            <div className="absolute inset-0 overflow-hidden bg-[linear-gradient(90deg,rgba(148,163,184,0.18)_1px,transparent_1px),linear-gradient(rgba(148,163,184,0.18)_1px,transparent_1px)] bg-[size:48px_48px]">
+              {loadState === "loading" ? <div className="absolute left-4 top-4 rounded-md bg-white px-3 py-2 text-sm text-slate-600 shadow-sm ring-1 ring-slate-200">正在加载高德地图...</div> : null}
+              {loadState === "error" ? <div className="absolute left-4 top-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 shadow-sm ring-1 ring-red-100">高德地图加载失败，已切换为本地坐标示意图。</div> : null}
+              {data.heatPoints.map((point) => {
+                const left = normalize(point.longitude, bounds.minLng, bounds.maxLng);
+                const top = 100 - normalize(point.latitude, bounds.minLat, bounds.maxLat);
+                return (
+                  <span
+                    className="absolute h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-400/20 blur-sm"
+                    key={point.id}
+                    style={{ left: `${left}%`, top: `${top}%` }}
+                    title={`${point.orderNo} ${formatCurrency(point.amount)}`}
+                  />
+                );
+              })}
+              {data.dealers.map((dealer) => {
+                const left = normalize(dealer.longitude, bounds.minLng, bounds.maxLng);
+                const top = 100 - normalize(dealer.latitude, bounds.minLat, bounds.maxLat);
+                return (
+                  <div className="absolute -translate-x-1/2 -translate-y-1/2" key={dealer.id} style={{ left: `${left}%`, top: `${top}%` }}>
+                    <div
+                      className={cn(
+                        "absolute left-1/2 top-1/2 -z-10 -translate-x-1/2 -translate-y-1/2 rounded-full border",
+                        dealer.isAccepting ? "border-red-300 bg-red-100/30" : "border-slate-300 bg-slate-200/40",
+                      )}
+                      style={{ width: `${Math.max(70, dealer.serviceRadius / 25)}px`, height: `${Math.max(70, dealer.serviceRadius / 25)}px` }}
+                    />
+                    <div className={cn("flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium shadow-sm", dealer.isAccepting ? "bg-red-600 text-white" : "bg-slate-600 text-white")}>
+                      <MapPinned className="h-4 w-4" />
+                      {dealer.name}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+        </div>
+      </section>
+    </div>
+  );
+}

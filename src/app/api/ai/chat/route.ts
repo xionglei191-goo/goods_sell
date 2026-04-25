@@ -1,0 +1,50 @@
+import { NextRequest } from "next/server";
+
+import { answerCustomerQuestion, getChatCustomerId } from "@/features/ai/chat-service";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+function encoderPayload(event: string, data: unknown) {
+  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
+export async function POST(request: NextRequest) {
+  const customerId = await getChatCustomerId();
+  if (!customerId) {
+    return Response.json({ error: "请先登录后再使用 AI 客服" }, { status: 401 });
+  }
+
+  const body = (await request.json().catch(() => null)) as { message?: string } | null;
+  const message = body?.message?.trim();
+  if (!message) {
+    return Response.json({ error: "请输入问题" }, { status: 400 });
+  }
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      const encoder = new TextEncoder();
+      try {
+        const answer = await answerCustomerQuestion(customerId, message);
+        const chars = Array.from(answer);
+        for (const char of chars) {
+          controller.enqueue(encoder.encode(encoderPayload("delta", { text: char })));
+          await new Promise((resolve) => setTimeout(resolve, 12));
+        }
+        controller.enqueue(encoder.encode(encoderPayload("done", { ok: true })));
+      } catch {
+        controller.enqueue(encoder.encode(encoderPayload("error", { message: "小启暂时开小差了，请稍后再试或联系人工客服。" })));
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      "Connection": "keep-alive",
+    },
+  });
+}

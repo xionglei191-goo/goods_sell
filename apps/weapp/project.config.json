@@ -1,0 +1,12 @@
+{
+  "appid": "touristappid",
+  "projectname": "huaqi-mall-weapp",
+  "miniprogramRoot": "dist/",
+  "compileType": "miniprogram",
+  "setting": {
+    "es6": true,
+    "postcss": true,
+    "minified": true,
+    "urlCheck": false
+  }
+}
