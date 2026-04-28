@@ -1,5 +1,3 @@
-import https from "node:https";
-
 type AnthropicMessage = {
   role: "user" | "assistant";
   content: string;
@@ -12,59 +10,55 @@ type ProviderOptions = {
 };
 
 function getAiConfig() {
+  const timeoutMs = Number(process.env.AI_TIMEOUT_MS ?? 60_000);
   return {
     baseUrl: process.env.AI_BASE_URL || process.env.DASHSCOPE_BASE_URL || "",
     apiKey: process.env.AI_API_KEY || process.env.DASHSCOPE_API_KEY || process.env.DEEPSEEK_API_KEY || "",
     model: process.env.AI_MODEL || "qwen3.6-plus",
+    timeoutMs: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 60_000,
   };
 }
 
-function httpsPostJson(url: URL, apiKey: string, payload: unknown): Promise<unknown> {
-  const body = JSON.stringify(payload);
-  return new Promise((resolve, reject) => {
-    const req = https.request(
-      url,
-      {
-        method: "POST",
-        rejectUnauthorized: false,
-        timeout: 20_000,
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-          "Anthropic-Version": "2023-06-01",
-          "Content-Length": Buffer.byteLength(body),
-        },
-      },
-      (res) => {
-        const chunks: Buffer[] = [];
-        res.on("data", (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
-        res.on("end", () => {
-          const text = Buffer.concat(chunks).toString("utf8");
-          if (!res.statusCode || res.statusCode >= 400) {
-            reject(new Error(`AI 接口返回 ${res.statusCode}: ${text.slice(0, 200)}`));
-            return;
-          }
-
-          try {
-            resolve(JSON.parse(text));
-          } catch (error) {
-            reject(error);
-          }
-        });
-      },
-    );
-    req.on("timeout", () => {
-      req.destroy(new Error("AI 接口超时"));
-    });
-    req.on("error", reject);
-    req.write(body);
-    req.end();
+async function postJson(url: URL, apiKey: string, payload: unknown, timeoutMs: number): Promise<unknown> {
+  const response = await fetch(url, {
+    method: "POST",
+    signal: AbortSignal.timeout(timeoutMs),
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "Anthropic-Version": "2023-06-01",
+    },
+    body: JSON.stringify(payload),
   });
+  const text = await response.text();
+
+  if (!response.ok) {
+    throw new Error(`AI 接口返回 ${response.status}: ${text.slice(0, 200)}`);
+  }
+
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    throw new Error(`AI 接口返回了非 JSON 内容: ${text.slice(0, 120)}`);
+  }
 }
 
 function extractText(response: unknown) {
-  const content = (response as { content?: Array<{ type?: string; text?: string }> }).content;
-  if (!Array.isArray(content)) return "";
+  const data = response as {
+    content?: string | Array<{ type?: string; text?: string }>;
+    choices?: Array<{ message?: { content?: string }; text?: string }>;
+  };
+
+  if (typeof data.content === "string") {
+    return data.content.trim();
+  }
+
+  const content = data.content;
+  if (!Array.isArray(content)) {
+    const choiceText = data.choices?.[0]?.message?.content ?? data.choices?.[0]?.text ?? "";
+    return choiceText.trim();
+  }
+
   return content
     .filter((part) => part.type === "text" && part.text)
     .map((part) => part.text)
@@ -84,8 +78,9 @@ export async function callAnthropicCompatible(options: ProviderOptions) {
     max_tokens: options.maxTokens ?? 1024,
     system: options.system,
     messages: options.messages,
+    thinking: { type: "disabled" },
   };
-  const response = await httpsPostJson(url, config.apiKey, payload);
+  const response = await postJson(url, config.apiKey, payload, config.timeoutMs);
   const text = extractText(response);
   if (!text) {
     throw new Error("AI 接口未返回文本内容");
