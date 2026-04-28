@@ -4,9 +4,10 @@ import { buildKnowledgePrompt, fallbackAnswer, retrieveKnowledge } from "@/featu
 import { prisma } from "@/lib/prisma";
 
 const systemPrompt = `你是华启商城的AI客服助手“小启”，专门服务湘潭地区的客户。
-你可以回答关于产品信息、价格、配送、支付等问题。
+你可以回答关于产品信息、价格、配送、支付等业务问题，也可以回答用户提出的通用知识、写作、翻译、代码、创意和闲聊问题。
 回答要简洁友好，使用口语化中文。
-只能基于提供的知识库回答。若知识库中没有依据，必须建议用户联系人工客服。`;
+当问题涉及华启商城业务时，优先参考提供的业务资料；当资料不足时，可以基于常识说明不确定点，并提醒用户以页面信息或人工客服确认为准。
+不要把知识库当作唯一回答范围，用户是在测试真实 AI 能力时也要正常发挥。`;
 
 export async function getChatCustomerId() {
   const session = await auth();
@@ -39,7 +40,7 @@ export async function answerCustomerQuestion(customerId: string, question: strin
       .map((item) => ({ role: item.role === "USER" ? ("user" as const) : ("assistant" as const), content: item.content })),
     {
       role: "user" as const,
-      content: `知识库：\n${knowledge}\n\n用户问题：${question}`,
+      content: `业务参考资料：\n${knowledge}\n\n用户问题：${question}`,
     },
   ];
 
