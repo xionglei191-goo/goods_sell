@@ -3,9 +3,10 @@ set -Eeuo pipefail
 
 DEPLOY_HOST="${DEPLOY_HOST:-103.229.126.92}"
 DEPLOY_USER="${DEPLOY_USER:-root}"
-DEPLOY_PATH="${DEPLOY_PATH:-/var/www/huaqi-mall}"
+DEPLOY_PATH="${DEPLOY_PATH:-/data/goods_sell}"
 DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
-PM2_APP="${PM2_APP:-huaqi-mall}"
+PM2_APP="${PM2_APP:-goods_sell}"
+DEPLOY_MODE="${DEPLOY_MODE:-archive}"
 RUN_LOCAL_CHECKS="${RUN_LOCAL_CHECKS:-1}"
 RUN_MIGRATIONS="${RUN_MIGRATIONS:-1}"
 RUN_SEED="${RUN_SEED:-0}"
@@ -22,9 +23,10 @@ Usage:
 Environment overrides:
   DEPLOY_HOST=103.229.126.92
   DEPLOY_USER=root
-  DEPLOY_PATH=/var/www/huaqi-mall
+  DEPLOY_PATH=/data/goods_sell
   DEPLOY_BRANCH=main
-  PM2_APP=huaqi-mall
+  PM2_APP=goods_sell
+  DEPLOY_MODE=archive   # archive for this VPS; git for git-backed deploy dirs
   RUN_LOCAL_CHECKS=1     # run lint, tsc, build locally before deploying
   RUN_MIGRATIONS=1       # run prisma migrate deploy on the server
   RUN_SEED=0             # run prisma db seed on the server
@@ -32,7 +34,8 @@ Environment overrides:
 
 Examples:
   npm run deploy:vps
-  DEPLOY_PATH=/www/wwwroot/goods_sell PM2_APP=goods-sell npm run deploy:vps
+  DEPLOY_PATH=/www/wwwroot/goods_sell PM2_APP=goods_sell npm run deploy:vps
+  DEPLOY_MODE=git npm run deploy:vps
   DEPLOY_PASSWORD='...' npm run deploy:vps
 USAGE
 }
@@ -85,19 +88,21 @@ if [[ -n "$SSH_STRICT_HOST_KEY" ]]; then
 fi
 
 ssh_cmd=(ssh "${ssh_options[@]}")
+scp_cmd=(scp "${ssh_options[@]}")
 if [[ -n "${DEPLOY_PASSWORD:-}" ]]; then
   if ! command -v sshpass >/dev/null 2>&1; then
     die "DEPLOY_PASSWORD was provided, but sshpass is not installed. Install sshpass or use SSH keys."
   fi
   export SSHPASS="$DEPLOY_PASSWORD"
   ssh_cmd=(sshpass -e ssh "${ssh_options[@]}")
+  scp_cmd=(sshpass -e scp "${ssh_options[@]}")
 fi
 
 remote="${DEPLOY_USER}@${DEPLOY_HOST}"
 remote_env="DEPLOY_PATH=$(quote "$DEPLOY_PATH") DEPLOY_BRANCH=$(quote "$DEPLOY_BRANCH") PM2_APP=$(quote "$PM2_APP") RUN_MIGRATIONS=$(quote "$RUN_MIGRATIONS") RUN_SEED=$(quote "$RUN_SEED")"
 
-log "Deploying origin/$DEPLOY_BRANCH to $remote:$DEPLOY_PATH"
-"${ssh_cmd[@]}" "$remote" "$remote_env bash -s" <<'REMOTE_SCRIPT'
+deploy_remote() {
+  "${ssh_cmd[@]}" "$remote" "$remote_env RELEASE_ARCHIVE=${1:+$(quote "$1")} bash -s" <<'REMOTE_SCRIPT'
 set -Eeuo pipefail
 
 log() {
@@ -115,17 +120,24 @@ fi
 
 cd "$DEPLOY_PATH"
 
-if [[ ! -d .git ]]; then
-  die "$DEPLOY_PATH is not a git repository"
+if [[ -n "${RELEASE_ARCHIVE:-}" ]]; then
+  if [[ ! -f "$RELEASE_ARCHIVE" ]]; then
+    die "release archive does not exist on server: $RELEASE_ARCHIVE"
+  fi
+  log "Extracting release archive"
+  tar -xzf "$RELEASE_ARCHIVE" -C "$DEPLOY_PATH"
+else
+  if [[ ! -d .git ]]; then
+    die "$DEPLOY_PATH is not a git repository. Use DEPLOY_MODE=archive for this server."
+  fi
+  log "Pulling latest code"
+  git fetch origin "$DEPLOY_BRANCH"
+  current_branch="$(git rev-parse --abbrev-ref HEAD)"
+  if [[ "$current_branch" != "$DEPLOY_BRANCH" ]]; then
+    git checkout "$DEPLOY_BRANCH"
+  fi
+  git pull --ff-only origin "$DEPLOY_BRANCH"
 fi
-
-log "Pulling latest code"
-git fetch origin "$DEPLOY_BRANCH"
-current_branch="$(git rev-parse --abbrev-ref HEAD)"
-if [[ "$current_branch" != "$DEPLOY_BRANCH" ]]; then
-  git checkout "$DEPLOY_BRANCH"
-fi
-git pull --ff-only origin "$DEPLOY_BRANCH"
 
 log "Installing dependencies"
 if [[ -f package-lock.json ]]; then
@@ -161,5 +173,28 @@ fi
 pm2 save
 pm2 list
 REMOTE_SCRIPT
+}
+
+case "$DEPLOY_MODE" in
+  archive)
+    release_name="goods_sell-${local_head:0:7}.tar.gz"
+    local_release="${TMPDIR:-/tmp}/$release_name"
+    remote_release="/tmp/$release_name"
+    log "Creating release archive: $local_release"
+    git archive --format=tar.gz -o "$local_release" HEAD
+    log "Uploading release archive to $remote:$remote_release"
+    "${scp_cmd[@]}" "$local_release" "$remote:$remote_release"
+    log "Deploying archive to $remote:$DEPLOY_PATH"
+    deploy_remote "$remote_release"
+    rm -f "$local_release"
+    ;;
+  git)
+    log "Deploying origin/$DEPLOY_BRANCH to $remote:$DEPLOY_PATH"
+    deploy_remote ""
+    ;;
+  *)
+    die "unsupported DEPLOY_MODE: $DEPLOY_MODE"
+    ;;
+esac
 
 log "Deployment finished"
