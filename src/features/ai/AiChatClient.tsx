@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Bot, Gift, PartyPopper, Send, Store, UserRound } from "lucide-react";
+import { ArrowRight, Bot, Gift, PartyPopper, Send, Sparkles, Store, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 
@@ -23,7 +23,35 @@ const quickQuestions = [
   { label: "宴席预算", value: "20桌婚宴，预算每桌600元，想配白酒、啤酒和饮料，怎么安排？", icon: PartyPopper },
   { label: "团购送礼", value: "公司端午礼盒100份，每份预算200元，需要开票，有什么组合建议？", icon: Gift },
   { label: "门店补货", value: "我是烟酒店，每周补货，想配白酒、啤酒、饮料，重视周转和利润，怎么选？", icon: Store },
+  { label: "新品试饮", value: "我想参加新品试饮，平时喜欢低度、果味或清爽口感，适合哪些新品？", icon: Sparkles },
   { label: "配送多久", value: "湘潭配送多久？", icon: Send },
+];
+
+const scenePrompts = [
+  {
+    title: "宴席配酒",
+    description: "桌数、预算、白酒/啤酒/饮料搭配",
+    value: "我要办20桌婚宴，每桌预算600元，想配白酒、啤酒和饮料，请帮我先整理询价需求。",
+    icon: PartyPopper,
+  },
+  {
+    title: "企业团购/送礼",
+    description: "份数、预算、包装、开票与配送批次",
+    value: "公司要做端午员工福利礼盒100份，每份预算200元，需要开票和统一配送，请给我组合建议。",
+    icon: Gift,
+  },
+  {
+    title: "门店补货",
+    description: "门店类型、畅销品类、周转和利润",
+    value: "我是烟酒店，每周补货，想配高周转常备款和利润款，也想试一点新品，请帮我做补货建议。",
+    icon: Store,
+  },
+  {
+    title: "新品试饮",
+    description: "口味偏好、试饮场景、后续新品推送",
+    value: "我想参加新品试饮，喜欢低度、果味或清爽口感，主要用于朋友聚餐，请帮我登记试饮偏好。",
+    icon: Sparkles,
+  },
 ];
 
 function parseSseChunk(buffer: string) {
@@ -98,8 +126,8 @@ export function AiChatClient({ initialMessages }: AiChatClientProps) {
   return (
     <div className="mx-auto flex min-h-[calc(100vh-10rem)] max-w-3xl flex-col rounded-lg bg-white shadow-sm ring-1 ring-stone-200">
       <div className="border-b border-stone-100 px-4 py-3">
-        <h1 className="text-xl font-bold text-stone-950">AI 客服小启</h1>
-        <p className="mt-1 text-sm text-stone-500">产品、价格、配送、支付问题都可以问我</p>
+        <h1 className="text-xl font-bold text-stone-950">AI 选品与询价助手</h1>
+        <p className="mt-1 text-sm text-stone-500">宴席配酒、企业团购、门店补货、新品试饮先由小启梳理需求</p>
       </div>
 
       <div className="px-4 pt-4">
@@ -108,7 +136,36 @@ export function AiChatClient({ initialMessages }: AiChatClientProps) {
 
       <div className="flex-1 space-y-4 overflow-y-auto px-4 py-5">
         {messages.length === 0 ? (
-          <div className="rounded-lg bg-stone-50 px-4 py-8 text-center text-sm text-stone-500">欢迎来到华启商城，我是小启。</div>
+          <div className="rounded-lg bg-stone-50 p-4">
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-100 text-[#dc2626]">
+                <Bot className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="font-semibold text-stone-950">小启会先把需求整理成线索或询价草稿</p>
+                <p className="mt-1 text-sm leading-6 text-stone-500">选择一个场景开始，也可以直接输入产品、价格、配送或支付问题。</p>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {scenePrompts.map((scene) => {
+                const Icon = scene.icon;
+                return (
+                  <button
+                    className="group rounded-lg bg-white p-3 text-left shadow-sm ring-1 ring-stone-200 transition hover:-translate-y-0.5 hover:ring-red-200"
+                    key={scene.title}
+                    onClick={() => send(scene.value)}
+                    type="button"
+                  >
+                    <span className="flex items-center gap-2 text-sm font-semibold text-stone-950">
+                      <Icon className="h-4 w-4 text-[#dc2626]" />
+                      {scene.title}
+                    </span>
+                    <span className="mt-2 block text-xs leading-5 text-stone-500">{scene.description}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         ) : null}
         {messages.map((message) => {
           const isUser = message.role === "USER";

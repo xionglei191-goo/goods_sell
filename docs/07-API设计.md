@@ -101,6 +101,7 @@ sendMessage(message: string): Promise<AIChatResponse>
 getChatHistory(customerId: string): Promise<ChatMessage[]>
 getUserProfile(customerId: string): Promise<UserProfile>
 getPersonalRecommendations(customerId: string): Promise<Product[]>
+extractChannelIntent(message: string): ChannelAiSuggestion | null // 内部识别宴席、团购/送礼、门店补货、新品试饮
 createScenarioInquiry(scene: ScenarioType, data: ScenarioInquiryInput): Promise<Inquiry>
 ```
 

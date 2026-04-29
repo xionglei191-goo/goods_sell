@@ -2,7 +2,7 @@ import type { LeadScene } from "@prisma/client";
 
 import type { KnowledgeHit } from "@/features/ai/knowledge";
 
-export type ChannelScenario = Extract<LeadScene, "BANQUET" | "GROUP_BUY" | "RESTOCK">;
+export type ChannelScenario = Extract<LeadScene, "BANQUET" | "GROUP_BUY" | "RESTOCK" | "NEW_PRODUCT_TRIAL">;
 
 export type ChannelExtraction = {
   scenario: ChannelScenario;
@@ -20,6 +20,8 @@ export type ChannelExtraction = {
   packageNeed?: string;
   cycle?: string;
   priceSensitivity?: string;
+  flavorPreference?: string;
+  trialScene?: string;
   raw: string;
 };
 
@@ -48,10 +50,17 @@ const scenarioConfig: Record<ChannelScenario, { title: string; href: string; req
     href: "/shop/scenes/restock",
     required: ["门店类型", "补货品类", "补货周期", "联系人"],
   },
+  NEW_PRODUCT_TRIAL: {
+    title: "新品试饮登记",
+    href: "/shop/fun",
+    required: ["口味偏好", "试饮场景", "联系人"],
+  },
 };
 
 const commonProducts = ["白酒", "啤酒", "红酒", "饮料", "可乐", "雪碧", "王老吉", "矿泉水", "果汁", "休闲食品"];
 const commonBrands = ["茅台", "五粮液", "泸州", "汾酒", "洋河", "青岛", "雪花", "百威", "可口可乐", "农夫山泉", "王老吉"];
+const flavorPreferences = ["酱香", "浓香", "清香", "低度", "果味", "清爽", "无糖", "微醺", "口感柔和", "不辣喉"];
+const trialScenes = ["家宴", "朋友聚餐", "门店试饮", "餐饮门店", "烟酒店", "宴席", "团购", "员工福利", "新品试饮"];
 
 function numberAfter(pattern: RegExp, input: string) {
   const match = input.match(pattern);
@@ -89,6 +98,7 @@ function detectScenario(input: string): ChannelScenario | null {
   if (/宴席|婚宴|寿宴|升学宴|乔迁宴|满月酒|桌|酒席|喜酒/.test(input)) return "BANQUET";
   if (/团购|福利|节礼|送礼|礼盒|企业|公司|单位|商务|开票|对公|员工/.test(input)) return "GROUP_BUY";
   if (/补货|门店|烟酒店|餐饮店|小超市|便利店|批发|周转|利润|进货/.test(input)) return "RESTOCK";
+  if (/新品|试饮|试喝|尝鲜|体验装|新口味|测评|资格|低度|果味/.test(input)) return "NEW_PRODUCT_TRIAL";
   return null;
 }
 
@@ -109,6 +119,8 @@ export function extractChannelIntent(input: string, hits: KnowledgeHit[]): Chann
   const priceSensitivity = pickFirst(input, ["利润", "周转", "品牌", "便宜", "性价比", "高端", "实惠"]);
   const deliveryDate = input.match(/(今天|明天|后天|周[一二三四五六日天]|端午|中秋|春节|国庆|\d{1,2}月\d{1,2}日)/)?.[1];
   const purpose = pickFirst(input, ["婚宴", "寿宴", "升学宴", "乔迁宴", "员工福利", "客户礼品", "商务拜访", "节礼", "新品试饮"]);
+  const flavorPreference = pickFirst(input, flavorPreferences);
+  const trialScene = pickFirst(input, trialScenes) ?? (scenario === "NEW_PRODUCT_TRIAL" ? purpose : undefined);
 
   return {
     scenario,
@@ -126,6 +138,8 @@ export function extractChannelIntent(input: string, hits: KnowledgeHit[]): Chann
     packageNeed,
     cycle,
     priceSensitivity,
+    flavorPreference,
+    trialScene,
     raw: input,
   };
 }
@@ -144,6 +158,8 @@ function extractionLines(extraction: ChannelExtraction) {
     extraction.packageNeed ? `包装：${extraction.packageNeed}` : "",
     extraction.cycle ? `补货周期：${extraction.cycle}` : "",
     extraction.priceSensitivity ? `价格偏好：${extraction.priceSensitivity}` : "",
+    extraction.flavorPreference ? `口味偏好：${extraction.flavorPreference}` : "",
+    extraction.trialScene ? `试饮场景：${extraction.trialScene}` : "",
     extraction.deliveryDate ? `期望时间：${extraction.deliveryDate}` : "",
     extraction.invoiceRequired ? "需要开票：是" : "",
   ].filter(Boolean);
@@ -177,7 +193,11 @@ export function buildChannelFallbackAnswer(extraction: ChannelExtraction, hits: 
     return `${known}\n团购送礼建议先确定每份预算、份数、包装和开票抬头，再做 2-3 档组合。${productText}\n还需要确认收货批次、是否分地址配送、包装标准和发票类型。提交询价后会统一报价。`;
   }
 
-  return `${known}\n门店补货建议按“高周转常备 + 利润款 + 新品试饮”来配，既保动销也方便试新品。${productText}\n还需要确认门店类型、补货周期、主销价位和是否有指定品牌。提交补货询价后可由业务员或经销商给组合。`;
+  if (extraction.scenario === "RESTOCK") {
+    return `${known}\n门店补货建议按“高周转常备 + 利润款 + 新品试饮”来配，既保动销也方便试新品。${productText}\n还需要确认门店类型、补货周期、主销价位和是否有指定品牌。提交补货询价后可由业务员或经销商给组合。`;
+  }
+
+  return `${known}\n新品试饮建议先记录口味偏好、试饮场景和大致位置，再匹配适合的低度、清爽或节礼新品。${productText}\n还需要补充试饮人数、联系方式和是否接受新品推送。登记后会进入新品推送池，由业务员按库存和活动名额联系。`;
 }
 
 function addParam(params: URLSearchParams, key: string, value: string | number | boolean | undefined) {
@@ -213,6 +233,12 @@ function buildHref(extraction: ChannelExtraction) {
     addParam(params, "priceSensitivity", extraction.priceSensitivity);
   }
 
+  if (extraction.scenario === "NEW_PRODUCT_TRIAL") {
+    addParam(params, "scenario", "new-product-trial");
+    addParam(params, "flavor", extraction.flavorPreference);
+    addParam(params, "trialScene", extraction.trialScene);
+  }
+
   const query = params.toString();
   return query ? `${config.href}?${query}` : config.href;
 }
@@ -229,6 +255,8 @@ function buildMissingFields(extraction: ChannelExtraction) {
   if (extraction.storeType) missing.delete("门店类型");
   if (extraction.productNeeds.length) missing.delete("补货品类");
   if (extraction.cycle) missing.delete("补货周期");
+  if (extraction.flavorPreference || extraction.productNeeds.length || extraction.brandPreferences.length) missing.delete("口味偏好");
+  if (extraction.trialScene || extraction.purpose) missing.delete("试饮场景");
   return Array.from(missing);
 }
 
