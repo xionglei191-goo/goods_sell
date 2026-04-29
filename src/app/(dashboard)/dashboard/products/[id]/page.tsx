@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { formatCurrency, getProductDetail } from "@/features/products/queries";
+import { ProductArt } from "@/features/shop/ProductArt";
 
 export const dynamic = "force-dynamic";
 
@@ -39,9 +40,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
       </div>
 
       <section className="grid gap-6 lg:grid-cols-[280px_1fr]">
-        <div className="flex aspect-square items-center justify-center rounded-lg bg-white text-sm text-slate-400 shadow-sm ring-1 ring-slate-200">
-          暂无图片
-        </div>
+        <ProductArt categoryName={product.category} className="rounded-lg shadow-sm ring-1 ring-slate-200" imageUrl={product.imageUrl} name={product.name} />
         <div className="grid gap-4 rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:grid-cols-2">
           <Info label="分类" value={product.category} />
           <Info label="品牌" value={product.brand} />

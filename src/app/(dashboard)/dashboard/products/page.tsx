@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ProductFilters } from "@/features/products/ProductFilters";
 import { ProductRowActions } from "@/features/products/ProductRowActions";
 import { formatCurrency, getBrands, getCategories, getProducts } from "@/features/products/queries";
+import { ProductArt } from "@/features/shop/ProductArt";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -90,7 +91,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                 <tr className="border-t border-slate-100 hover:bg-slate-50" key={product.id}>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-md bg-slate-100 text-xs text-slate-400">暂无图片</div>
+                      <ProductArt categoryName={product.category} className="h-12 w-12 rounded-md" imageUrl={product.imageUrl} name={product.name} />
                       <div>
                         <p className="font-medium text-slate-900">{product.name}</p>
                         <p className="mt-1 text-xs text-slate-500">大单阈值：{product.bulkThreshold}</p>

@@ -41,6 +41,7 @@ export const dashboardNavItems: DashboardNavItem[] = [
     icon: Package,
     children: [
       { title: "产品列表", href: "/dashboard/products" },
+      { title: "图片素材", href: "/dashboard/products/materials" },
       { title: "分类管理", href: "/dashboard/products/categories" },
       { title: "品牌管理", href: "/dashboard/products/brands" },
     ],
@@ -150,6 +151,7 @@ export const breadcrumbLabels: Record<string, string> = {
   dashboard: "仪表盘",
   pending: "待处理事项",
   products: "产品管理",
+  materials: "图片素材",
   categories: "分类管理",
   brands: "品牌管理",
   inventory: "库存管理",

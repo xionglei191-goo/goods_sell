@@ -140,35 +140,36 @@ model Brand {
 }
 
 model Product {
-  id              String           @id @default(cuid())
-  sku             String           @unique
-  barcode         String?          @unique
+  id              String                 @id @default(cuid())
+  sku             String                 @unique
+  barcode         String?                @unique
   name            String
   categoryId      String
-  category        Category         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  category        Category               @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   brandId         String
-  brand           Brand            @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  brand           Brand                  @relation(fields: [brandId], references: [id], onDelete: Restrict)
   unit            String
   spec            String?
-  costPrice       Decimal          @db.Decimal(12, 2)
-  wholesalePrice  Decimal          @db.Decimal(12, 2)
-  retailPrice     Decimal          @db.Decimal(12, 2)
-  memberPrice     Decimal?         @db.Decimal(12, 2)
-  stock           Int              @default(0)
-  safeStock       Int              @default(0)
-  bulkThreshold   Int              @default(10)
+  costPrice       Decimal                @db.Decimal(12, 2)
+  wholesalePrice  Decimal                @db.Decimal(12, 2)
+  retailPrice     Decimal                @db.Decimal(12, 2)
+  memberPrice     Decimal?               @db.Decimal(12, 2)
+  stock           Int                    @default(0)
+  safeStock       Int                    @default(0)
+  bulkThreshold   Int                    @default(10)
   description     String?
-  status          ProductStatus    @default(ACTIVE)
-  salesCount      Int              @default(0)
+  status          ProductStatus          @default(ACTIVE)
+  salesCount      Int                    @default(0)
   images          ProductImage[]
+  imageMaterials  ProductImageMaterial[]
   orderItems      OrderItem[]
   stockRecords    StockRecord[]
   cartItems       CartItem[]
   purchaseItems   PurchaseItem[]
   dealerStocks    DealerStock[]
   stockCheckItems StockCheckItem[]
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
 
   @@index([categoryId])
   @@index([brandId])
@@ -190,6 +191,38 @@ model ProductImage {
   updatedAt DateTime @updatedAt
 
   @@index([productId])
+}
+
+model ProductImageMaterial {
+  id                    String                       @id @default(cuid())
+  productId             String
+  product               Product                      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  imageUrl              String
+  localUrl              String?
+  productImageId        String?
+  sourcePage            String?
+  sourceName            String?
+  licenseStatus         ImageMaterialLicenseStatus   @default(PENDING)
+  reviewStatus          ImageMaterialReviewStatus    @default(PENDING)
+  storageProvider       ImageMaterialStorageProvider @default(LOCAL)
+  contentType           String?
+  fileSize              Int?
+  width                 Int?
+  height                Int?
+  imageHash             String?
+  duplicateOfMaterialId String?
+  authAttachmentUrl     String?
+  notes                 String?
+  approvedAt            DateTime?
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
+
+  @@index([productId])
+  @@index([licenseStatus])
+  @@index([reviewStatus])
+  @@index([storageProvider])
+  @@index([imageHash])
+  @@index([createdAt])
 }
 
 model Order {
@@ -725,6 +758,30 @@ enum ProductStatus {
   ACTIVE
   INACTIVE
   OUT_OF_STOCK
+}
+
+enum ImageMaterialLicenseStatus {
+  PENDING
+  AUTHORIZED
+  BRAND_PROVIDED
+  SUPPLIER_PROVIDED
+  OWNED
+  PUBLIC_DOMAIN
+  CC
+  INTERNAL_DEMO_APPROVED
+}
+
+enum ImageMaterialReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ImageMaterialStorageProvider {
+  LOCAL
+  CLOUDFLARE_R2
+  ALIYUN_OSS
+  REMOTE_URL
 }
 
 enum OrderType {
