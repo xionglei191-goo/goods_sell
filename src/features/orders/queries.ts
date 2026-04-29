@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import type { OrderStatus, OrderType, Prisma } from "@prisma/client";
 
+import { getSessionUser } from "@/features/auth/guards";
 import type { ManualOrderOptions, OrderDetailData, OrderListData } from "@/features/orders/types";
 import {
   firstParam,
@@ -23,6 +24,7 @@ function normalizeType(value: string): OrderType | undefined {
 }
 
 export async function getOrderList(searchParams: SearchParams): Promise<OrderListData> {
+  const user = await getSessionUser();
   const filters = {
     status: firstParam(searchParams.status),
     type: firstParam(searchParams.type),
@@ -38,7 +40,7 @@ export async function getOrderList(searchParams: SearchParams): Promise<OrderLis
   const endDate = parseDate(filters.endDate, true);
   const minAmount = parseAmount(filters.minAmount);
   const maxAmount = parseAmount(filters.maxAmount);
-  const where: Prisma.OrderWhereInput = {
+  const filterWhere: Prisma.OrderWhereInput = {
     parentId: null,
     ...(status ? { status } : {}),
     ...(type ? { type } : {}),
@@ -61,6 +63,11 @@ export async function getOrderList(searchParams: SearchParams): Promise<OrderLis
           },
         }
       : {}),
+  };
+  const scopeWhere: Prisma.OrderWhereInput =
+    user?.role === "SALESPERSON" ? { OR: [{ salesPersonId: user.id }, { customer: { salesPersonId: user.id } }] } : {};
+  const where: Prisma.OrderWhereInput = {
+    AND: [filterWhere, scopeWhere].filter((item) => Object.keys(item).length > 0),
   };
 
   const [orders, total] = await Promise.all([
@@ -95,8 +102,11 @@ export async function getOrderList(searchParams: SearchParams): Promise<OrderLis
 }
 
 export async function getOrderDetail(id: string): Promise<OrderDetailData> {
-  const order = await prisma.order.findUnique({
-    where: { id },
+  const user = await getSessionUser();
+  const scopeWhere: Prisma.OrderWhereInput =
+    user?.role === "SALESPERSON" ? { OR: [{ salesPersonId: user.id }, { customer: { salesPersonId: user.id } }] } : {};
+  const order = await prisma.order.findFirst({
+    where: { id, ...scopeWhere },
     include: {
       customer: { select: { id: true, name: true, phone: true, type: true } },
       address: true,
@@ -195,9 +205,10 @@ export async function getOrderDetail(id: string): Promise<OrderDetailData> {
 }
 
 export async function getManualOrderOptions(): Promise<ManualOrderOptions> {
+  const user = await getSessionUser();
   const [customers, products] = await Promise.all([
     prisma.customer.findMany({
-      where: { isVerified: true },
+      where: { isVerified: true, ...(user?.role === "SALESPERSON" ? { salesPersonId: user.id } : {}) },
       include: {
         addresses: { orderBy: [{ isDefault: "desc" }, { updatedAt: "desc" }] },
       },

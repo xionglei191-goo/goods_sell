@@ -12,7 +12,8 @@
     "images:template": "tsx scripts/product-image-materials.ts export",
     "images:import": "tsx scripts/product-image-materials.ts import",
     "test:phase5": "tsx scripts/phase5-smoke.ts",
-    "test:phase6": "tsx scripts/phase6-smoke.ts"
+    "test:phase6": "tsx scripts/phase6-smoke.ts",
+    "test:rbac": "tsx scripts/rbac-smoke.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",

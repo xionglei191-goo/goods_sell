@@ -411,3 +411,27 @@
 | 税控电子发票接口 | 待定 | Phase 6 | 航信/百旺税控平台对接，未配置时 Mock 模式 |
 | 酒类经营资质 | 待定 | 上线 | 线上销售酒类需许可证 |
 | 产品图片素材 | 已完成 | 全阶段 | 已接入 `/dashboard/products/materials` 后台增强版素材管理，支持授权记录、CSV 预检导入、批量审核、重复检测、图片元数据和 R2/OSS 存储切换 |
+
+---
+
+## Phase 10：权限与角色化体验（2026-04-29）
+
+### 10.1 文档与权限规划
+- [x] 更新 `docs/02-需求分析.md`：补充注册后角色体验、权限矩阵、经销商待审核和越权体验。
+- [x] 更新 `docs/04-数据库设计.md`：明确复用 `Customer.isVerified`、`Lead.DEALER_JOIN` 和 `Lead.metadata`，本轮不新增迁移。
+- [x] 更新 `docs/05-功能模块设计.md`：新增角色权限、无权限页、经销商审核和销售员数据隔离模块。
+- [x] 更新 `docs/07-API设计.md`：补充 RBAC 工具、注册返回和经销商审核 action 接口。
+- [x] 更新 `docs/09-项目计划.md`、`docs/11-产品说明书.md`、`docs/12-全功能测试方案.md`：加入 Phase 10 计划、产品说明和专项测试。
+
+### 10.2 实施清单
+- [x] 新增集中权限配置：`canAccessPath`、`filterDashboardNavItems`、`requireRole`、`requireDashboardPermission`。
+- [x] 改造 middleware：未登录跳登录，已登录越权跳 `/forbidden`。
+- [x] 改造后台侧边栏：按 ADMIN/SALESPERSON/WAREHOUSE/FINANCE 过滤菜单与子菜单。
+- [x] 改造注册页：支持消费者注册与经销商申请两种账号类型。
+- [x] 经销商申请：写入 `Customer(type=DEALER,isVerified=false)` 与 `Lead(scene=DEALER_JOIN)`。
+- [x] 经销商审核：管理员在 `/dashboard/dealers` 通过或驳回申请，通过后创建 `Dealer` 并开通登录。
+- [x] 服务端权限守卫：库存、采购、仓储、配送、财务、票据、营销、渠道、设置、日志、经销商审核等 action 统一按角色校验。
+- [x] 销售员数据隔离：客户、订单、线索、询价、报价、推广码、经销商等后台查询默认限制名下或分派数据。
+- [x] 新增 RBAC smoke 测试，覆盖路由、菜单、注册审核和权限工具。
+- [x] 运行 `npx tsc --noEmit`、`npm run lint`、`npm run build`、`npm audit --audit-level=moderate` 和 smoke 测试。
+- [ ] 提交代码并部署到 `shop.xionglei.online`。

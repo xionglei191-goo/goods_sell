@@ -3,6 +3,7 @@
 import type { ProductStatus } from "@prisma/client";
 import { revalidatePath, revalidateTag } from "next/cache";
 
+import { requireDashboardPermission } from "@/features/auth/guards";
 import { brandSchema, categorySchema, productSchema, type BrandInput, type CategoryInput, type ProductInput } from "@/features/products/schemas";
 import { SHOP_PRODUCTS_CACHE_TAG } from "@/features/shop/cache";
 import { logAction } from "@/features/logs/audit";
@@ -51,6 +52,10 @@ function revalidateProductCache() {
   revalidatePath("/shop/catalog");
 }
 
+async function requireProductWrite() {
+  await requireDashboardPermission("products:write", "无权限维护商品资料");
+}
+
 export async function createProduct(input: ProductInput): Promise<ActionResult> {
   const parsed = productSchema.safeParse(input);
   if (!parsed.success) {
@@ -58,6 +63,7 @@ export async function createProduct(input: ProductInput): Promise<ActionResult> 
   }
 
   try {
+    await requireProductWrite();
     const product = await prisma.product.create({
       data: toProductData(parsed.data),
       select: { id: true, name: true, sku: true, status: true },
@@ -78,6 +84,7 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Ac
   }
 
   try {
+    await requireProductWrite();
     const before = await prisma.product.findUnique({ where: { id }, select: { id: true, name: true, sku: true, status: true, retailPrice: true, safeStock: true } });
     const product = await prisma.product.update({
       where: { id },
@@ -96,6 +103,7 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Ac
 
 export async function deleteProduct(id: string): Promise<ActionResult> {
   try {
+    await requireProductWrite();
     const product = await prisma.product.findUnique({ where: { id }, select: { id: true, name: true, sku: true } });
     await prisma.product.delete({ where: { id } });
     await logAction({ module: "商品", action: "删除商品", targetType: "Product", targetId: id, targetName: product?.name, before: product, summary: `删除商品 ${product?.name ?? id}` });
@@ -109,6 +117,7 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
 
 export async function updateProductStatus(id: string, status: ProductStatus): Promise<ActionResult> {
   try {
+    await requireProductWrite();
     const before = await prisma.product.findUnique({ where: { id }, select: { id: true, name: true, status: true } });
     const product = await prisma.product.update({ where: { id }, data: { status }, select: { id: true, name: true, status: true } });
     await logAction({ module: "商品", action: "更新商品状态", targetType: "Product", targetId: product.id, targetName: product.name, before, after: product, summary: `${product.name} 状态更新为 ${status}` });
@@ -127,6 +136,7 @@ export async function createCategory(input: CategoryInput): Promise<ActionResult
   }
 
   try {
+    await requireProductWrite();
     await prisma.category.create({
       data: {
         name: parsed.data.name,
@@ -148,6 +158,7 @@ export async function updateCategory(id: string, input: CategoryInput): Promise<
   }
 
   try {
+    await requireProductWrite();
     await prisma.category.update({
       where: { id },
       data: {
@@ -165,6 +176,7 @@ export async function updateCategory(id: string, input: CategoryInput): Promise<
 
 export async function deleteCategory(id: string): Promise<ActionResult> {
   try {
+    await requireProductWrite();
     const [childrenCount, productCount] = await Promise.all([
       prisma.category.count({ where: { parentId: id } }),
       prisma.product.count({ where: { categoryId: id } }),
@@ -196,6 +208,7 @@ export async function createBrand(input: BrandInput): Promise<ActionResult> {
   }
 
   try {
+    await requireProductWrite();
     await prisma.brand.create({
       data: {
         name: parsed.data.name,
@@ -217,6 +230,7 @@ export async function updateBrand(id: string, input: BrandInput): Promise<Action
   }
 
   try {
+    await requireProductWrite();
     await prisma.brand.update({
       where: { id },
       data: {
@@ -234,6 +248,7 @@ export async function updateBrand(id: string, input: BrandInput): Promise<Action
 
 export async function deleteBrand(id: string): Promise<ActionResult> {
   try {
+    await requireProductWrite();
     const productCount = await prisma.product.count({ where: { brandId: id } });
     if (productCount > 0) {
       return { success: false, error: { code: "BRAND_IN_USE", message: `该品牌下有 ${productCount} 个产品，无法删除` } };

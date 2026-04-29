@@ -2,7 +2,9 @@ import { ProductStatus } from "@prisma/client";
 import { Plus } from "lucide-react";
 import Link from "next/link";
 
+import { auth } from "@/auth";
 import { Button } from "@/components/ui/button";
+import { roleHasPermission } from "@/features/auth/permissions";
 import { ProductFilters } from "@/features/products/ProductFilters";
 import { ProductRowActions } from "@/features/products/ProductRowActions";
 import { formatCurrency, getBrands, getCategories, getProducts } from "@/features/products/queries";
@@ -32,6 +34,8 @@ function firstParam(value: string | string[] | undefined) {
 }
 
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {
+  const session = await auth();
+  const canWriteProducts = roleHasPermission(session?.user.role, "products:write");
   const params = await searchParams;
   const q = firstParam(params.q) ?? "";
   const categoryId = firstParam(params.categoryId) ?? "";
@@ -61,12 +65,14 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           <h1 className="text-2xl font-semibold text-slate-900">产品管理</h1>
           <p className="mt-1 text-sm text-slate-500">维护产品资料、分类、品牌和大单分单阈值</p>
         </div>
-        <Button asChild>
-          <Link href="/dashboard/products/new">
-            <Plus className="h-4 w-4" />
-            新增产品
-          </Link>
-        </Button>
+        {canWriteProducts ? (
+          <Button asChild>
+            <Link href="/dashboard/products/new">
+              <Plus className="h-4 w-4" />
+              新增产品
+            </Link>
+          </Button>
+        ) : null}
       </div>
 
       <ProductFilters brands={brands} categories={categories} initial={{ q, categoryId, brandId, status: status ?? "" }} />
@@ -108,8 +114,8 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                       {statusLabels[product.status]}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
-                    <ProductRowActions id={product.id} status={product.status} />
+                  <td className="px-4 py-3 text-right">
+                    {canWriteProducts ? <ProductRowActions id={product.id} status={product.status} /> : <Link className="text-sm font-medium text-blue-700 hover:text-blue-900" href={`/dashboard/products/${product.id}`}>查看</Link>}
                   </td>
                 </tr>
               ))}

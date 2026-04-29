@@ -4,7 +4,7 @@ import type { ChannelConflictStatus, LeadScene, LeadSource, OrderType, Prisma } 
 import { hash } from "bcryptjs";
 import { revalidatePath } from "next/cache";
 
-import { auth } from "@/auth";
+import { getSessionUser, requireDashboardPermission } from "@/features/auth/guards";
 import {
   createChannelConflictSchema,
   createPromoterCodeSchema,
@@ -23,8 +23,6 @@ type ActionResult<T = unknown> =
   | { success: true; message?: string; data?: T }
   | { success: false; error: { code: string; message: string } };
 
-const staffRoles = new Set(["ADMIN", "SALESPERSON", "FINANCE"]);
-
 function formatDateSequence(date = new Date()) {
   const yyyy = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, "0");
@@ -37,11 +35,8 @@ function getErrorMessage(error: unknown) {
 }
 
 async function requireStaff() {
-  const session = await auth();
-  if (!session?.user.id || !session.user.role || !staffRoles.has(session.user.role)) {
-    throw new Error("无权限执行渠道经营操作");
-  }
-  return session.user.id;
+  const user = await requireDashboardPermission("channel:manage", "无权限执行渠道经营操作");
+  return user.id;
 }
 
 async function buildInquiryNo(tx: Prisma.TransactionClient) {
@@ -346,6 +341,7 @@ export async function createScenarioInquiry(input: unknown): Promise<ActionResul
 
 export async function createQuote(input: unknown): Promise<ActionResult<{ quoteNo: string; quoteId: string }>> {
   let createdById: string;
+  const currentUser = await getSessionUser();
   try {
     createdById = await requireStaff();
   } catch (error) {
@@ -361,11 +357,24 @@ export async function createQuote(input: unknown): Promise<ActionResult<{ quoteN
     const result = await prisma.$transaction(async (tx) => {
       const inquiry = await tx.inquiry.findUnique({
         where: { id: parsed.data.inquiryId },
-        select: { id: true, customerId: true, leadId: true, inquiryNo: true, contactName: true, contactPhone: true, scene: true },
+        select: {
+          id: true,
+          customerId: true,
+          leadId: true,
+          inquiryNo: true,
+          contactName: true,
+          contactPhone: true,
+          scene: true,
+          salespersonId: true,
+          customer: { select: { salesPersonId: true } },
+        },
       });
 
       if (!inquiry) {
         throw new Error("询价单不存在");
+      }
+      if (currentUser?.role === "SALESPERSON" && inquiry.salespersonId !== createdById && inquiry.customer?.salesPersonId !== createdById) {
+        throw new Error("无权限给非本人名下询价报价");
       }
 
       const quoteNo = await buildQuoteNo(tx);
@@ -415,6 +424,7 @@ export async function createQuote(input: unknown): Promise<ActionResult<{ quoteN
 
 export async function convertQuoteToOrder(input: unknown): Promise<ActionResult<{ orderId: string; orderNo: string }>> {
   let operatorId: string;
+  const currentUser = await getSessionUser();
   try {
     operatorId = await requireStaff();
   } catch (error) {
@@ -431,6 +441,7 @@ export async function convertQuoteToOrder(input: unknown): Promise<ActionResult<
       const quote = await tx.quote.findUnique({
         where: { id: parsed.data.quoteId },
         include: {
+          customer: { select: { salesPersonId: true } },
           inquiry: {
             select: {
               id: true,
@@ -444,6 +455,8 @@ export async function convertQuoteToOrder(input: unknown): Promise<ActionResult<
               deliveryAddress: true,
               content: true,
               notes: true,
+              salespersonId: true,
+              customer: { select: { salesPersonId: true } },
             },
           },
         },
@@ -451,6 +464,15 @@ export async function convertQuoteToOrder(input: unknown): Promise<ActionResult<
 
       if (!quote) {
         throw new Error("报价单不存在");
+      }
+      if (
+        currentUser?.role === "SALESPERSON" &&
+        quote.createdById !== operatorId &&
+        quote.inquiry.salespersonId !== operatorId &&
+        quote.customer?.salesPersonId !== operatorId &&
+        quote.inquiry.customer?.salesPersonId !== operatorId
+      ) {
+        throw new Error("无权限转换非本人名下报价");
       }
       if (quote.convertedOrderId || quote.status === "CONVERTED") {
         throw new Error("该报价单已转订单");
@@ -618,6 +640,7 @@ export async function convertQuoteToOrder(input: unknown): Promise<ActionResult<
 }
 
 export async function createPromoterCode(input: unknown): Promise<ActionResult<{ id: string; code: string }>> {
+  const currentUser = await getSessionUser();
   try {
     await requireStaff();
   } catch (error) {
@@ -627,6 +650,9 @@ export async function createPromoterCode(input: unknown): Promise<ActionResult<{
   const parsed = createPromoterCodeSchema.safeParse(input);
   if (!parsed.success) {
     return { success: false, error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0]?.message ?? "推广码信息不完整" } };
+  }
+  if (currentUser?.role === "SALESPERSON" && (parsed.data.ownerType !== "SALESPERSON" || parsed.data.salespersonId !== currentUser.id)) {
+    return { success: false, error: { code: "UNAUTHORIZED", message: "销售员只能创建自己的推广码" } };
   }
 
   try {
@@ -653,6 +679,7 @@ export async function createPromoterCode(input: unknown): Promise<ActionResult<{
 }
 
 export async function updateDealerPolicy(input: unknown): Promise<ActionResult> {
+  const currentUser = await getSessionUser();
   try {
     await requireStaff();
   } catch (error) {
@@ -665,6 +692,16 @@ export async function updateDealerPolicy(input: unknown): Promise<ActionResult> 
   }
 
   try {
+    if (currentUser?.role === "SALESPERSON") {
+      const dealer = await prisma.dealer.findFirst({
+        where: { id: parsed.data.dealerId, customer: { salesPersonId: currentUser.id } },
+        select: { id: true },
+      });
+      if (!dealer) {
+        throw new Error("无权限维护非本人名下经销商政策");
+      }
+    }
+
     await prisma.dealerPolicy.upsert({
       where: { dealerId: parsed.data.dealerId },
       update: {
@@ -702,6 +739,7 @@ export async function updateDealerPolicy(input: unknown): Promise<ActionResult> 
 
 export async function createChannelConflict(input: unknown): Promise<ActionResult<{ id: string }>> {
   let operatorId: string;
+  const currentUser = await getSessionUser();
   try {
     operatorId = await requireStaff();
   } catch (error) {
@@ -714,6 +752,9 @@ export async function createChannelConflict(input: unknown): Promise<ActionResul
   }
 
   try {
+    if (currentUser?.role === "SALESPERSON" && parsed.data.ownerId && parsed.data.ownerId !== currentUser.id) {
+      throw new Error("销售员只能创建分派给自己的渠道冲突");
+    }
     const detailText = parsed.data.detail?.trim() || null;
     const created = await prisma.channelConflict.create({
       data: {
@@ -759,6 +800,7 @@ export async function createChannelConflict(input: unknown): Promise<ActionResul
 
 export async function updateChannelConflict(input: unknown): Promise<ActionResult> {
   let operatorId: string;
+  const currentUser = await getSessionUser();
   try {
     operatorId = await requireStaff();
   } catch (error) {
@@ -773,10 +815,26 @@ export async function updateChannelConflict(input: unknown): Promise<ActionResul
   try {
     const before = await prisma.channelConflict.findUnique({
       where: { id: parsed.data.conflictId },
-      select: { id: true, summary: true, status: true, ownerId: true, detail: true },
+      select: {
+        id: true,
+        summary: true,
+        status: true,
+        ownerId: true,
+        detail: true,
+        customer: { select: { salesPersonId: true } },
+        dealer: { select: { customer: { select: { salesPersonId: true } } } },
+      },
     });
     if (!before) {
       throw new Error("渠道冲突记录不存在");
+    }
+    if (
+      currentUser?.role === "SALESPERSON" &&
+      before.ownerId !== operatorId &&
+      before.customer?.salesPersonId !== operatorId &&
+      before.dealer?.customer.salesPersonId !== operatorId
+    ) {
+      throw new Error("无权限处理非本人相关渠道冲突");
     }
 
     const status = parsed.data.status as ChannelConflictStatus;

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { dealerPriceLevelLabels } from "@/features/channel/labels";
+import { DealerApplicationReviewForm } from "@/features/dealers/DealerApplicationReviewForm";
 import { dealerTierClasses, dealerTierLabels, type DealerTier } from "@/features/dealers/segmentation";
 import { getDealerManagementData } from "@/features/dealers/queries";
 
@@ -22,14 +23,41 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
         <p className="mt-1 text-sm text-slate-500">查看经销商信息、渠道政策、接单状态与动态分层。</p>
       </div>
 
-      <section className="grid gap-4 md:grid-cols-6">
+      <section className="grid gap-4 md:grid-cols-7">
         <SummaryCard label="经销商总数" value={String(data.summary.total)} />
+        <SummaryCard label="待审核" value={String(data.summary.pendingApplications)} tone="amber" />
         <SummaryCard label="活跃" value={String(data.summary.ACTIVE)} tone="emerald" />
         <SummaryCard label="普通" value={String(data.summary.STANDARD)} tone="blue" />
         <SummaryCard label="待激活" value={String(data.summary.TO_ACTIVATE)} tone="amber" />
         <SummaryCard label="风险" value={String(data.summary.RISK)} tone="red" />
         <SummaryCard label="可接单" value={`${data.summary.accepting}/${data.summary.total}`} tone="emerald" />
       </section>
+
+      {data.pendingApplications.length > 0 ? (
+        <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-amber-200">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-slate-900">经销商申请审核</h2>
+            <p className="mt-1 text-sm text-slate-500">审核通过后将创建正式门店档案，并开通经销商端登录。</p>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {data.pendingApplications.map((application) => (
+              <article className="rounded-lg border border-slate-200 p-4" key={application.id}>
+                <div className="mb-3">
+                  <p className="font-medium text-slate-900">{application.shopName}</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {application.contactName} · {application.phone} · {application.createdAt}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {application.zone || "未填区域"} · {application.address || "未填地址"}
+                  </p>
+                  {application.notes ? <p className="mt-2 text-xs text-slate-500">备注：{application.notes}</p> : null}
+                </div>
+                <DealerApplicationReviewForm application={application} salespeople={data.salespeople} />
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <form action="/dashboard/dealers" className="grid gap-3 rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200 md:grid-cols-[1fr_220px_auto]">
         <input

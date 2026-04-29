@@ -2,20 +2,18 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
-const staffRoles = new Set(["ADMIN", "SALESPERSON", "WAREHOUSE", "FINANCE"]);
-
-function isPublicPath(pathname: string) {
-  if (pathname === "/" || pathname === "/login" || pathname === "/register") {
-    return true;
-  }
-
-  return pathname === "/shop" || pathname.startsWith("/shop/catalog") || pathname.startsWith("/shop/product");
-}
+import { canAccessPath, isPublicPath } from "@/features/auth/permissions";
 
 function redirectToLogin(requestUrl: URL) {
   const loginUrl = new URL("/login", requestUrl);
   loginUrl.searchParams.set("callbackUrl", `${requestUrl.pathname}${requestUrl.search}`);
   return NextResponse.redirect(loginUrl);
+}
+
+function redirectToForbidden(requestUrl: URL) {
+  const forbiddenUrl = new URL("/forbidden", requestUrl);
+  forbiddenUrl.searchParams.set("from", `${requestUrl.pathname}${requestUrl.search}`);
+  return NextResponse.redirect(forbiddenUrl);
 }
 
 export async function middleware(request: NextRequest) {
@@ -30,46 +28,15 @@ export async function middleware(request: NextRequest) {
   });
   const role = token?.role;
 
-  if (isPublicPath(pathname)) {
+  if (isPublicPath(pathname) || canAccessPath(typeof role === "string" ? role : null, pathname)) {
     return NextResponse.next();
   }
 
-  if (pathname.startsWith("/dashboard")) {
-    if (!role || !staffRoles.has(role)) {
-      return redirectToLogin(nextUrl);
-    }
-
-    if ((pathname.startsWith("/dashboard/settings") || pathname.startsWith("/dashboard/logs")) && role !== "ADMIN") {
-      return redirectToLogin(nextUrl);
-    }
-
-    return NextResponse.next();
+  if (!role) {
+    return redirectToLogin(nextUrl);
   }
 
-  if (pathname.startsWith("/dealer")) {
-    if (role !== "DEALER") {
-      return redirectToLogin(nextUrl);
-    }
-
-    return NextResponse.next();
-  }
-
-  if (
-    pathname.startsWith("/shop/cart") ||
-    pathname.startsWith("/shop/checkout") ||
-    pathname.startsWith("/shop/my-orders") ||
-    pathname.startsWith("/shop/account") ||
-    pathname.startsWith("/shop/ai-chat") ||
-    pathname.startsWith("/shop/coupons")
-  ) {
-    if (role !== "CONSUMER") {
-      return redirectToLogin(nextUrl);
-    }
-
-    return NextResponse.next();
-  }
-
-  return NextResponse.next();
+  return redirectToForbidden(nextUrl);
 }
 
 export const config = {

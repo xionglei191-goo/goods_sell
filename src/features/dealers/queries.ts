@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
+import { getSessionUser } from "@/features/auth/guards";
 import { evaluateDealerTier, type DealerTier } from "@/features/dealers/segmentation";
 import { firstParam, formatCurrency, formatDate, formatDateTime } from "@/features/orders/utils";
 import { prisma } from "@/lib/prisma";
@@ -12,12 +13,23 @@ function enumOrUndefined<T extends string>(value: string, allowed: readonly T[])
   return allowed.includes(value as T) ? (value as T) : undefined;
 }
 
+function jsonObject(value: Prisma.JsonValue | null | undefined) {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function stringValue(value: unknown) {
+  return typeof value === "string" ? value : "";
+}
+
 export async function getDealerManagementData(searchParams: SearchParams) {
+  const user = await getSessionUser();
+  const isSalesperson = user?.role === "SALESPERSON";
+  const canReviewApplications = user?.role === "ADMIN";
   const filters = {
     q: firstParam(searchParams.q).trim(),
     tier: enumOrUndefined(firstParam(searchParams.tier), dealerTiers),
   };
-  const where: Prisma.DealerWhereInput = {
+  const filterWhere: Prisma.DealerWhereInput = {
     ...(filters.q
       ? {
           OR: [
@@ -30,28 +42,52 @@ export async function getDealerManagementData(searchParams: SearchParams) {
         }
       : {}),
   };
+  const scopeWhere: Prisma.DealerWhereInput = isSalesperson ? { customer: { salesPersonId: user.id } } : {};
+  const where: Prisma.DealerWhereInput = {
+    AND: [filterWhere, scopeWhere].filter((item) => Object.keys(item).length > 0),
+  };
 
-  const dealers = await prisma.dealer.findMany({
-    where,
-    include: {
-      customer: { select: { name: true, phone: true, salesPerson: { select: { name: true, phone: true } } } },
-      policy: true,
-      routings: {
-        select: {
-          status: true,
-          assignedAt: true,
-          respondedAt: true,
-          order: { select: { status: true, payableAmount: true } },
+  const [dealers, pendingApplications, salespeople] = await Promise.all([
+    prisma.dealer.findMany({
+      where,
+      include: {
+        customer: { select: { name: true, phone: true, salesPerson: { select: { name: true, phone: true } } } },
+        policy: true,
+        routings: {
+          select: {
+            status: true,
+            assignedAt: true,
+            respondedAt: true,
+            order: { select: { status: true, payableAmount: true } },
+          },
         },
+        stocks: { select: { stock: true, reportedAt: true } },
+        leads: { select: { createdAt: true } },
+        promoterCodes: { select: { isActive: true, scanCount: true, leadCount: true, orderCount: true } },
+        channelConflicts: { select: { type: true, status: true, createdAt: true } },
       },
-      stocks: { select: { stock: true, reportedAt: true } },
-      leads: { select: { createdAt: true } },
-      promoterCodes: { select: { isActive: true, scanCount: true, leadCount: true, orderCount: true } },
-      channelConflicts: { select: { type: true, status: true, createdAt: true } },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 500,
-  });
+      orderBy: { createdAt: "desc" },
+      take: 500,
+    }),
+    canReviewApplications
+      ? prisma.lead.findMany({
+          where: { scene: "DEALER_JOIN", status: { in: ["NEW", "ASSIGNED", "FOLLOWING"] } },
+          include: {
+            customer: { select: { name: true, phone: true } },
+            salesperson: { select: { name: true } },
+          },
+          orderBy: { createdAt: "desc" },
+          take: 30,
+        })
+      : Promise.resolve([]),
+    canReviewApplications
+      ? prisma.user.findMany({
+          where: { role: "SALESPERSON", isActive: true },
+          select: { id: true, name: true },
+          orderBy: { createdAt: "asc" },
+        })
+      : Promise.resolve([]),
+  ]);
 
   const items = dealers.map((dealer) => {
     const segmentation = evaluateDealerTier(dealer);
@@ -110,9 +146,26 @@ export async function getDealerManagementData(searchParams: SearchParams) {
       total: items.length,
       accepting: items.filter((item) => item.isAccepting).length,
       inactive: items.filter((item) => !item.isAccepting).length,
+      pendingApplications: pendingApplications.length,
       ...tierCounts,
     },
     items: filteredItems,
+    pendingApplications: pendingApplications.map((item) => {
+      const metadata = jsonObject(item.metadata);
+      return {
+        id: item.id,
+        shopName: stringValue(metadata.shopName) || item.name || item.customer?.name || "-",
+        contactName: stringValue(metadata.contactName) || item.customer?.name || "-",
+        phone: item.phone ?? item.customer?.phone ?? "-",
+        zone: stringValue(metadata.zone),
+        address: stringValue(metadata.address),
+        businessLicense: stringValue(metadata.businessLicense),
+        notes: item.notes ?? "",
+        salesperson: item.salesperson?.name ?? "-",
+        createdAt: formatDateTime(item.createdAt),
+      };
+    }),
+    salespeople,
   };
 }
 

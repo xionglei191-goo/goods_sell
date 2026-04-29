@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import type { CustomerType, Prisma } from "@prisma/client";
 
+import { getSessionUser } from "@/features/auth/guards";
 import { evaluateCustomerSegment, type CustomerSegment } from "@/features/customers/segmentation";
 import { firstParam, formatCurrency } from "@/features/orders/utils";
 import { prisma } from "@/lib/prisma";
@@ -18,6 +19,7 @@ function normalizeSegment(value: string): CustomerSegment | undefined {
 }
 
 export async function getCustomerList(searchParams: SearchParams) {
+  const user = await getSessionUser();
   const filters = {
     q: firstParam(searchParams.q),
     type: firstParam(searchParams.type),
@@ -27,7 +29,7 @@ export async function getCustomerList(searchParams: SearchParams) {
   };
   const type = normalizeCustomerType(filters.type);
   const segment = normalizeSegment(filters.segment);
-  const where: Prisma.CustomerWhereInput = {
+  const filterWhere: Prisma.CustomerWhereInput = {
     ...(type ? { type } : {}),
     ...(filters.q
       ? {
@@ -39,6 +41,10 @@ export async function getCustomerList(searchParams: SearchParams) {
       : {}),
     ...(filters.salesPersonId ? { salesPersonId: filters.salesPersonId } : {}),
     ...(filters.tag ? { tags: { some: { name: { contains: filters.tag, mode: "insensitive" } } } } : {}),
+  };
+  const scopeWhere: Prisma.CustomerWhereInput = user?.role === "SALESPERSON" ? { salesPersonId: user.id } : {};
+  const where: Prisma.CustomerWhereInput = {
+    AND: [filterWhere, scopeWhere].filter((item) => Object.keys(item).length > 0),
   };
   const [customers, salespeople] = await Promise.all([
     prisma.customer.findMany({
@@ -120,8 +126,9 @@ export async function getCustomerList(searchParams: SearchParams) {
 }
 
 export async function getCustomerDetail(id: string) {
-  const customer = await prisma.customer.findUnique({
-    where: { id },
+  const user = await getSessionUser();
+  const customer = await prisma.customer.findFirst({
+    where: { id, ...(user?.role === "SALESPERSON" ? { salesPersonId: user.id } : {}) },
     include: {
       salesPerson: { select: { name: true, phone: true } },
       addresses: { orderBy: [{ isDefault: "desc" }, { updatedAt: "desc" }] },

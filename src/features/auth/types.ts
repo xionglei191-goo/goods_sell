@@ -1,6 +1,8 @@
-import type { UserRole } from "@prisma/client";
+import { getDefaultAuthorizedPath } from "@/features/auth/permissions";
+import type { AppRole } from "@/features/auth/permissions";
 
-export type AppRole = UserRole | "CONSUMER" | "DEALER";
+export type { AppRole } from "@/features/auth/permissions";
+
 export type AppAccountType = "STAFF" | "CUSTOMER";
 
 export type AuthUser = {
@@ -13,15 +15,7 @@ export type AuthUser = {
 };
 
 export function getDefaultRedirect(role?: string | null) {
-  if (role === "DEALER") {
-    return "/dealer/incoming";
-  }
-
-  if (role === "CONSUMER") {
-    return "/shop";
-  }
-
-  return "/dashboard";
+  return getDefaultAuthorizedPath(role);
 }
 
 export function isSafeLocalPath(path: string | null): path is string {

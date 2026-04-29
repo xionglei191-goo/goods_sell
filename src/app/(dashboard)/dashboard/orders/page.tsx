@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 
+import { auth } from "@/auth";
 import { Button } from "@/components/ui/button";
+import { roleHasPermission } from "@/features/auth/permissions";
 import { ExportOrdersButton } from "@/features/orders/ExportOrdersButton";
 import { OrderFilters } from "@/features/orders/OrderFilters";
 import { OrderStatusActions } from "@/features/orders/OrderStatusActions";
@@ -24,6 +26,14 @@ type OrdersPageProps = {
 };
 
 export default async function OrdersPage({ searchParams }: OrdersPageProps) {
+  const session = await auth();
+  const canWriteOrders = roleHasPermission(session?.user.role, "orders:write");
+  const canFulfillOrders = roleHasPermission(session?.user.role, "orders:fulfill");
+  const canOperateOrders = canWriteOrders || canFulfillOrders;
+  const allowedOrderActions: Array<"confirm" | "ship" | "complete" | "cancel"> = [
+    ...(canWriteOrders ? (["confirm", "cancel"] as const) : []),
+    ...(canFulfillOrders ? (["ship", "complete"] as const) : []),
+  ];
   const params = await searchParams;
   const data = await getOrderList(params);
 
@@ -36,12 +46,14 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
         </div>
         <div className="flex gap-2">
           <ExportOrdersButton orders={data.items} />
-          <Button asChild>
-            <Link href="/dashboard/orders/new">
-              <Plus className="h-4 w-4" />
-              手动开单
-            </Link>
-          </Button>
+          {canWriteOrders ? (
+            <Button asChild>
+              <Link href="/dashboard/orders/new">
+                <Plus className="h-4 w-4" />
+                手动开单
+              </Link>
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -91,7 +103,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
                   <td className="px-4 py-3 text-slate-500">{formatDateTime(order.createdAt)}</td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end">
-                      <OrderStatusActions orderId={order.id} status={order.status} />
+                      {canOperateOrders ? <OrderStatusActions allowedActions={allowedOrderActions} orderId={order.id} status={order.status} /> : null}
                     </div>
                   </td>
                 </tr>

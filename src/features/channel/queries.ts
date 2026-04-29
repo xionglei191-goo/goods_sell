@@ -1,5 +1,6 @@
 import type { ChannelConflictStatus, ChannelConflictType, DealerPriceLevel, InquiryStatus, LeadScene, LeadStatus, Prisma, PromoterOwnerType, QuoteStatus } from "@prisma/client";
 
+import { getSessionUser, type SessionUser } from "@/features/auth/guards";
 import { firstParam, formatCurrency, formatDate, formatDateTime } from "@/features/orders/utils";
 import { prisma } from "@/lib/prisma";
 
@@ -76,13 +77,40 @@ function getLatestConflictEvent(detail: Prisma.JsonValue | null | undefined) {
   };
 }
 
+function andWhere<T extends object>(...items: T[]) {
+  return { AND: items.filter((item) => Object.keys(item).length > 0) };
+}
+
+function leadScope(user: SessionUser | null): Prisma.LeadWhereInput {
+  return user?.role === "SALESPERSON" ? { OR: [{ salespersonId: user.id }, { customer: { salesPersonId: user.id } }] } : {};
+}
+
+function inquiryScope(user: SessionUser | null): Prisma.InquiryWhereInput {
+  return user?.role === "SALESPERSON" ? { OR: [{ salespersonId: user.id }, { customer: { salesPersonId: user.id } }] } : {};
+}
+
+function quoteScope(user: SessionUser | null): Prisma.QuoteWhereInput {
+  return user?.role === "SALESPERSON" ? { OR: [{ createdById: user.id }, { inquiry: { salespersonId: user.id } }, { customer: { salesPersonId: user.id } }] } : {};
+}
+
+function promoterScope(user: SessionUser | null): Prisma.PromoterCodeWhereInput {
+  return user?.role === "SALESPERSON" ? { salespersonId: user.id } : {};
+}
+
+function conflictScope(user: SessionUser | null): Prisma.ChannelConflictWhereInput {
+  return user?.role === "SALESPERSON"
+    ? { OR: [{ ownerId: user.id }, { customer: { salesPersonId: user.id } }, { dealer: { customer: { salesPersonId: user.id } } }] }
+    : {};
+}
+
 export async function getLeadDashboardData(searchParams: SearchParams) {
+  const user = await getSessionUser();
   const filters = {
     q: firstParam(searchParams.q),
     scene: enumOrUndefined(firstParam(searchParams.scene), leadScenes),
     status: enumOrUndefined(firstParam(searchParams.status), leadStatuses),
   };
-  const where: Prisma.LeadWhereInput = {
+  const filterWhere: Prisma.LeadWhereInput = {
     ...(filters.scene ? { scene: filters.scene as LeadScene } : {}),
     ...(filters.status ? { status: filters.status as LeadStatus } : {}),
     ...(filters.q
@@ -95,6 +123,7 @@ export async function getLeadDashboardData(searchParams: SearchParams) {
         }
       : {}),
   };
+  const where: Prisma.LeadWhereInput = andWhere(filterWhere, leadScope(user));
   const [items, total, newCount, convertedCount] = await Promise.all([
     prisma.lead.findMany({
       where,
@@ -109,8 +138,8 @@ export async function getLeadDashboardData(searchParams: SearchParams) {
       take: 50,
     }),
     prisma.lead.count({ where }),
-    prisma.lead.count({ where: { status: "NEW" } }),
-    prisma.lead.count({ where: { status: "CONVERTED" } }),
+    prisma.lead.count({ where: andWhere({ status: "NEW" }, leadScope(user)) }),
+    prisma.lead.count({ where: andWhere({ status: "CONVERTED" }, leadScope(user)) }),
   ]);
 
   return {
@@ -134,12 +163,13 @@ export async function getLeadDashboardData(searchParams: SearchParams) {
 }
 
 export async function getInquiryDashboardData(searchParams: SearchParams) {
+  const user = await getSessionUser();
   const filters = {
     q: firstParam(searchParams.q),
     scene: enumOrUndefined(firstParam(searchParams.scene), leadScenes),
     status: enumOrUndefined(firstParam(searchParams.status), inquiryStatuses),
   };
-  const where: Prisma.InquiryWhereInput = {
+  const filterWhere: Prisma.InquiryWhereInput = {
     ...(filters.scene ? { scene: filters.scene as LeadScene } : {}),
     ...(filters.status ? { status: filters.status as InquiryStatus } : {}),
     ...(filters.q
@@ -153,6 +183,7 @@ export async function getInquiryDashboardData(searchParams: SearchParams) {
         }
       : {}),
   };
+  const where: Prisma.InquiryWhereInput = andWhere(filterWhere, inquiryScope(user));
   const [items, total, quotedCount, wonCount] = await Promise.all([
     prisma.inquiry.findMany({
       where,
@@ -166,8 +197,8 @@ export async function getInquiryDashboardData(searchParams: SearchParams) {
       take: 50,
     }),
     prisma.inquiry.count({ where }),
-    prisma.inquiry.count({ where: { status: "QUOTED" } }),
-    prisma.inquiry.count({ where: { status: "WON" } }),
+    prisma.inquiry.count({ where: andWhere({ status: "QUOTED" }, inquiryScope(user)) }),
+    prisma.inquiry.count({ where: andWhere({ status: "WON" }, inquiryScope(user)) }),
   ]);
 
   return {
@@ -192,11 +223,12 @@ export async function getInquiryDashboardData(searchParams: SearchParams) {
 }
 
 export async function getPromoterDashboardData(searchParams: SearchParams) {
+  const user = await getSessionUser();
   const filters = {
     q: firstParam(searchParams.q),
     ownerType: enumOrUndefined(firstParam(searchParams.ownerType), promoterOwnerTypes),
   };
-  const where: Prisma.PromoterCodeWhereInput = {
+  const filterWhere: Prisma.PromoterCodeWhereInput = {
     ...(filters.ownerType ? { ownerType: filters.ownerType as PromoterOwnerType } : {}),
     ...(filters.q
       ? {
@@ -209,6 +241,7 @@ export async function getPromoterDashboardData(searchParams: SearchParams) {
         }
       : {}),
   };
+  const where: Prisma.PromoterCodeWhereInput = andWhere(filterWhere, promoterScope(user));
   const items = await prisma.promoterCode.findMany({
     where,
     include: {
@@ -245,11 +278,12 @@ export async function getPromoterDashboardData(searchParams: SearchParams) {
 }
 
 export async function getQuoteDashboardData(searchParams: SearchParams) {
+  const user = await getSessionUser();
   const filters = {
     q: firstParam(searchParams.q),
     status: enumOrUndefined(firstParam(searchParams.status), quoteStatuses),
   };
-  const where: Prisma.QuoteWhereInput = {
+  const filterWhere: Prisma.QuoteWhereInput = {
     ...(filters.status ? { status: filters.status as QuoteStatus } : {}),
     ...(filters.q
       ? {
@@ -262,6 +296,7 @@ export async function getQuoteDashboardData(searchParams: SearchParams) {
         }
       : {}),
   };
+  const where: Prisma.QuoteWhereInput = andWhere(filterWhere, quoteScope(user));
   const [items, total, sentCount, acceptedCount, convertedCount] = await Promise.all([
     prisma.quote.findMany({
       where,
@@ -273,9 +308,9 @@ export async function getQuoteDashboardData(searchParams: SearchParams) {
       take: 50,
     }),
     prisma.quote.count({ where }),
-    prisma.quote.count({ where: { status: "SENT" } }),
-    prisma.quote.count({ where: { status: "ACCEPTED" } }),
-    prisma.quote.count({ where: { status: "CONVERTED" } }),
+    prisma.quote.count({ where: andWhere({ status: "SENT" }, quoteScope(user)) }),
+    prisma.quote.count({ where: andWhere({ status: "ACCEPTED" }, quoteScope(user)) }),
+    prisma.quote.count({ where: andWhere({ status: "CONVERTED" }, quoteScope(user)) }),
   ]);
 
   return {
@@ -305,8 +340,9 @@ export async function getQuoteDashboardData(searchParams: SearchParams) {
 }
 
 export async function getQuoteFormOptions() {
+  const user = await getSessionUser();
   const inquiries = await prisma.inquiry.findMany({
-    where: { status: { in: ["NEW", "ASSIGNED", "QUOTED"] } },
+    where: andWhere({ status: { in: ["NEW", "ASSIGNED", "QUOTED"] } }, inquiryScope(user)),
     select: {
       id: true,
       inquiryNo: true,
@@ -336,13 +372,15 @@ export async function getQuoteFormOptions() {
 export type QuoteFormOptions = Awaited<ReturnType<typeof getQuoteFormOptions>>;
 
 export async function getPromoterFormOptions() {
+  const user = await getSessionUser();
   const [salespeople, dealers, campaigns] = await Promise.all([
     prisma.user.findMany({
-      where: { role: "SALESPERSON", isActive: true },
+      where: { role: "SALESPERSON", isActive: true, ...(user?.role === "SALESPERSON" ? { id: user.id } : {}) },
       select: { id: true, name: true, phone: true },
       orderBy: { name: "asc" },
     }),
     prisma.dealer.findMany({
+      where: user?.role === "SALESPERSON" ? { customer: { salesPersonId: user.id } } : {},
       include: { customer: { select: { name: true, phone: true } } },
       orderBy: { shopName: "asc" },
       take: 300,
@@ -365,6 +403,7 @@ export async function getPromoterFormOptions() {
 export type PromoterFormOptions = Awaited<ReturnType<typeof getPromoterFormOptions>>;
 
 export async function getChannelConflictDashboardData(searchParams: SearchParams) {
+  const user = await getSessionUser();
   const filters = {
     q: firstParam(searchParams.q).trim(),
     type: enumOrUndefined(firstParam(searchParams.type), channelConflictTypes),
@@ -396,11 +435,12 @@ export async function getChannelConflictDashboardData(searchParams: SearchParams
     }
   }
 
-  const where: Prisma.ChannelConflictWhereInput = {
+  const filterWhere: Prisma.ChannelConflictWhereInput = {
     ...(filters.type ? { type: filters.type as ChannelConflictType } : {}),
     ...(filters.status ? { status: filters.status as ChannelConflictStatus } : {}),
     ...(searchFilters.length > 0 ? { OR: searchFilters } : {}),
   };
+  const where: Prisma.ChannelConflictWhereInput = andWhere(filterWhere, conflictScope(user));
 
   const [items, total, openCount, processingCount, resolvedCount, ignoredCount] = await Promise.all([
     prisma.channelConflict.findMany({
@@ -414,10 +454,10 @@ export async function getChannelConflictDashboardData(searchParams: SearchParams
       take: 100,
     }),
     prisma.channelConflict.count({ where }),
-    prisma.channelConflict.count({ where: { status: "OPEN" } }),
-    prisma.channelConflict.count({ where: { status: "PROCESSING" } }),
-    prisma.channelConflict.count({ where: { status: "RESOLVED" } }),
-    prisma.channelConflict.count({ where: { status: "IGNORED" } }),
+    prisma.channelConflict.count({ where: andWhere({ status: "OPEN" }, conflictScope(user)) }),
+    prisma.channelConflict.count({ where: andWhere({ status: "PROCESSING" }, conflictScope(user)) }),
+    prisma.channelConflict.count({ where: andWhere({ status: "RESOLVED" }, conflictScope(user)) }),
+    prisma.channelConflict.count({ where: andWhere({ status: "IGNORED" }, conflictScope(user)) }),
   ]);
 
   const orderIds = Array.from(new Set(items.map((item) => item.orderId).filter((id): id is string => Boolean(id))));
@@ -471,8 +511,10 @@ export async function getChannelConflictDashboardData(searchParams: SearchParams
 }
 
 export async function getChannelConflictFormOptions() {
+  const user = await getSessionUser();
   const [orders, dealers, customers, owners] = await Promise.all([
     prisma.order.findMany({
+      where: user?.role === "SALESPERSON" ? { OR: [{ salesPersonId: user.id }, { customer: { salesPersonId: user.id } }] } : {},
       select: {
         id: true,
         orderNo: true,
@@ -484,17 +526,23 @@ export async function getChannelConflictFormOptions() {
       take: 150,
     }),
     prisma.dealer.findMany({
+      where: user?.role === "SALESPERSON" ? { customer: { salesPersonId: user.id } } : {},
       select: { id: true, shopName: true, zone: true, customer: { select: { name: true, phone: true } } },
       orderBy: { shopName: "asc" },
       take: 300,
     }),
     prisma.customer.findMany({
+      where: user?.role === "SALESPERSON" ? { salesPersonId: user.id } : {},
       select: { id: true, name: true, phone: true },
       orderBy: { updatedAt: "desc" },
       take: 200,
     }),
     prisma.user.findMany({
-      where: { isActive: true, role: { in: ["ADMIN", "SALESPERSON", "FINANCE"] } },
+      where: {
+        isActive: true,
+        role: { in: user?.role === "SALESPERSON" ? ["SALESPERSON"] : ["ADMIN", "SALESPERSON"] },
+        ...(user?.role === "SALESPERSON" ? { id: user.id } : {}),
+      },
       select: { id: true, name: true, role: true },
       orderBy: { name: "asc" },
     }),
@@ -525,9 +573,10 @@ export async function getChannelConflictFormOptions() {
 export type ChannelConflictFormOptions = Awaited<ReturnType<typeof getChannelConflictFormOptions>>;
 
 export async function getDealerPolicyPageData(dealerId: string) {
+  const user = await getSessionUser();
   const [dealer, brands] = await Promise.all([
-    prisma.dealer.findUnique({
-      where: { id: dealerId },
+    prisma.dealer.findFirst({
+      where: { id: dealerId, ...(user?.role === "SALESPERSON" ? { customer: { salesPersonId: user.id } } : {}) },
       include: {
         customer: { select: { name: true, phone: true } },
         policy: true,

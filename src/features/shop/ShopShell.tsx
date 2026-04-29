@@ -7,6 +7,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { getDefaultAuthorizedPath } from "@/features/auth/permissions";
 import type { ShopUser } from "@/features/shop/types";
 import { cn } from "@/lib/utils";
 
@@ -43,7 +44,7 @@ export function ShopShell({ user, cartCount, children }: ShopShellProps) {
 
   const accountHref = useMemo(() => {
     if (!user) return "/login?callbackUrl=/shop/account";
-    if (user.role !== "CONSUMER") return "/dashboard";
+    if (user.role !== "CONSUMER") return getDefaultAuthorizedPath(user.role);
     return "/shop/account";
   }, [user]);
 

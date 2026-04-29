@@ -4,13 +4,11 @@ import type { ProductPushStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { auth } from "@/auth";
+import { getSessionUser, requireDashboardPermission } from "@/features/auth/guards";
 import { customerSegmentLabels, evaluateCustomerSegment } from "@/features/customers/segmentation";
 import type { ActionResult } from "@/features/orders/types";
 import { toMoney } from "@/features/orders/utils";
 import { prisma } from "@/lib/prisma";
-
-const staffRoles = new Set(["ADMIN", "SALESPERSON", "FINANCE"]);
 
 const couponSchema = z
   .object({
@@ -60,10 +58,7 @@ function getErrorMessage(error: unknown) {
 }
 
 async function requireStaff() {
-  const session = await auth();
-  if (!session?.user.role || !staffRoles.has(session.user.role)) {
-    throw new Error("无权限执行营销操作");
-  }
+  await requireDashboardPermission("marketing:manage", "无权限执行营销操作");
 }
 
 function profileLabels(tags: unknown) {
@@ -167,6 +162,7 @@ export async function createCoupon(input: CouponInput): Promise<ActionResult> {
 }
 
 export async function issueCouponByTag(couponId: string, tag: string): Promise<ActionResult<{ count: number }>> {
+  const currentUser = await getSessionUser();
   try {
     await requireStaff();
   } catch (error) {
@@ -175,7 +171,10 @@ export async function issueCouponByTag(couponId: string, tag: string): Promise<A
 
   try {
     const coupon = await prisma.coupon.findUniqueOrThrow({ where: { id: couponId } });
-    const customers = await prisma.customer.findMany({ include: { profile: true, tags: true, coupons: true } });
+    const customers = await prisma.customer.findMany({
+      where: currentUser?.role === "SALESPERSON" ? { salesPersonId: currentUser.id } : {},
+      include: { profile: true, tags: true, coupons: true },
+    });
     const targets = customers.filter((customer) => {
       const profileLabels = customer.profile?.tags && typeof customer.profile.tags === "object" ? ((customer.profile.tags as { labels?: string[] }).labels ?? []) : [];
       const labels = [...customer.tags.map((item) => item.name), ...profileLabels];
@@ -205,6 +204,7 @@ export async function issueCouponByTag(couponId: string, tag: string): Promise<A
 }
 
 export async function createProductPush(input: CreateProductPushInput): Promise<ActionResult<{ count: number }>> {
+  const currentUser = await getSessionUser();
   try {
     await requireStaff();
   } catch (error) {
@@ -226,6 +226,7 @@ export async function createProductPush(input: CreateProductPushInput): Promise<
     }
 
     const customers = await prisma.customer.findMany({
+      where: currentUser?.role === "SALESPERSON" ? { salesPersonId: currentUser.id } : {},
       include: {
         profile: { select: { tags: true } },
         tags: true,

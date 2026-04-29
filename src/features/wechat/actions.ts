@@ -2,14 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 
-import { auth } from "@/auth";
+import { requireDashboardPermission } from "@/features/auth/guards";
 import { createOfficialMenu } from "@/features/wechat/official";
 
-const staffRoles = new Set(["ADMIN", "SALESPERSON", "WAREHOUSE", "FINANCE"]);
-
 export async function syncOfficialMenu() {
-  const session = await auth();
-  if (!session?.user.role || !staffRoles.has(session.user.role)) {
+  try {
+    await requireDashboardPermission("wechat:manage", "无权配置公众号菜单");
+  } catch {
     return { success: false as const, error: "无权配置公众号菜单" };
   }
 

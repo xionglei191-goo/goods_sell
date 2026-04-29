@@ -8,8 +8,8 @@ export default function RegisterPage() {
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-[#dc2626] text-xl font-bold text-white">
             华启
           </div>
-          <h1 className="text-2xl font-semibold text-slate-900">注册华启商城</h1>
-          <p className="mt-2 text-sm text-slate-500">消费者账号可用于商城下单和订单查询</p>
+          <h1 className="text-2xl font-semibold text-slate-900">注册华启账号</h1>
+          <p className="mt-2 text-sm text-slate-500">消费者可直接下单，经销商申请需管理员审核后开通</p>
         </div>
         <RegisterForm />
       </div>

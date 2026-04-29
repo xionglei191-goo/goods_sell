@@ -7,7 +7,8 @@ import { prisma } from "@/lib/prisma";
 import { registerSchema, type RegisterInput } from "@/features/auth/schemas";
 
 export type AuthActionResult =
-  | { success: true }
+  | { success: true; accountType: "CONSUMER"; status: "ACTIVE" }
+  | { success: true; accountType: "DEALER"; status: "PENDING_REVIEW" }
   | { success: false; error: { code: string; message: string } };
 
 export async function registerCustomer(input: RegisterInput): Promise<AuthActionResult> {
@@ -41,11 +42,64 @@ export async function registerCustomer(input: RegisterInput): Promise<AuthAction
     };
   }
 
+  const password = await hash(parsed.data.password, 12);
+
+  if (parsed.data.accountType === "DEALER") {
+    await prisma.$transaction(async (tx) => {
+      const customer = await tx.customer.create({
+        data: {
+          name: parsed.data.name,
+          phone: parsed.data.phone,
+          password,
+          type: CustomerType.DEALER,
+          isVerified: false,
+          profile: {
+            create: {
+              preferredCategories: [],
+              tags: { labels: ["画像:潜在经销商", "生命周期:NEW"] },
+            },
+          },
+          tags: {
+            create: [
+              { name: "画像:潜在经销商", color: "#ede9fe", source: "DEALER_APPLICATION" },
+              { name: "经销商申请", color: "#dbeafe", source: "DEALER_APPLICATION" },
+            ],
+          },
+        },
+        select: { id: true },
+      });
+
+      await tx.lead.create({
+        data: {
+          source: "SHOP",
+          scene: "DEALER_JOIN",
+          status: "NEW",
+          name: parsed.data.shopName || parsed.data.name,
+          phone: parsed.data.phone,
+          customerId: customer.id,
+          notes: parsed.data.notes || null,
+          consentAccepted: Boolean(parsed.data.consentAccepted),
+          metadata: {
+            accountType: "DEALER_APPLICATION",
+            contactName: parsed.data.name,
+            shopName: parsed.data.shopName,
+            zone: parsed.data.zone,
+            address: parsed.data.address,
+            businessLicense: parsed.data.businessLicense || null,
+            submittedAt: new Date().toISOString(),
+          },
+        },
+      });
+    });
+
+    return { success: true, accountType: "DEALER", status: "PENDING_REVIEW" };
+  }
+
   await prisma.customer.create({
     data: {
       name: parsed.data.name,
       phone: parsed.data.phone,
-      password: await hash(parsed.data.password, 12),
+      password,
       type: CustomerType.CONSUMER,
       isVerified: true,
       profile: {
@@ -64,5 +118,5 @@ export async function registerCustomer(input: RegisterInput): Promise<AuthAction
     },
   });
 
-  return { success: true };
+  return { success: true, accountType: "CONSUMER", status: "ACTIVE" };
 }

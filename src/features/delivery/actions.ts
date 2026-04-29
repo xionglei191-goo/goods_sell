@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { requireDashboardPermission } from "@/features/auth/guards";
 import { logAction } from "@/features/logs/audit";
 import type { ActionResult } from "@/features/orders/types";
 import { sendOrderStatusTemplate } from "@/features/wechat/official";
@@ -35,6 +36,7 @@ export async function markOrderShipped(input: z.infer<typeof shipSchema>): Promi
   }
 
   try {
+    await requireDashboardPermission("delivery:manage", "无权限执行配送操作");
     const order = await prisma.order.findUnique({ where: { id: parsed.data.orderId }, select: { id: true, orderNo: true, status: true } });
     if (!order) throw new Error("订单不存在");
     if (!["PAID", "CONFIRMED"].includes(order.status)) throw new Error("当前订单状态不可发货");
@@ -73,6 +75,7 @@ export async function markOrderDelivered(input: z.infer<typeof orderSchema>): Pr
   }
 
   try {
+    await requireDashboardPermission("delivery:manage", "无权限执行配送操作");
     const order = await prisma.order.findUnique({ where: { id: parsed.data.orderId }, select: { id: true, orderNo: true, status: true } });
     if (!order) throw new Error("订单不存在");
     if (order.status !== "SHIPPING") throw new Error("当前订单状态不可送达");

@@ -7,6 +7,7 @@ import path from "node:path";
 import { ImageMaterialLicenseStatus, ImageMaterialReviewStatus, ImageMaterialStorageProvider } from "@prisma/client";
 import { revalidatePath, revalidateTag } from "next/cache";
 
+import { requireDashboardPermission } from "@/features/auth/guards";
 import { logAction } from "@/features/logs/audit";
 import { SHOP_PRODUCTS_CACHE_TAG } from "@/features/shop/cache";
 import { prisma } from "@/lib/prisma";
@@ -89,6 +90,10 @@ const licenseAliases: Record<string, ImageMaterialLicenseStatus> = {
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "操作失败，请稍后重试";
+}
+
+async function requireImageMaterialPermission() {
+  await requireDashboardPermission("products:write", "无权限维护商品图片素材");
 }
 
 function getFormString(formData: FormData, name: string) {
@@ -402,6 +407,12 @@ async function downloadAndStoreMaterialImage(material: { id: string; imageUrl: s
 }
 
 export async function createImageMaterial(formData: FormData): Promise<ActionResult> {
+  try {
+    await requireImageMaterialPermission();
+  } catch (error) {
+    return { success: false, error: { code: "UNAUTHORIZED", message: getErrorMessage(error) } };
+  }
+
   const productId = getFormString(formData, "productId");
   const imageUrl = getFormString(formData, "imageUrl");
   const sourcePage = getFormString(formData, "sourcePage");
@@ -593,6 +604,7 @@ async function approveImageMaterialCore(id: string): Promise<ActionResult> {
 
 export async function approveImageMaterial(id: string): Promise<ActionResult> {
   try {
+    await requireImageMaterialPermission();
     return await approveImageMaterialCore(id);
   } catch (error) {
     return { success: false, error: { code: "APPROVE_IMAGE_MATERIAL_FAILED", message: getErrorMessage(error) } };
@@ -601,6 +613,7 @@ export async function approveImageMaterial(id: string): Promise<ActionResult> {
 
 export async function rejectImageMaterial(id: string): Promise<ActionResult> {
   try {
+    await requireImageMaterialPermission();
     const before = await prisma.productImageMaterial.findUnique({
       where: { id },
       include: { product: { select: { id: true, name: true } } },
@@ -633,6 +646,7 @@ export async function rejectImageMaterial(id: string): Promise<ActionResult> {
 
 export async function deleteImageMaterial(id: string): Promise<ActionResult> {
   try {
+    await requireImageMaterialPermission();
     const material = await prisma.productImageMaterial.findUnique({
       where: { id },
       include: { product: { select: { id: true, name: true } } },
@@ -658,6 +672,12 @@ export async function deleteImageMaterial(id: string): Promise<ActionResult> {
 }
 
 export async function batchProcessImageMaterials(ids: string[], operation: "approve" | "reject" | "delete"): Promise<ActionResult> {
+  try {
+    await requireImageMaterialPermission();
+  } catch (error) {
+    return { success: false, error: { code: "UNAUTHORIZED", message: getErrorMessage(error) } };
+  }
+
   if (ids.length === 0) return { success: false, error: { code: "EMPTY_SELECTION", message: "请选择素材" } };
   const uniqueIds = Array.from(new Set(ids));
   let successCount = 0;
@@ -730,6 +750,12 @@ function parseCsv(content: string) {
 }
 
 export async function previewImageMaterialCsv(csvText: string): Promise<ImageMaterialCsvPreviewResult> {
+  try {
+    await requireImageMaterialPermission();
+  } catch (error) {
+    return { success: false, error: { code: "UNAUTHORIZED", message: getErrorMessage(error) } };
+  }
+
   if (!csvText.trim()) {
     return { success: false, error: { code: "CSV_EMPTY", message: "请先粘贴或上传 CSV 内容" } };
   }
@@ -809,6 +835,7 @@ export async function previewImageMaterialCsv(csvText: string): Promise<ImageMat
 
 export async function importImageMaterialCsv(rows: ImageMaterialCsvPreviewRow[]): Promise<ImageMaterialCsvImportResult> {
   try {
+    await requireImageMaterialPermission();
     const importableRows = rows.filter((row) => row.approved && row.productId && row.licenseStatus && row.errors.length === 0);
     if (importableRows.length === 0) {
       return { success: false, error: { code: "NO_IMPORTABLE_ROWS", message: "没有可导入的行" } };

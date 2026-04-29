@@ -1,6 +1,8 @@
 import Link from "next/link";
 
+import { auth } from "@/auth";
 import { Button } from "@/components/ui/button";
+import { roleHasPermission } from "@/features/auth/permissions";
 import { OrderStatusActions } from "@/features/orders/OrderStatusActions";
 import { getOrderDetail } from "@/features/orders/queries";
 import {
@@ -22,6 +24,14 @@ type OrderDetailPageProps = {
 };
 
 export default async function OrderDetailPage({ params }: OrderDetailPageProps) {
+  const session = await auth();
+  const canWriteOrders = roleHasPermission(session?.user.role, "orders:write");
+  const canFulfillOrders = roleHasPermission(session?.user.role, "orders:fulfill");
+  const canOperateOrders = canWriteOrders || canFulfillOrders;
+  const allowedOrderActions: Array<"confirm" | "ship" | "complete" | "cancel"> = [
+    ...(canWriteOrders ? (["confirm", "cancel"] as const) : []),
+    ...(canFulfillOrders ? (["ship", "complete"] as const) : []),
+  ];
   const { id } = await params;
   const order = await getOrderDetail(id);
   const itemsTotal = order.items.reduce((sum, item) => sum + item.totalAmount, 0);
@@ -34,7 +44,7 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
           <h1 className="mt-1 text-2xl font-semibold text-slate-900">{order.orderNo}</h1>
           <p className="mt-1 text-sm text-slate-500">{formatDateTime(order.createdAt)} 创建</p>
         </div>
-        <OrderStatusActions orderId={order.id} status={order.status} />
+        {canOperateOrders ? <OrderStatusActions allowedActions={allowedOrderActions} orderId={order.id} status={order.status} /> : null}
       </div>
 
       <section className="grid gap-4 lg:grid-cols-4">

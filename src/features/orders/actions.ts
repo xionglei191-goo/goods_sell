@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { OrderStatus, Prisma } from "@prisma/client";
 
-import { auth } from "@/auth";
+import { requireDashboardPermission } from "@/features/auth/guards";
 import { logAction } from "@/features/logs/audit";
 import { routeOrderById } from "@/features/orders/routing";
 import { manualOrderSchema, statusActionSchema, type ManualOrderInput } from "@/features/orders/schemas";
@@ -12,18 +12,9 @@ import { buildOrderNoSequence, toMoney } from "@/features/orders/utils";
 import { sendOrderStatusTemplate } from "@/features/wechat/official";
 import { prisma } from "@/lib/prisma";
 
-async function getStaffId() {
-  const session = await auth();
-  if (session?.user.id && session.user.type === "STAFF") {
-    return session.user.id;
-  }
-
-  const admin = await prisma.user.findFirst({ where: { role: "ADMIN" }, select: { id: true } });
-  if (!admin) {
-    throw new Error("未找到可用管理员账号");
-  }
-
-  return admin.id;
+async function getOrderOperatorId(permission: "orders:write" | "orders:fulfill") {
+  const user = await requireDashboardPermission(permission, permission === "orders:fulfill" ? "无权限执行订单履约操作" : "无权限维护订单");
+  return user.id;
 }
 
 function getErrorMessage(error: unknown) {
@@ -98,7 +89,7 @@ export async function updateOrderStatus(input: { orderId: string; action: "confi
   }
 
   try {
-    const operatorId = await getStaffId();
+    const operatorId = await getOrderOperatorId(["ship", "deliver", "complete"].includes(parsed.data.action) ? "orders:fulfill" : "orders:write");
     await prisma.$transaction(async (tx) => {
       const order = await tx.order.findUnique({
         where: { id: parsed.data.orderId },
@@ -203,7 +194,7 @@ export async function createManualOrder(input: ManualOrderInput): Promise<Action
   }
 
   try {
-    const operatorId = await getStaffId();
+    const operatorId = await getOrderOperatorId("orders:write");
     const order = await prisma.$transaction(async (tx) => {
       const address = await tx.address.findFirst({
         where: { id: parsed.data.addressId, customerId: parsed.data.customerId },

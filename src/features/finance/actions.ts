@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { auth } from "@/auth";
+import { requireDashboardPermission } from "@/features/auth/guards";
 import { logAction } from "@/features/logs/audit";
 import type { ActionResult } from "@/features/orders/types";
 import { toMoney } from "@/features/orders/utils";
@@ -16,11 +16,8 @@ const paymentSchema = z.object({
 });
 
 async function getOperatorId() {
-  const session = await auth();
-  if (session?.user.id && session.user.type === "STAFF") return session.user.id;
-  const admin = await prisma.user.findFirst({ where: { role: "ADMIN" }, select: { id: true } });
-  if (!admin) throw new Error("未找到可用操作员");
-  return admin.id;
+  const user = await requireDashboardPermission("finance:manage", "无权限执行财务操作");
+  return user.id;
 }
 
 function getErrorMessage(error: unknown) {

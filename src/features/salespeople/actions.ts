@@ -5,7 +5,7 @@ import { hash } from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { auth } from "@/auth";
+import { requireDashboardPermission } from "@/features/auth/guards";
 import { logAction } from "@/features/logs/audit";
 import type { ActionResult } from "@/features/orders/types";
 import { prisma } from "@/lib/prisma";
@@ -34,11 +34,8 @@ const dealerPilotBindSchema = z.object({
 });
 
 async function requireAdmin() {
-  const session = await auth();
-  if (!session?.user.id || session.user.role !== "ADMIN") {
-    throw new Error("仅管理员可维护销售员");
-  }
-  return session.user.id;
+  const user = await requireDashboardPermission("settings:manage", "仅管理员可维护销售员");
+  return user.id;
 }
 
 function getErrorMessage(error: unknown) {

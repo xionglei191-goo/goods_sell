@@ -3,7 +3,7 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 
-import { auth } from "@/auth";
+import { requireDashboardPermission } from "@/features/auth/guards";
 import { logAction } from "@/features/logs/audit";
 import type { ActionResult } from "@/features/orders/types";
 import { SHOP_PRODUCTS_CACHE_TAG } from "@/features/shop/cache";
@@ -20,11 +20,8 @@ const confirmSchema = z.object({
 });
 
 async function getOperatorId() {
-  const session = await auth();
-  if (session?.user.id && session.user.type === "STAFF") return session.user.id;
-  const admin = await prisma.user.findFirst({ where: { role: "ADMIN" }, select: { id: true } });
-  if (!admin) throw new Error("未找到可用操作员");
-  return admin.id;
+  const user = await requireDashboardPermission("warehouse:manage", "无权限执行仓储操作");
+  return user.id;
 }
 
 function getErrorMessage(error: unknown) {
@@ -52,6 +49,7 @@ export async function updateSafeStock(input: z.infer<typeof safeStockSchema>): P
   }
 
   try {
+    await requireDashboardPermission("warehouse:manage", "无权限更新安全库存");
     const before = await prisma.product.findUniqueOrThrow({
       where: { id: parsed.data.productId },
       select: { id: true, name: true, safeStock: true },

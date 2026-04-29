@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { dashboardNavItems } from "@/components/layout/dashboard-nav";
+import { filterDashboardNavItems } from "@/features/auth/permissions";
 import { cn } from "@/lib/utils";
 import type { AppRole } from "@/features/auth/types";
 
@@ -39,11 +40,12 @@ function isItemActive(pathname: string, href: string) {
 
 export function Sidebar({ user, onNavigate }: SidebarProps) {
   const pathname = usePathname();
+  const navItems = useMemo(() => filterDashboardNavItems(user.role, dashboardNavItems), [user.role]);
   const activeParents = useMemo(() => {
-    return dashboardNavItems
+    return navItems
       .filter((item) => item.children?.some((child) => isItemActive(pathname, child.href)))
       .map((item) => item.href);
-  }, [pathname]);
+  }, [navItems, pathname]);
   const [expanded, setExpanded] = useState<string[]>(activeParents);
   const [compact, setCompact] = useState(false);
 
@@ -74,7 +76,7 @@ export function Sidebar({ user, onNavigate }: SidebarProps) {
 
       <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
         <div className="space-y-1">
-          {dashboardNavItems.map((item) => {
+          {navItems.map((item) => {
             const Icon = item.icon;
             const hasChildren = Boolean(item.children?.length);
             const itemActive = isItemActive(pathname, item.href) || item.children?.some((child) => isItemActive(pathname, child.href));

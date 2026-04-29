@@ -1,15 +1,14 @@
 import { NextResponse } from "next/server";
 
-import { auth } from "@/auth";
+import { requireDashboardPermission } from "@/features/auth/guards";
 import { createOfficialMenu } from "@/features/wechat/official";
 
 export const runtime = "nodejs";
 
-const staffRoles = new Set(["ADMIN", "SALESPERSON", "WAREHOUSE", "FINANCE"]);
-
 export async function POST() {
-  const session = await auth();
-  if (!session?.user.role || !staffRoles.has(session.user.role)) {
+  try {
+    await requireDashboardPermission("wechat:manage", "无权配置公众号菜单");
+  } catch {
     return NextResponse.json({ success: false, error: "无权配置公众号菜单" }, { status: 403 });
   }
 

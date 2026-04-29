@@ -3,7 +3,7 @@
 import { StockType } from "@prisma/client";
 import { revalidatePath, revalidateTag } from "next/cache";
 
-import { auth } from "@/auth";
+import { requireDashboardPermission } from "@/features/auth/guards";
 import { stockMovementSchema, type StockMovementInput } from "@/features/inventory/schemas";
 import { logAction } from "@/features/logs/audit";
 import { SHOP_PRODUCTS_CACHE_TAG } from "@/features/shop/cache";
@@ -14,21 +14,8 @@ type ActionResult =
   | { success: false; error: { code: string; message: string } };
 
 async function getOperatorId() {
-  const session = await auth();
-  if (session?.user.id && session.user.type === "STAFF") {
-    return session.user.id;
-  }
-
-  const admin = await prisma.user.findFirst({
-    where: { role: "ADMIN" },
-    select: { id: true },
-  });
-
-  if (!admin) {
-    throw new Error("未找到可用操作员，请先创建管理员账号");
-  }
-
-  return admin.id;
+  const user = await requireDashboardPermission("inventory:manage", "无权限执行库存操作");
+  return user.id;
 }
 
 function parseMovement(input: StockMovementInput) {

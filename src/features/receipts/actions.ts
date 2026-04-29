@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { requireDashboardPermission } from "@/features/auth/guards";
 import { logAction } from "@/features/logs/audit";
 import type { ActionResult } from "@/features/orders/types";
 import { toMoney } from "@/features/orders/utils";
@@ -37,6 +38,7 @@ export async function issueInvoice(input: z.infer<typeof invoiceSchema>): Promis
   }
 
   try {
+    await requireDashboardPermission("receipts:manage", "无权限开具票据");
     const order = await prisma.order.findUnique({
       where: { id: parsed.data.orderId },
       include: {

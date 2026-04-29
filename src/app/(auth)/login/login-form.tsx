@@ -36,7 +36,7 @@ export function LoginForm() {
       });
 
       if (!result?.ok) {
-        setError("手机号或密码错误，请检查后重试");
+        setError("手机号或密码错误；经销商申请需审核通过后才能登录");
         return;
       }
 
@@ -87,7 +87,7 @@ export function LoginForm() {
       <p className="text-center text-sm text-slate-500">
         还没有账号？
         <Link className="ml-1 font-medium text-[#1e3a5f] hover:underline" href="/register">
-          注册消费者账号
+          注册账号/经销商申请
         </Link>
       </p>
     </form>

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { auth } from "@/auth";
+import { requireDashboardPermission } from "@/features/auth/guards";
 import type { ActionResult } from "@/features/orders/types";
 import { prisma } from "@/lib/prisma";
 
@@ -12,11 +12,7 @@ const clearSchema = z.object({
 });
 
 async function requireAdmin() {
-  const session = await auth();
-  if (!session?.user.id || session.user.role !== "ADMIN") {
-    throw new Error("仅管理员可清除操作日志");
-  }
-  return session.user;
+  return requireDashboardPermission("logs:manage", "仅管理员可清除操作日志");
 }
 
 export async function clearAuditLogs(input: z.infer<typeof clearSchema>): Promise<ActionResult<{ deleted: number }>> {

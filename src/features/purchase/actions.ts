@@ -3,7 +3,7 @@
 import { PurchaseStatus, StockType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
-import { auth } from "@/auth";
+import { requireDashboardPermission } from "@/features/auth/guards";
 import { purchaseOrderSchema, supplierSchema, type PurchaseOrderInput, type SupplierInput } from "@/features/purchase/schemas";
 import { prisma } from "@/lib/prisma";
 
@@ -16,16 +16,8 @@ function getErrorMessage(error: unknown) {
 }
 
 async function getOperatorId() {
-  const session = await auth();
-  if (session?.user.id && session.user.type === "STAFF") {
-    return session.user.id;
-  }
-
-  const admin = await prisma.user.findFirst({ where: { role: "ADMIN" }, select: { id: true } });
-  if (!admin) {
-    throw new Error("未找到可用操作员，请先创建管理员账号");
-  }
-  return admin.id;
+  const user = await requireDashboardPermission("purchase:manage", "无权限执行采购操作");
+  return user.id;
 }
 
 function nextPurchaseNo() {
@@ -41,6 +33,7 @@ export async function createSupplier(input: SupplierInput): Promise<ActionResult
   }
 
   try {
+    await requireDashboardPermission("purchase:manage", "无权限维护供应商");
     await prisma.supplier.create({
       data: {
         name: parsed.data.name,
@@ -63,6 +56,7 @@ export async function updateSupplier(id: string, input: SupplierInput): Promise<
   }
 
   try {
+    await requireDashboardPermission("purchase:manage", "无权限维护供应商");
     await prisma.supplier.update({
       where: { id },
       data: {
@@ -81,6 +75,7 @@ export async function updateSupplier(id: string, input: SupplierInput): Promise<
 
 export async function deleteSupplier(id: string): Promise<ActionResult> {
   try {
+    await requireDashboardPermission("purchase:manage", "无权限维护供应商");
     const purchaseCount = await prisma.purchaseOrder.count({ where: { supplierId: id } });
     if (purchaseCount > 0) {
       return { success: false, error: { code: "SUPPLIER_IN_USE", message: `该供应商已有 ${purchaseCount} 张采购单，无法删除` } };
@@ -130,6 +125,7 @@ export async function createPurchaseOrder(input: PurchaseOrderInput): Promise<Ac
 
 export async function updatePurchaseStatus(id: string, status: PurchaseStatus): Promise<ActionResult> {
   try {
+    await requireDashboardPermission("purchase:manage", "无权限更新采购状态");
     await prisma.purchaseOrder.update({
       where: { id },
       data: {

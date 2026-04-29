@@ -129,6 +129,42 @@ createChannelConflict(data: ChannelConflictInput): Promise<ChannelConflict>
 updateChannelConflict(id: string, status: ConflictStatus, ownerId?: string, note?: string): Promise<ChannelConflict>
 ```
 
+### 2.13 权限与经销商审核（Phase 10）
+```typescript
+canAccessPath(role: AppRole | null | undefined, pathname: string): boolean
+filterDashboardNavItems(role: AppRole | null | undefined): DashboardNavItem[]
+requireRole(roles: AppRole[]): Promise<SessionUser>
+requireDashboardPermission(permission: DashboardPermission): Promise<SessionUser>
+
+registerCustomer(data: RegisterInput): Promise<
+  | { success: true; accountType: "CONSUMER"; status: "ACTIVE" }
+  | { success: true; accountType: "DEALER"; status: "PENDING_REVIEW" }
+  | { success: false; error: { code: string; message: string } }
+>
+
+approveDealerApplication(data: {
+  leadId: string
+  shopName: string
+  zone: string
+  latitude: number
+  longitude: number
+  serviceRadius: number
+  businessLicense?: string
+  salesPersonId?: string
+  notes?: string
+}): Promise<ActionResult<{ dealerId: string }>>
+
+rejectDealerApplication(data: {
+  leadId: string
+  reason: string
+}): Promise<ActionResult>
+```
+
+权限错误约定：
+- 未登录由 middleware 跳转 `/login?callbackUrl=...`。
+- 已登录越权由 middleware 跳转 `/forbidden`。
+- Server Action 返回 `UNAUTHORIZED` 或抛出“无权限...”错误，避免只依赖前端隐藏按钮。
+
 ### 2.12 业务员绩效（Phase 9 已上线）
 ```typescript
 getSalespersonManagementData(filters: SalespersonFilters): Promise<{

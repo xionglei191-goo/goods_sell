@@ -11,9 +11,10 @@ import { updateOrderStatus } from "@/features/orders/actions";
 type OrderStatusActionsProps = {
   orderId: string;
   status: OrderStatus;
+  allowedActions?: Array<"confirm" | "ship" | "deliver" | "complete" | "cancel">;
 };
 
-export function OrderStatusActions({ orderId, status }: OrderStatusActionsProps) {
+export function OrderStatusActions({ orderId, status, allowedActions }: OrderStatusActionsProps) {
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -23,7 +24,8 @@ export function OrderStatusActions({ orderId, status }: OrderStatusActionsProps)
     { key: "complete", label: "完成", icon: PackageCheck, show: status === "SHIPPING" || status === "DELIVERED" },
     { key: "cancel", label: "取消", icon: XCircle, show: status === "PENDING_PAYMENT" || status === "PAID" || status === "CONFIRMED" },
   ] as const;
-  const visible = actions.filter((action) => action.show);
+  const allowed = new Set(allowedActions ?? actions.map((action) => action.key));
+  const visible = actions.filter((action) => action.show && allowed.has(action.key));
 
   function run(action: (typeof actions)[number]["key"]) {
     startTransition(async () => {
