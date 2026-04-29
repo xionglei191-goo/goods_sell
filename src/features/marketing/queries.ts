@@ -1,6 +1,7 @@
-import type { ProductPushStatus, Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 
 import { auth } from "@/auth";
+import { customerSegmentLabels, evaluateCustomerSegment } from "@/features/customers/segmentation";
 import { formatCurrency, formatDateTime } from "@/features/orders/utils";
 import { prisma } from "@/lib/prisma";
 
@@ -51,6 +52,33 @@ function reasonEvents(value: Prisma.JsonValue | null | undefined) {
       };
     })
     .filter((event): event is { event: string; label: string; at: string } => Boolean(event?.event));
+}
+
+function customerSegmentTag(customer: Parameters<typeof evaluateCustomerSegment>[0]) {
+  const segment = evaluateCustomerSegment(customer).segment;
+  return `客户分层:${customerSegmentLabels[segment]}`;
+}
+
+function customerTargetLabels(customer: Parameters<typeof evaluateCustomerSegment>[0]) {
+  return Array.from(new Set([...customer.tags.map((tag) => tag.name), ...profileLabels(customer.profile?.tags), customerSegmentTag(customer)]));
+}
+
+function hasEvent(events: Array<{ event: string }>, event: string) {
+  return events.some((item) => item.event === event);
+}
+
+function percent(part: number, total: number) {
+  return total > 0 ? `${Math.round((part / total) * 100)}%` : "0%";
+}
+
+function nextPushAction(group: { total: number; opened: number; consulted: number; trial: number; ordered: number; repurchase: number; cancelled: number }) {
+  if (group.total === 0) return "先生成推送样本";
+  if (group.opened === 0) return "优化首句和触达渠道";
+  if (group.consulted >= group.opened * 0.5 && group.trial === 0) return "尽快安排样品或试饮";
+  if (group.trial > 0 && group.ordered === 0) return "补充组合价和首单政策";
+  if (group.ordered > 0 && group.repurchase === 0) return "设置复购提醒和二次触达";
+  if (group.cancelled >= group.total * 0.4) return "复盘目标人群和价格匹配";
+  return "继续跟进未转化客户";
 }
 
 export async function getMarketingCoupons() {
@@ -109,48 +137,91 @@ export async function getProductPushDashboardData() {
       take: 100,
     }),
     prisma.customer.findMany({
-      include: { profile: true, tags: true },
+      include: {
+        profile: { select: { tags: true } },
+        tags: true,
+        orders: { where: { parentId: null }, select: { type: true, status: true, payableAmount: true, createdAt: true } },
+        leads: { select: { scene: true, metadata: true, notes: true, createdAt: true } },
+        inquiries: { select: { scene: true, budget: true, content: true, notes: true, createdAt: true } },
+      },
       orderBy: { createdAt: "desc" },
       take: 500,
     }),
   ]);
-  const statusCounts = pushes.reduce(
-    (acc, push) => {
-      acc[push.status] += 1;
-      return acc;
-    },
-    { DRAFT: 0, SENT: 0, OPENED: 0, CLICKED: 0, CONVERTED: 0, CANCELLED: 0 } satisfies Record<ProductPushStatus, number>,
-  );
-  const eventCounts = pushes.reduce(
-    (acc, push) => {
-      for (const event of reasonEvents(push.reason)) {
-        if (event.event === "CONSULTED") acc.consulted += 1;
-        if (event.event === "TRIAL") acc.trial += 1;
-        if (event.event === "ORDERED") acc.ordered += 1;
-        if (event.event === "REPURCHASED") acc.repurchase += 1;
-      }
-      return acc;
-    },
-    { consulted: 0, trial: 0, ordered: 0, repurchase: 0 },
-  );
+
+  const pushRows = pushes.map((push) => {
+    const events = reasonEvents(push.reason);
+    const opened = push.status === "OPENED" || push.status === "CLICKED" || push.status === "CONVERTED" || Boolean(push.openedAt) || hasEvent(events, "OPENED");
+    const consulted = hasEvent(events, "CONSULTED");
+    const trial = hasEvent(events, "TRIAL");
+    const ordered = hasEvent(events, "ORDERED");
+    const repurchase = hasEvent(events, "REPURCHASED");
+    const converted = push.status === "CONVERTED" || ordered || repurchase;
+    const cancelled = push.status === "CANCELLED" || hasEvent(events, "CANCELLED");
+    return { push, events, opened, consulted, trial, ordered, repurchase, converted, cancelled };
+  });
+
   const tagCounts = new Map<string, number>();
   for (const customer of customers) {
-    const labels = [...customer.tags.map((tag) => tag.name), ...profileLabels(customer.profile?.tags)];
-    for (const label of new Set(labels)) {
+    for (const label of customerTargetLabels(customer)) {
       tagCounts.set(label, (tagCounts.get(label) ?? 0) + 1);
     }
   }
 
+  const summary = pushRows.reduce(
+    (acc, row) => {
+      acc.total += 1;
+      if (row.push.status !== "DRAFT") acc.sent += 1;
+      if (row.opened) acc.opened += 1;
+      if (row.consulted) acc.consulted += 1;
+      if (row.trial) acc.trial += 1;
+      if (row.ordered) acc.ordered += 1;
+      if (row.repurchase) acc.repurchase += 1;
+      if (row.converted) acc.converted += 1;
+      if (row.cancelled) acc.cancelled += 1;
+      return acc;
+    },
+    { total: 0, sent: 0, opened: 0, consulted: 0, trial: 0, ordered: 0, repurchase: 0, converted: 0, cancelled: 0 },
+  );
+
+  const reviewMap = new Map<
+    string,
+    {
+      productName: string;
+      targetTag: string;
+      total: number;
+      opened: number;
+      consulted: number;
+      trial: number;
+      ordered: number;
+      repurchase: number;
+      cancelled: number;
+      converted: number;
+    }
+  >();
+  for (const row of pushRows) {
+    const productName = row.push.product?.name ?? "商品已下架";
+    const targetTag = row.push.targetTag ?? "-";
+    const key = `${row.push.productId ?? "none"}:${targetTag}`;
+    const current = reviewMap.get(key) ?? { productName, targetTag, total: 0, opened: 0, consulted: 0, trial: 0, ordered: 0, repurchase: 0, cancelled: 0, converted: 0 };
+    current.total += 1;
+    if (row.opened) current.opened += 1;
+    if (row.consulted) current.consulted += 1;
+    if (row.trial) current.trial += 1;
+    if (row.ordered) current.ordered += 1;
+    if (row.repurchase) current.repurchase += 1;
+    if (row.cancelled) current.cancelled += 1;
+    if (row.converted) current.converted += 1;
+    reviewMap.set(key, current);
+  }
+
   return {
     summary: {
-      total: pushes.length,
-      sent: statusCounts.SENT + statusCounts.OPENED + statusCounts.CLICKED + statusCounts.CONVERTED,
-      opened: statusCounts.OPENED + statusCounts.CLICKED + statusCounts.CONVERTED,
-      consulted: eventCounts.consulted,
-      trial: eventCounts.trial,
-      ordered: eventCounts.ordered,
-      repurchase: eventCounts.repurchase,
-      converted: statusCounts.CONVERTED,
+      ...summary,
+      openRate: percent(summary.opened, summary.sent),
+      trialRate: percent(summary.trial, summary.sent),
+      orderRate: percent(summary.ordered + summary.repurchase, summary.sent),
+      repurchaseRate: percent(summary.repurchase, Math.max(summary.ordered, 1)),
     },
     form: {
       products: products.map((product) => ({
@@ -160,10 +231,21 @@ export async function getProductPushDashboardData() {
       })),
       targetTags: Array.from(tagCounts.entries())
         .sort((a, b) => b[1] - a[1])
-        .map(([name, count]) => ({ name, count })),
+        .map(([name, count]) => ({ name, count, source: name.startsWith("客户分层:") ? "动态分层" : "画像标签" })),
     },
-    items: pushes.map((push) => {
-      const events = reasonEvents(push.reason);
+    reviews: Array.from(reviewMap.values())
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 8)
+      .map((group) => ({
+        ...group,
+        openRate: percent(group.opened, group.total),
+        conversionRate: percent(group.converted, group.total),
+        nextAction: nextPushAction(group),
+      })),
+    items: pushRows.map((row) => {
+      const push = row.push;
+      const reason = reasonObject(push.reason);
+      const matchedLabels = Array.isArray(reason.matchedLabels) ? reason.matchedLabels.filter((item): item is string => typeof item === "string") : [];
       return {
         id: push.id,
         status: push.status,
@@ -172,13 +254,15 @@ export async function getProductPushDashboardData() {
         customerName: push.customer?.name ?? "客户已删除",
         customerPhone: push.customer?.phone ?? "-",
         targetTag: push.targetTag ?? "-",
+        targetSource: push.targetTag?.startsWith("客户分层:") ? "动态分层" : "画像标签",
+        matchedLabels: matchedLabels.slice(0, 4),
         message: push.message,
         sentAt: push.sentAt ? formatDateTime(push.sentAt) : "-",
         openedAt: push.openedAt ? formatDateTime(push.openedAt) : "-",
         clickedAt: push.clickedAt ? formatDateTime(push.clickedAt) : "-",
         convertedAt: push.convertedAt ? formatDateTime(push.convertedAt) : "-",
-        latestEvent: events.at(-1)?.label ?? "-",
-        eventTrail: events.map((event) => `${event.label} ${event.at ? formatDateTime(event.at) : ""}`),
+        latestEvent: row.events.at(-1)?.label ?? "-",
+        eventTrail: row.events.map((event) => `${event.label} ${event.at ? formatDateTime(event.at) : ""}`),
         createdAt: formatDateTime(push.createdAt),
       };
     }),

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { auth } from "@/auth";
+import { customerSegmentLabels, evaluateCustomerSegment } from "@/features/customers/segmentation";
 import type { ActionResult } from "@/features/orders/types";
 import { toMoney } from "@/features/orders/utils";
 import { prisma } from "@/lib/prisma";
@@ -75,9 +76,26 @@ function reasonObject(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
-function buildProductPushMessage(input: { customerName: string; productName: string; targetTag: string; category: string; brand: string }) {
-  const segment = input.targetTag.replace(/^画像:/, "");
-  return `${input.customerName}您好，${input.brand}${input.productName}适合${segment}场景，${input.category}新品可咨询试饮、组合价和配送安排。`;
+function normalizeTargetName(targetTag: string) {
+  return targetTag.replace(/^画像:/, "").replace(/^客户分层:/, "");
+}
+
+function buildProductPushMessage(input: { customerName: string; productName: string; targetTag: string; category: string; brand: string; description?: string | null }) {
+  const segment = normalizeTargetName(input.targetTag);
+  const productIntro = input.description ? `，${input.description.slice(0, 48)}` : "";
+  if (segment.includes("团购")) {
+    return `${input.customerName}您好，${input.brand}${input.productName}${productIntro}，适合企业福利、节礼和批量采购。可给您单独核算组合价、开票和分批配送方案。`;
+  }
+  if (segment.includes("餐饮")) {
+    return `${input.customerName}您好，${input.brand}${input.productName}${productIntro}，适合餐饮门店做高周转新品试饮。可先安排样品、动销建议和补货周期。`;
+  }
+  if (segment.includes("烟酒")) {
+    return `${input.customerName}您好，${input.brand}${input.productName}${productIntro}，适合门店陈列和老客推荐。可咨询试饮、进货组合价和就近配送。`;
+  }
+  if (segment.includes("宴席")) {
+    return `${input.customerName}您好，${input.brand}${input.productName}${productIntro}，适合宴席备货和临时补货。可按桌数、预算和配送时间给您配一套方案。`;
+  }
+  return `${input.customerName}您好，${input.brand}${input.productName}${productIntro}，这款${input.category}新品可咨询试饮、组合价和配送安排。`;
 }
 
 function eventLabel(event: ProductPushEventInput["event"]) {
@@ -99,6 +117,15 @@ function statusFromEvent(event: ProductPushEventInput["event"]): ProductPushStat
   if (event === "CONSULTED" || event === "TRIAL") return "CLICKED";
   if (event === "OPENED") return "OPENED";
   return "SENT";
+}
+
+function customerSegmentTag(customer: Parameters<typeof evaluateCustomerSegment>[0]) {
+  const segment = evaluateCustomerSegment(customer).segment;
+  return `客户分层:${customerSegmentLabels[segment]}`;
+}
+
+function customerTargetLabels(customer: Parameters<typeof evaluateCustomerSegment>[0]) {
+  return Array.from(new Set([...customer.tags.map((tag) => tag.name), ...profileLabels(customer.profile?.tags), customerSegmentTag(customer)]));
 }
 
 export async function createCoupon(input: CouponInput): Promise<ActionResult> {
@@ -199,12 +226,18 @@ export async function createProductPush(input: CreateProductPushInput): Promise<
     }
 
     const customers = await prisma.customer.findMany({
-      include: { profile: true, tags: true },
+      include: {
+        profile: { select: { tags: true } },
+        tags: true,
+        orders: { where: { parentId: null }, select: { type: true, status: true, payableAmount: true, createdAt: true } },
+        leads: { select: { scene: true, metadata: true, notes: true, createdAt: true } },
+        inquiries: { select: { scene: true, budget: true, content: true, notes: true, createdAt: true } },
+      },
       orderBy: { createdAt: "desc" },
       take: 300,
     });
     const targets = customers.filter((customer) => {
-      const labels = [...customer.tags.map((tag) => tag.name), ...profileLabels(customer.profile?.tags)];
+      const labels = customerTargetLabels(customer);
       return labels.includes(parsed.data.targetTag);
     });
     if (targets.length === 0) {
@@ -228,7 +261,7 @@ export async function createProductPush(input: CreateProductPushInput): Promise<
     const now = new Date();
     await prisma.productPush.createMany({
       data: selected.map((customer) => {
-        const labels = [...customer.tags.map((tag) => tag.name), ...profileLabels(customer.profile?.tags)];
+        const labels = customerTargetLabels(customer);
         return {
           productId: product.id,
           customerId: customer.id,
@@ -242,6 +275,7 @@ export async function createProductPush(input: CreateProductPushInput): Promise<
               targetTag: parsed.data.targetTag,
               category: product.category.name,
               brand: product.brand.name,
+              description: product.description,
             }),
           sentAt: now,
           reason: {

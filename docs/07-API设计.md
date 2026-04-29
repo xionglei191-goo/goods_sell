@@ -123,6 +123,7 @@ recordPromoterVisit(data: PromoterVisitInput): Promise<void>
 bindDealerPilot(data: { salespersonId: string; dealerIds: string[]; generateSalespersonCode: boolean; generateDealerCodes: boolean }): Promise<PilotBindResult>
 createProductPush(data: ProductPushInput): Promise<ProductPush>
 recordProductPushEvent(id: string, event: PushEvent): Promise<void>
+reviewProductPushFunnel(productId?: string, targetTag?: string): Promise<ProductPushReview>
 createChannelConflict(data: ChannelConflictInput): Promise<ChannelConflict>
 updateChannelConflict(id: string, status: ConflictStatus, ownerId?: string, note?: string): Promise<ChannelConflict>
 ```

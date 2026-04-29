@@ -31,21 +31,71 @@ export default async function ProductPushesPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">新品推送</h1>
-        <p className="mt-1 text-sm text-slate-500">按画像筛选客户，记录打开、咨询、试饮、下单和复购。</p>
+        <p className="mt-1 text-sm text-slate-500">按画像或客户分层筛选客户，生成话术并记录打开、咨询、试饮、下单、复购和复盘建议。</p>
       </div>
 
-      <section className="grid gap-4 md:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-6">
         <SummaryCard label="推送记录" value={String(data.summary.total)} />
-        <SummaryCard label="已打开" value={String(data.summary.opened)} tone="blue" />
+        <SummaryCard label="打开率" value={data.summary.openRate} tone="blue" />
         <SummaryCard label="咨询/试饮" value={`${data.summary.consulted}/${data.summary.trial}`} tone="amber" />
         <SummaryCard label="下单/复购" value={`${data.summary.ordered}/${data.summary.repurchase}`} tone="emerald" />
+        <SummaryCard label="转化率" value={data.summary.orderRate} tone="emerald" />
+        <SummaryCard label="已取消" value={String(data.summary.cancelled)} />
       </section>
 
       <ProductPushForm products={data.form.products} targetTags={data.form.targetTags} />
 
       <section className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
+        <div className="border-b border-slate-100 px-4 py-3">
+          <h2 className="text-sm font-semibold text-slate-900">新品推送复盘</h2>
+        </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1240px] text-left text-sm">
+          <table className="w-full min-w-[980px] text-left text-sm">
+            <thead className="bg-slate-50 text-slate-500">
+              <tr>
+                <th className="px-4 py-3 font-medium">新品 / 人群</th>
+                <th className="px-4 py-3 font-medium">触达</th>
+                <th className="px-4 py-3 font-medium">打开</th>
+                <th className="px-4 py-3 font-medium">咨询</th>
+                <th className="px-4 py-3 font-medium">试饮</th>
+                <th className="px-4 py-3 font-medium">下单</th>
+                <th className="px-4 py-3 font-medium">复购</th>
+                <th className="px-4 py-3 font-medium">转化率</th>
+                <th className="px-4 py-3 font-medium">下一步</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.reviews.map((review) => (
+                <tr className="border-t border-slate-100 hover:bg-slate-50" key={`${review.productName}-${review.targetTag}`}>
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-slate-900">{review.productName}</p>
+                    <p className="mt-1 text-xs text-slate-500">{review.targetTag}</p>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">{review.total}</td>
+                  <td className="px-4 py-3 text-slate-600">{review.opened} · {review.openRate}</td>
+                  <td className="px-4 py-3 text-slate-600">{review.consulted}</td>
+                  <td className="px-4 py-3 text-slate-600">{review.trial}</td>
+                  <td className="px-4 py-3 text-slate-600">{review.ordered}</td>
+                  <td className="px-4 py-3 text-slate-600">{review.repurchase}</td>
+                  <td className="px-4 py-3 font-medium text-slate-900">{review.conversionRate}</td>
+                  <td className="px-4 py-3 text-slate-600">{review.nextAction}</td>
+                </tr>
+              ))}
+              {data.reviews.length === 0 ? (
+                <tr>
+                  <td className="px-4 py-8 text-center text-slate-500" colSpan={9}>
+                    暂无可复盘的新品推送
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1380px] text-left text-sm">
             <thead className="bg-slate-50 text-slate-500">
               <tr>
                 <th className="px-4 py-3 font-medium">新品</th>
@@ -69,7 +119,15 @@ export default async function ProductPushesPage() {
                     <p className="font-medium text-slate-900">{item.customerName}</p>
                     <p className="mt-1 text-xs text-slate-500">{item.customerPhone}</p>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{item.targetTag}</td>
+                  <td className="px-4 py-3 text-slate-600">
+                    <p>{item.targetTag}</p>
+                    <p className="mt-1 text-xs text-slate-400">{item.targetSource}</p>
+                    <div className="mt-2 flex max-w-64 flex-wrap gap-1">
+                      {item.matchedLabels.map((label) => (
+                        <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-500" key={label}>{label}</span>
+                      ))}
+                    </div>
+                  </td>
                   <td className="px-4 py-3">
                     <span className={`rounded-full px-2 py-1 text-xs ${statusClasses[item.status]}`}>{statusLabels[item.status]}</span>
                   </td>

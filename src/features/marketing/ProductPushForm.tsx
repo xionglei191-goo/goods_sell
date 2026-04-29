@@ -9,7 +9,7 @@ import { createProductPush } from "@/features/marketing/actions";
 
 type ProductPushFormProps = {
   products: Array<{ id: string; label: string; meta: string }>;
-  targetTags: Array<{ name: string; count: number }>;
+  targetTags: Array<{ name: string; count: number; source: string }>;
 };
 
 export function ProductPushForm({ products, targetTags }: ProductPushFormProps) {
@@ -17,6 +17,7 @@ export function ProductPushForm({ products, targetTags }: ProductPushFormProps) 
   const [form, setForm] = useState({ productId: products[0]?.id ?? "", targetTag: targetTags[0]?.name ?? "", message: "" });
   const [notice, setNotice] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const selectedTag = targetTags.find((tag) => tag.name === form.targetTag);
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -36,7 +37,7 @@ export function ProductPushForm({ products, targetTags }: ProductPushFormProps) 
     <form className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200" onSubmit={submit}>
       <div>
         <h2 className="text-lg font-semibold text-slate-900">创建新品推送</h2>
-        <p className="mt-1 text-sm text-slate-500">选择 1 款新品和目标画像，系统会批量生成推送记录。</p>
+        <p className="mt-1 text-sm text-slate-500">选择 1 款新品和目标人群，系统会生成匹配画像或客户分层的话术与推送记录。</p>
       </div>
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <label className="space-y-2">
@@ -55,10 +56,11 @@ export function ProductPushForm({ products, targetTags }: ProductPushFormProps) 
           <select className="form-input" disabled={isPending || targetTags.length === 0} onChange={(event) => setForm((current) => ({ ...current, targetTag: event.target.value }))} value={form.targetTag}>
             {targetTags.map((tag) => (
               <option key={tag.name} value={tag.name}>
-                {tag.name}（{tag.count} 人）
+                {tag.name}（{tag.count} 人 · {tag.source}）
               </option>
             ))}
           </select>
+          {selectedTag ? <p className="text-xs text-slate-500">{selectedTag.source} · 可覆盖 {selectedTag.count} 人</p> : null}
         </label>
       </div>
       <label className="mt-4 block space-y-2">
