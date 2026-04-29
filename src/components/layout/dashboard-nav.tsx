@@ -130,6 +130,7 @@ export const dashboardNavItems: DashboardNavItem[] = [
     children: [
       { title: "运营看板", href: "/dashboard/marketing/operations" },
       { title: "优惠券管理", href: "/dashboard/marketing/coupons" },
+      { title: "新品推送", href: "/dashboard/product-pushes" },
     ],
   },
   {
@@ -191,6 +192,7 @@ export const breadcrumbLabels: Record<string, string> = {
   marketing: "运营营销",
   operations: "运营看板",
   coupons: "优惠券管理",
+  "product-pushes": "新品推送",
   wechat: "微信生态",
   new: "新建",
   delivery: "物流配送",

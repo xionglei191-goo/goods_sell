@@ -1,4 +1,7 @@
+import type { ProductPushStatus, Prisma } from "@prisma/client";
+
 import { auth } from "@/auth";
+import { formatCurrency, formatDateTime } from "@/features/orders/utils";
 import { prisma } from "@/lib/prisma";
 
 function startOfDay(date: Date) {
@@ -28,6 +31,26 @@ function profileLabels(tags: unknown) {
 
   const labels = (tags as { labels?: unknown }).labels;
   return Array.isArray(labels) ? labels.filter((item): item is string => typeof item === "string") : [];
+}
+
+function reasonObject(value: Prisma.JsonValue | null | undefined) {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function reasonEvents(value: Prisma.JsonValue | null | undefined) {
+  const events = reasonObject(value).events;
+  if (!Array.isArray(events)) return [];
+  return events
+    .map((event) => {
+      if (!event || typeof event !== "object" || Array.isArray(event)) return null;
+      const row = event as Record<string, unknown>;
+      return {
+        event: typeof row.event === "string" ? row.event : "",
+        label: typeof row.label === "string" ? row.label : "",
+        at: typeof row.at === "string" ? row.at : "",
+      };
+    })
+    .filter((event): event is { event: string; label: string; at: string } => Boolean(event?.event));
 }
 
 export async function getMarketingCoupons() {
@@ -66,6 +89,99 @@ export async function getMarketingCoupons() {
       holders: coupon.holders.length,
     })),
     targetTags,
+  };
+}
+
+export async function getProductPushDashboardData() {
+  const [pushes, products, customers] = await Promise.all([
+    prisma.productPush.findMany({
+      include: {
+        product: { include: { brand: { select: { name: true } }, category: { select: { name: true } } } },
+        customer: { select: { name: true, phone: true, tags: true, profile: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    }),
+    prisma.product.findMany({
+      where: { status: "ACTIVE" },
+      include: { brand: { select: { name: true } }, category: { select: { name: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    }),
+    prisma.customer.findMany({
+      include: { profile: true, tags: true },
+      orderBy: { createdAt: "desc" },
+      take: 500,
+    }),
+  ]);
+  const statusCounts = pushes.reduce(
+    (acc, push) => {
+      acc[push.status] += 1;
+      return acc;
+    },
+    { DRAFT: 0, SENT: 0, OPENED: 0, CLICKED: 0, CONVERTED: 0, CANCELLED: 0 } satisfies Record<ProductPushStatus, number>,
+  );
+  const eventCounts = pushes.reduce(
+    (acc, push) => {
+      for (const event of reasonEvents(push.reason)) {
+        if (event.event === "CONSULTED") acc.consulted += 1;
+        if (event.event === "TRIAL") acc.trial += 1;
+        if (event.event === "ORDERED") acc.ordered += 1;
+        if (event.event === "REPURCHASED") acc.repurchase += 1;
+      }
+      return acc;
+    },
+    { consulted: 0, trial: 0, ordered: 0, repurchase: 0 },
+  );
+  const tagCounts = new Map<string, number>();
+  for (const customer of customers) {
+    const labels = [...customer.tags.map((tag) => tag.name), ...profileLabels(customer.profile?.tags)];
+    for (const label of new Set(labels)) {
+      tagCounts.set(label, (tagCounts.get(label) ?? 0) + 1);
+    }
+  }
+
+  return {
+    summary: {
+      total: pushes.length,
+      sent: statusCounts.SENT + statusCounts.OPENED + statusCounts.CLICKED + statusCounts.CONVERTED,
+      opened: statusCounts.OPENED + statusCounts.CLICKED + statusCounts.CONVERTED,
+      consulted: eventCounts.consulted,
+      trial: eventCounts.trial,
+      ordered: eventCounts.ordered,
+      repurchase: eventCounts.repurchase,
+      converted: statusCounts.CONVERTED,
+    },
+    form: {
+      products: products.map((product) => ({
+        id: product.id,
+        label: `${product.name} · ${product.brand.name} · ${formatCurrency(Number(product.retailPrice))}`,
+        meta: `${product.category.name} · 库存 ${product.stock} · ${formatDateTime(product.createdAt)}`,
+      })),
+      targetTags: Array.from(tagCounts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([name, count]) => ({ name, count })),
+    },
+    items: pushes.map((push) => {
+      const events = reasonEvents(push.reason);
+      return {
+        id: push.id,
+        status: push.status,
+        productName: push.product?.name ?? "商品已下架",
+        productMeta: push.product ? `${push.product.brand.name} · ${push.product.category.name}` : "-",
+        customerName: push.customer?.name ?? "客户已删除",
+        customerPhone: push.customer?.phone ?? "-",
+        targetTag: push.targetTag ?? "-",
+        message: push.message,
+        sentAt: push.sentAt ? formatDateTime(push.sentAt) : "-",
+        openedAt: push.openedAt ? formatDateTime(push.openedAt) : "-",
+        clickedAt: push.clickedAt ? formatDateTime(push.clickedAt) : "-",
+        convertedAt: push.convertedAt ? formatDateTime(push.convertedAt) : "-",
+        latestEvent: events.at(-1)?.label ?? "-",
+        eventTrail: events.map((event) => `${event.label} ${event.at ? formatDateTime(event.at) : ""}`),
+        createdAt: formatDateTime(push.createdAt),
+      };
+    }),
   };
 }
 

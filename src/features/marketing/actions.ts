@@ -1,5 +1,6 @@
 "use server";
 
+import type { ProductPushStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -39,6 +40,20 @@ const couponSchema = z
 
 export type CouponInput = z.infer<typeof couponSchema>;
 
+const createProductPushSchema = z.object({
+  productId: z.string().trim().min(1, "请选择新品"),
+  targetTag: z.string().trim().min(1, "请选择画像标签"),
+  message: z.string().trim().max(500, "推送话术不超过 500 字").optional(),
+});
+
+const productPushEventSchema = z.object({
+  id: z.string().trim().min(1, "缺少推送记录"),
+  event: z.enum(["SENT", "OPENED", "CONSULTED", "TRIAL", "ORDERED", "REPURCHASED", "CANCELLED"]),
+});
+
+export type CreateProductPushInput = z.infer<typeof createProductPushSchema>;
+export type ProductPushEventInput = z.infer<typeof productPushEventSchema>;
+
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "操作失败";
 }
@@ -48,6 +63,42 @@ async function requireStaff() {
   if (!session?.user.role || !staffRoles.has(session.user.role)) {
     throw new Error("无权限执行营销操作");
   }
+}
+
+function profileLabels(tags: unknown) {
+  if (!tags || typeof tags !== "object" || Array.isArray(tags)) return [];
+  const labels = (tags as { labels?: unknown }).labels;
+  return Array.isArray(labels) ? labels.filter((item): item is string => typeof item === "string") : [];
+}
+
+function reasonObject(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function buildProductPushMessage(input: { customerName: string; productName: string; targetTag: string; category: string; brand: string }) {
+  const segment = input.targetTag.replace(/^画像:/, "");
+  return `${input.customerName}您好，${input.brand}${input.productName}适合${segment}场景，${input.category}新品可咨询试饮、组合价和配送安排。`;
+}
+
+function eventLabel(event: ProductPushEventInput["event"]) {
+  const labels: Record<ProductPushEventInput["event"], string> = {
+    SENT: "已发送",
+    OPENED: "已打开",
+    CONSULTED: "已咨询",
+    TRIAL: "已试饮",
+    ORDERED: "已下单",
+    REPURCHASED: "已复购",
+    CANCELLED: "已取消",
+  };
+  return labels[event];
+}
+
+function statusFromEvent(event: ProductPushEventInput["event"]): ProductPushStatus {
+  if (event === "CANCELLED") return "CANCELLED";
+  if (event === "ORDERED" || event === "REPURCHASED") return "CONVERTED";
+  if (event === "CONSULTED" || event === "TRIAL") return "CLICKED";
+  if (event === "OPENED") return "OPENED";
+  return "SENT";
 }
 
 export async function createCoupon(input: CouponInput): Promise<ActionResult> {
@@ -123,5 +174,133 @@ export async function issueCouponByTag(couponId: string, tag: string): Promise<A
     return { success: true, message: `已发放 ${selected.length} 张优惠券`, data: { count: selected.length } };
   } catch (error) {
     return { success: false, error: { code: "ISSUE_COUPON_FAILED", message: getErrorMessage(error) } };
+  }
+}
+
+export async function createProductPush(input: CreateProductPushInput): Promise<ActionResult<{ count: number }>> {
+  try {
+    await requireStaff();
+  } catch (error) {
+    return { success: false, error: { code: "UNAUTHORIZED", message: getErrorMessage(error) } };
+  }
+
+  const parsed = createProductPushSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0]?.message ?? "新品推送信息不完整" } };
+  }
+
+  try {
+    const product = await prisma.product.findUnique({
+      where: { id: parsed.data.productId },
+      include: { brand: { select: { name: true } }, category: { select: { name: true } } },
+    });
+    if (!product || product.status !== "ACTIVE") {
+      throw new Error("新品不存在或已下架");
+    }
+
+    const customers = await prisma.customer.findMany({
+      include: { profile: true, tags: true },
+      orderBy: { createdAt: "desc" },
+      take: 300,
+    });
+    const targets = customers.filter((customer) => {
+      const labels = [...customer.tags.map((tag) => tag.name), ...profileLabels(customer.profile?.tags)];
+      return labels.includes(parsed.data.targetTag);
+    });
+    if (targets.length === 0) {
+      return { success: false, error: { code: "NO_TARGETS", message: "该画像标签下暂无可推送客户" } };
+    }
+
+    const existing = await prisma.productPush.findMany({
+      where: {
+        productId: product.id,
+        targetTag: parsed.data.targetTag,
+        customerId: { in: targets.map((customer) => customer.id) },
+      },
+      select: { customerId: true },
+    });
+    const existingCustomerIds = new Set(existing.map((item) => item.customerId).filter((id): id is string => Boolean(id)));
+    const selected = targets.filter((customer) => !existingCustomerIds.has(customer.id)).slice(0, 80);
+    if (selected.length === 0) {
+      return { success: false, error: { code: "NO_NEW_TARGETS", message: "该新品已覆盖当前画像客户" } };
+    }
+
+    const now = new Date();
+    await prisma.productPush.createMany({
+      data: selected.map((customer) => {
+        const labels = [...customer.tags.map((tag) => tag.name), ...profileLabels(customer.profile?.tags)];
+        return {
+          productId: product.id,
+          customerId: customer.id,
+          targetTag: parsed.data.targetTag,
+          status: "SENT",
+          message:
+            parsed.data.message ||
+            buildProductPushMessage({
+              customerName: customer.name,
+              productName: product.name,
+              targetTag: parsed.data.targetTag,
+              category: product.category.name,
+              brand: product.brand.name,
+            }),
+          sentAt: now,
+          reason: {
+            targetTag: parsed.data.targetTag,
+            matchedLabels: Array.from(new Set(labels)),
+            productName: product.name,
+            generatedAt: now.toISOString(),
+            events: [{ event: "SENT", label: eventLabel("SENT"), at: now.toISOString() }],
+          },
+        };
+      }),
+    });
+
+    revalidatePath("/dashboard/product-pushes");
+    revalidatePath("/dashboard/marketing/operations");
+    return { success: true, message: `已生成 ${selected.length} 条新品推送`, data: { count: selected.length } };
+  } catch (error) {
+    return { success: false, error: { code: "CREATE_PRODUCT_PUSH_FAILED", message: getErrorMessage(error) } };
+  }
+}
+
+export async function recordProductPushEvent(input: ProductPushEventInput): Promise<ActionResult> {
+  try {
+    await requireStaff();
+  } catch (error) {
+    return { success: false, error: { code: "UNAUTHORIZED", message: getErrorMessage(error) } };
+  }
+
+  const parsed = productPushEventSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0]?.message ?? "推送事件信息不完整" } };
+  }
+
+  try {
+    const push = await prisma.productPush.findUnique({ where: { id: parsed.data.id }, select: { reason: true } });
+    if (!push) throw new Error("推送记录不存在");
+
+    const now = new Date();
+    const reason = reasonObject(push.reason);
+    const events = Array.isArray(reason.events) ? reason.events : [];
+    const eventItem = { event: parsed.data.event, label: eventLabel(parsed.data.event), at: now.toISOString() };
+    const data = {
+      status: statusFromEvent(parsed.data.event),
+      reason: { ...reason, events: [...events, eventItem] },
+      ...(parsed.data.event === "SENT" ? { sentAt: now } : {}),
+      ...(parsed.data.event === "OPENED" ? { openedAt: now } : {}),
+      ...(parsed.data.event === "CONSULTED" || parsed.data.event === "TRIAL" ? { clickedAt: now } : {}),
+      ...(parsed.data.event === "ORDERED" || parsed.data.event === "REPURCHASED" ? { convertedAt: now } : {}),
+    };
+
+    await prisma.productPush.update({
+      where: { id: parsed.data.id },
+      data,
+    });
+
+    revalidatePath("/dashboard/product-pushes");
+    revalidatePath("/dashboard/marketing/operations");
+    return { success: true, message: eventItem.label };
+  } catch (error) {
+    return { success: false, error: { code: "RECORD_PRODUCT_PUSH_EVENT_FAILED", message: getErrorMessage(error) } };
   }
 }
