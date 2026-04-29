@@ -120,6 +120,7 @@ convertQuoteToOrder(quoteId: string): Promise<Order>
 createPromoterCode(data: PromoterCodeInput): Promise<PromoterCode>
 resolvePromoterCode(code: string): Promise<PromoterContext>
 recordPromoterVisit(data: PromoterVisitInput): Promise<void>
+bindDealerPilot(data: { salespersonId: string; dealerIds: string[]; generateSalespersonCode: boolean; generateDealerCodes: boolean }): Promise<PilotBindResult>
 createProductPush(data: ProductPushInput): Promise<ProductPush>
 recordProductPushEvent(id: string, event: PushEvent): Promise<void>
 createChannelConflict(data: ChannelConflictInput): Promise<ChannelConflict>
