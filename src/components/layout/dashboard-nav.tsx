@@ -81,9 +81,13 @@ export const dashboardNavItems: DashboardNavItem[] = [
     icon: Store,
   },
   {
-    title: "销售报表",
+    title: "销售管理",
     href: "/dashboard/sales",
     icon: BarChart3,
+    children: [
+      { title: "销售报表", href: "/dashboard/sales" },
+      { title: "销售员管理", href: "/dashboard/salespeople" },
+    ],
   },
   {
     title: "财务管理",
@@ -158,6 +162,7 @@ export const breadcrumbLabels: Record<string, string> = {
   customers: "客户管理",
   dealers: "经销商管理",
   sales: "销售报表",
+  salespeople: "销售员管理",
   finance: "财务管理",
   receivable: "应收账款",
   payments: "收款登记",
