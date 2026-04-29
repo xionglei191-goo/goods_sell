@@ -434,4 +434,4 @@
 - [x] 销售员数据隔离：客户、订单、线索、询价、报价、推广码、经销商等后台查询默认限制名下或分派数据。
 - [x] 新增 RBAC smoke 测试，覆盖路由、菜单、注册审核和权限工具。
 - [x] 运行 `npx tsc --noEmit`、`npm run lint`、`npm run build`、`npm audit --audit-level=moderate` 和 smoke 测试。
-- [ ] 提交代码并部署到 `shop.xionglei.online`。
+- [x] 提交代码并部署到 `shop.xionglei.online`。
