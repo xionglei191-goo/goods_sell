@@ -4,15 +4,20 @@ import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { customerSegmentLabels, type CustomerSegment } from "@/features/customers/segmentation";
+
 type CustomerFiltersProps = {
   initial: {
     q: string;
     type: string;
     salesPersonId: string;
     tag: string;
+    segment: string;
   };
   salespeople: Array<{ id: string; name: string }>;
 };
+
+const customerSegments: CustomerSegment[] = ["HIGH_VALUE_GROUP_BUY", "RESTAURANT", "TOBACCO_WINE_STORE", "BANQUET", "REGULAR"];
 
 export function CustomerFilters({ initial, salespeople }: CustomerFiltersProps) {
   const router = useRouter();
@@ -36,7 +41,7 @@ export function CustomerFilters({ initial, salespeople }: CustomerFiltersProps) 
   }
 
   return (
-    <div className="grid gap-3 rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
+    <div className="grid gap-3 rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200 md:grid-cols-[1.4fr_1fr_1fr_1fr_1fr]">
       <label className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input className="h-10 w-full rounded-md border border-slate-200 pl-9 pr-3 text-sm outline-none focus:border-blue-400" onChange={(event) => update("q", event.target.value)} placeholder="客户名 / 手机号" value={filters.q} />
@@ -51,6 +56,14 @@ export function CustomerFilters({ initial, salespeople }: CustomerFiltersProps) 
         {salespeople.map((person) => (
           <option key={person.id} value={person.id}>
             {person.name}
+          </option>
+        ))}
+      </select>
+      <select className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400" onChange={(event) => update("segment", event.target.value)} value={filters.segment}>
+        <option value="">全部分层</option>
+        {customerSegments.map((segment) => (
+          <option key={segment} value={segment}>
+            {customerSegmentLabels[segment]}
           </option>
         ))}
       </select>

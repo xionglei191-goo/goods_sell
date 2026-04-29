@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ProfileRefreshButton } from "@/features/ai/ProfileRefreshButton";
 import { ProfileTrendChart } from "@/features/ai/ProfileCharts";
+import { customerSegmentClasses, customerSegmentLabels } from "@/features/customers/segmentation";
 import { getCustomerDetail } from "@/features/customers/queries";
 import { formatCurrency, formatDateTime, orderStatusClasses, orderStatusLabels } from "@/features/orders/utils";
 import { cn } from "@/lib/utils";
@@ -111,10 +112,12 @@ export default async function CustomerDetailPage({ params }: CustomerDetailPageP
             </div>
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
+            <span className={cn("rounded-full px-2 py-1 text-xs font-medium", customerSegmentClasses[data.customer.segment])}>{customerSegmentLabels[data.customer.segment]}</span>
             {profileLabels.length > 0 ? profileLabels.map((label) => (
               <span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700" key={label}>{label}</span>
             )) : <span className="text-sm text-slate-500">点击刷新画像生成标签</span>}
           </div>
+          <p className="mt-3 text-sm text-slate-600">{data.customer.nextAction}</p>
         </div>
       </section>
 

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import type { CustomerType, Prisma } from "@prisma/client";
 
+import { evaluateCustomerSegment, type CustomerSegment } from "@/features/customers/segmentation";
 import { firstParam, formatCurrency } from "@/features/orders/utils";
 import { prisma } from "@/lib/prisma";
 
@@ -10,14 +11,22 @@ function normalizeCustomerType(value: string): CustomerType | undefined {
   return value === "CONSUMER" || value === "DEALER" ? value : undefined;
 }
 
+const customerSegments = ["HIGH_VALUE_GROUP_BUY", "RESTAURANT", "TOBACCO_WINE_STORE", "BANQUET", "REGULAR"] as const;
+
+function normalizeSegment(value: string): CustomerSegment | undefined {
+  return customerSegments.includes(value as CustomerSegment) ? (value as CustomerSegment) : undefined;
+}
+
 export async function getCustomerList(searchParams: SearchParams) {
   const filters = {
     q: firstParam(searchParams.q),
     type: firstParam(searchParams.type),
     salesPersonId: firstParam(searchParams.salesPersonId),
     tag: firstParam(searchParams.tag),
+    segment: firstParam(searchParams.segment),
   };
   const type = normalizeCustomerType(filters.type);
+  const segment = normalizeSegment(filters.segment);
   const where: Prisma.CustomerWhereInput = {
     ...(type ? { type } : {}),
     ...(filters.q
@@ -37,9 +46,12 @@ export async function getCustomerList(searchParams: SearchParams) {
       include: {
         salesPerson: { select: { id: true, name: true } },
         tags: true,
+        profile: { select: { tags: true } },
+        leads: { select: { scene: true, metadata: true, notes: true, createdAt: true } },
+        inquiries: { select: { scene: true, budget: true, content: true, notes: true, createdAt: true } },
         orders: {
           where: { parentId: null },
-          select: { status: true, payableAmount: true, paidAmount: true, createdAt: true },
+          select: { type: true, status: true, payableAmount: true, paidAmount: true, createdAt: true },
         },
       },
       orderBy: { createdAt: "desc" },
@@ -52,14 +64,12 @@ export async function getCustomerList(searchParams: SearchParams) {
     }),
   ]);
 
-  return {
-    filters,
-    salespeople,
-    items: customers.map((customer) => {
+  const items = customers.map((customer) => {
       const completedOrders = customer.orders.filter((order) => order.status === "COMPLETED");
       const totalSpent = completedOrders.reduce((sum, order) => sum + Number(order.payableAmount), 0);
       const debt = customer.orders.reduce((sum, order) => sum + Math.max(0, Number(order.payableAmount) - Number(order.paidAmount)), 0);
       const lastOrder = [...customer.orders].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+      const segmentation = evaluateCustomerSegment(customer);
       return {
         id: customer.id,
         name: customer.name,
@@ -73,8 +83,39 @@ export async function getCustomerList(searchParams: SearchParams) {
         debt,
         debtText: formatCurrency(debt),
         lastOrderAt: lastOrder?.createdAt.toISOString() ?? null,
+        segment: segmentation.segment,
+        segmentReasons: segmentation.reasons,
+        nextAction: segmentation.nextAction,
+        groupBuyAmountText: formatCurrency(segmentation.metrics.groupBuyAmount),
+        sceneStats: {
+          groupBuyCount: segmentation.metrics.groupBuyCount,
+          restockCount: segmentation.metrics.restockCount,
+          banquetCount: segmentation.metrics.banquetCount,
+        },
       };
-    }),
+    });
+  const segmentCounts = items.reduce(
+    (counts, item) => {
+      counts[item.segment] += 1;
+      return counts;
+    },
+    {
+      HIGH_VALUE_GROUP_BUY: 0,
+      RESTAURANT: 0,
+      TOBACCO_WINE_STORE: 0,
+      BANQUET: 0,
+      REGULAR: 0,
+    } satisfies Record<CustomerSegment, number>,
+  );
+
+  return {
+    filters,
+    salespeople,
+    summary: {
+      total: items.length,
+      ...segmentCounts,
+    },
+    items: segment ? items.filter((item) => item.segment === segment) : items,
   };
 }
 
@@ -86,6 +127,8 @@ export async function getCustomerDetail(id: string) {
       addresses: { orderBy: [{ isDefault: "desc" }, { updatedAt: "desc" }] },
       tags: true,
       profile: true,
+      leads: { select: { scene: true, metadata: true, notes: true, createdAt: true } },
+      inquiries: { select: { scene: true, budget: true, content: true, notes: true, createdAt: true } },
       dealer: true,
       orders: {
         where: { parentId: null },
@@ -105,6 +148,7 @@ export async function getCustomerDetail(id: string) {
   const avgOrderAmount = completedOrders.length > 0 ? totalSpent / completedOrders.length : 0;
   const debt = customer.orders.reduce((sum, order) => sum + Math.max(0, Number(order.payableAmount) - Number(order.paidAmount)), 0);
   const lastOrder = customer.orders[0];
+  const segmentation = evaluateCustomerSegment(customer);
 
   return {
     customer: {
@@ -126,6 +170,9 @@ export async function getCustomerDetail(id: string) {
             isAccepting: customer.dealer.isAccepting,
           }
         : null,
+      segment: segmentation.segment,
+      segmentReasons: segmentation.reasons,
+      nextAction: segmentation.nextAction,
     },
     addresses: customer.addresses.map((address) => ({
       id: address.id,
