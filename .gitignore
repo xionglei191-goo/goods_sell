@@ -40,3 +40,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# image material helper workspace
+/image-materials/*.csv
+/image-materials/*.jsonl
