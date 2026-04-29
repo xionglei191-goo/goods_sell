@@ -42,6 +42,28 @@ type DealerWithPolicy = Prisma.DealerGetPayload<{
   };
 }>;
 
+type DealerRoutingMetrics = {
+  rejectedToday: number;
+  recentAccepted: number;
+  recentRejected: number;
+  recentPending: number;
+  avgResponseHours: number | null;
+};
+
+type DealerConflictMetrics = {
+  openConflicts: number;
+  recentRiskConflicts: number;
+};
+
+type DealerCandidate = {
+  dealer: DealerWithPolicy;
+  distance: number;
+  score: number;
+  reason: string;
+};
+
+const riskConflictTypes = new Set(["COMPLAINT", "REJECTION", "PRICE_ANOMALY", "STOCK_MISMATCH"]);
+
 function toNumber(value: Prisma.Decimal | number | string | null | undefined) {
   if (value === null || value === undefined) return null;
   return Number(value);
@@ -108,6 +130,125 @@ function hasDealerStock(dealer: DealerWithPolicy, context: RoutingContext) {
   return context.items.every((item) => (stockMap.get(item.productId) ?? 0) >= item.quantity);
 }
 
+function clamp(value: number, min = 0, max = 1) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function getStockCoverage(dealer: DealerWithPolicy, context: RoutingContext) {
+  if (context.items.length === 0) return { coveredItems: 0, totalItems: 0, ratio: 0 };
+
+  const stockMap = new Map(dealer.stocks.map((stock) => [stock.productId, stock.stock]));
+  let coveredItems = 0;
+  let ratioSum = 0;
+  for (const item of context.items) {
+    const stock = stockMap.get(item.productId) ?? 0;
+    if (stock >= item.quantity) coveredItems += 1;
+    ratioSum += clamp(stock / Math.max(1, item.quantity), 0, 3);
+  }
+
+  return {
+    coveredItems,
+    totalItems: context.items.length,
+    ratio: ratioSum / context.items.length,
+  };
+}
+
+function buildRoutingMetrics(
+  routingSignals: Array<{ dealerId: string; status: "PENDING" | "ACCEPTED" | "REJECTED" | "EXPIRED"; assignedAt: Date; respondedAt: Date | null }>,
+  today: Date,
+) {
+  const metrics = new Map<string, DealerRoutingMetrics>();
+  for (const routing of routingSignals) {
+    const current = metrics.get(routing.dealerId) ?? {
+      rejectedToday: 0,
+      recentAccepted: 0,
+      recentRejected: 0,
+      recentPending: 0,
+      avgResponseHours: null,
+    };
+
+    if (routing.status === "ACCEPTED") current.recentAccepted += 1;
+    if (routing.status === "REJECTED") {
+      current.recentRejected += 1;
+      if ((routing.respondedAt ?? routing.assignedAt) >= today) current.rejectedToday += 1;
+    }
+    if (routing.status === "PENDING") current.recentPending += 1;
+
+    if (routing.respondedAt) {
+      const responseHours = Math.max(0, routing.respondedAt.getTime() - routing.assignedAt.getTime()) / 3600000;
+      current.avgResponseHours =
+        current.avgResponseHours === null ? responseHours : (current.avgResponseHours + responseHours) / 2;
+    }
+
+    metrics.set(routing.dealerId, current);
+  }
+  return metrics;
+}
+
+function buildConflictMetrics(
+  conflicts: Array<{ dealerId: string | null; type: string; status: "OPEN" | "PROCESSING" | "RESOLVED" | "IGNORED"; createdAt: Date }>,
+  riskSince: Date,
+) {
+  const metrics = new Map<string, DealerConflictMetrics>();
+  for (const conflict of conflicts) {
+    if (!conflict.dealerId) continue;
+
+    const current = metrics.get(conflict.dealerId) ?? { openConflicts: 0, recentRiskConflicts: 0 };
+    if (conflict.status === "OPEN" || conflict.status === "PROCESSING") current.openConflicts += 1;
+    if (conflict.createdAt >= riskSince && riskConflictTypes.has(conflict.type)) current.recentRiskConflicts += 1;
+    metrics.set(conflict.dealerId, current);
+  }
+  return metrics;
+}
+
+function scoreDealerCandidate(
+  dealer: DealerWithPolicy,
+  distance: number,
+  context: RoutingContext,
+  routingMetrics: DealerRoutingMetrics,
+  conflictMetrics: DealerConflictMetrics,
+): DealerCandidate {
+  const serviceRadiusKm = Math.max(0.1, dealer.serviceRadius / 1000);
+  const distanceScore = clamp(1 - distance / Math.max(serviceRadiusKm, distance));
+  const stockCoverage = getStockCoverage(dealer, context);
+  const stockScore = 0.7 + clamp((stockCoverage.ratio - 1) / 2) * 0.3;
+  const priority = dealer.policy?.priority ?? 0;
+  const priorityScore = clamp((priority + 5) / 10);
+  const serviceScore = clamp((distance <= serviceRadiusKm ? 0.75 : 0.3) + priorityScore * 0.25);
+  const answered = routingMetrics.recentAccepted + routingMetrics.recentRejected;
+  const acceptanceRate = answered > 0 ? routingMetrics.recentAccepted / answered : 0.55;
+  const responseTimeScore =
+    routingMetrics.avgResponseHours === null ? 0.55 : clamp(1 - routingMetrics.avgResponseHours / 24);
+  const pendingPenalty = clamp(routingMetrics.recentPending / 5);
+  const responseScore = clamp(acceptanceRate * 0.7 + responseTimeScore * 0.3 - pendingPenalty * 0.2);
+  const riskPenalty = clamp(
+    routingMetrics.rejectedToday * 0.18 +
+      routingMetrics.recentRejected * 0.08 +
+      conflictMetrics.openConflicts * 0.2 +
+      conflictMetrics.recentRiskConflicts * 0.18,
+  );
+  const riskScore = 1 - riskPenalty;
+  const score =
+    distanceScore * 28 +
+    stockScore * 22 +
+    serviceScore * 18 +
+    responseScore * 20 +
+    riskScore * 12;
+
+  return {
+    dealer,
+    distance,
+    score,
+    reason: [
+      `综合评分 ${Math.round(score)}`,
+      `距离 ${distance.toFixed(2)}km`,
+      `库存 ${stockCoverage.coveredItems}/${stockCoverage.totalItems}`,
+      `近30天接单 ${routingMetrics.recentAccepted}/${answered || routingMetrics.recentAccepted + routingMetrics.recentPending}`,
+      `未结冲突 ${conflictMetrics.openConflicts}`,
+    ].join(" · "),
+  };
+}
+
 async function generateChildOrderNo(tx: DbLike, suffix: string) {
   const now = new Date();
   const start = new Date(now);
@@ -116,7 +257,7 @@ async function generateChildOrderNo(tx: DbLike, suffix: string) {
   return `${buildOrderNoSequence(count, now)}-${suffix}`;
 }
 
-async function findNearestDealer(tx: DbLike, address: RoutingAddress, context: RoutingContext, excludedDealerIds: string[] = []) {
+async function findBestDealer(tx: DbLike, address: RoutingAddress, context: RoutingContext, excludedDealerIds: string[] = []) {
   const dealers = await tx.dealer.findMany({
     where: {
       isAccepting: true,
@@ -131,31 +272,71 @@ async function findNearestDealer(tx: DbLike, address: RoutingAddress, context: R
   const dealerIds = dealers.map((dealer) => dealer.id);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const rejectedGroups =
+  const recentSince = new Date(today);
+  recentSince.setDate(recentSince.getDate() - 30);
+  const riskSince = new Date(today);
+  riskSince.setDate(riskSince.getDate() - 60);
+  const [routingSignals, conflicts] =
     dealerIds.length === 0
-      ? []
-      : await tx.orderRouting.groupBy({
-          by: ["dealerId"],
-          where: {
-            dealerId: { in: dealerIds },
-            status: "REJECTED",
-            respondedAt: { gte: today },
-          },
-          _count: { _all: true },
-        });
-  const rejectedCountByDealer = new Map(rejectedGroups.map((item) => [item.dealerId, item._count._all]));
+      ? [[], []]
+      : await Promise.all([
+          tx.orderRouting.findMany({
+            where: {
+              dealerId: { in: dealerIds },
+              assignedAt: { gte: recentSince },
+            },
+            select: {
+              dealerId: true,
+              status: true,
+              assignedAt: true,
+              respondedAt: true,
+            },
+          }),
+          tx.channelConflict.findMany({
+            where: {
+              dealerId: { in: dealerIds },
+              OR: [
+                { status: { in: ["OPEN", "PROCESSING"] } },
+                {
+                  createdAt: { gte: riskSince },
+                  type: { in: ["COMPLAINT", "REJECTION", "PRICE_ANOMALY", "STOCK_MISMATCH"] },
+                },
+              ],
+            },
+            select: {
+              dealerId: true,
+              type: true,
+              status: true,
+              createdAt: true,
+            },
+          }),
+        ]);
+  const routingMetricsByDealer = buildRoutingMetrics(routingSignals, today);
+  const conflictMetricsByDealer = buildConflictMetrics(conflicts, riskSince);
 
   const candidates = dealers
-    .filter((dealer) => matchesDealerPolicy(dealer, context, rejectedCountByDealer.get(dealer.id) ?? 0))
+    .filter((dealer) => matchesDealerPolicy(dealer, context, routingMetricsByDealer.get(dealer.id)?.rejectedToday ?? 0))
     .filter((dealer) => hasDealerStock(dealer, context))
     .map((dealer) => {
       const distance = calculateDistanceKm(address, {
         latitude: Number(dealer.latitude),
         longitude: Number(dealer.longitude),
       });
-      return { dealer, distance };
+      return scoreDealerCandidate(
+        dealer,
+        distance,
+        context,
+        routingMetricsByDealer.get(dealer.id) ?? {
+          rejectedToday: 0,
+          recentAccepted: 0,
+          recentRejected: 0,
+          recentPending: 0,
+          avgResponseHours: null,
+        },
+        conflictMetricsByDealer.get(dealer.id) ?? { openConflicts: 0, recentRiskConflicts: 0 },
+      );
     })
-    .sort((a, b) => (b.dealer.policy?.priority ?? 0) - (a.dealer.policy?.priority ?? 0) || a.distance - b.distance);
+    .sort((a, b) => b.score - a.score || a.distance - b.distance);
 
   return candidates.find((candidate) => candidate.distance * 1000 <= candidate.dealer.serviceRadius) ?? candidates[0] ?? null;
 }
@@ -170,8 +351,8 @@ async function assignDealer(tx: DbLike, orderId: string, address: RoutingAddress
     return { assigned: true as const, routingId: existingActive.id };
   }
 
-  const nearest = await findNearestDealer(tx, address, context, excludedDealerIds);
-  if (!nearest) {
+  const best = await findBestDealer(tx, address, context, excludedDealerIds);
+  if (!best) {
     await tx.order.update({ where: { id: orderId }, data: { routingType: "WAREHOUSE" } });
     return { assigned: false as const };
   }
@@ -179,15 +360,15 @@ async function assignDealer(tx: DbLike, orderId: string, address: RoutingAddress
   const routing = await tx.orderRouting.create({
     data: {
       orderId,
-      dealerId: nearest.dealer.id,
+      dealerId: best.dealer.id,
       status: "PENDING",
-      distance: toMoney(nearest.distance),
-      reason: nearest.dealer.policy ? "匹配经销商政策和库存" : "匹配距离和库存",
+      distance: toMoney(best.distance),
+      reason: best.reason,
     },
     select: { id: true },
   });
   await tx.order.update({ where: { id: orderId }, data: { routingType: "DEALER" } });
-  return { assigned: true as const, routingId: routing.id, dealerId: nearest.dealer.id, distance: nearest.distance };
+  return { assigned: true as const, routingId: routing.id, dealerId: best.dealer.id, distance: best.distance, score: best.score };
 }
 
 async function createSplitChild(tx: DbLike, parent: {

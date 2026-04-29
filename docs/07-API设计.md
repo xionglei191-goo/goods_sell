@@ -51,7 +51,7 @@ createOrder(data: CreateOrderInput): Promise<Order>
 updateOrderStatus(id: string, status: OrderStatus): Promise<Order>
 cancelOrder(id: string, reason: string): Promise<void>
 routeOrder(orderId: string): Promise<OrderRouting>
-evaluateRoutingPolicy(orderId: string): Promise<RoutingDecision>
+evaluateRoutingPolicy(orderId: string): Promise<RoutingDecision> // 距离、库存、服务能力、历史响应、冲突/拒单综合评分
 ```
 
 ### 2.5 客户模块 (features/customers/actions.ts)
