@@ -123,7 +123,7 @@ recordPromoterVisit(data: PromoterVisitInput): Promise<void>
 createProductPush(data: ProductPushInput): Promise<ProductPush>
 recordProductPushEvent(id: string, event: PushEvent): Promise<void>
 createChannelConflict(data: ChannelConflictInput): Promise<ChannelConflict>
-resolveChannelConflict(id: string, resolution: ConflictResolutionInput): Promise<ChannelConflict>
+updateChannelConflict(id: string, status: ConflictStatus, ownerId?: string, note?: string): Promise<ChannelConflict>
 ```
 
 ## 3. API Routes（外部接口）

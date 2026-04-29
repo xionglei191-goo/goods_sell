@@ -86,6 +86,7 @@ export const dashboardNavItems: DashboardNavItem[] = [
       { title: "询价单", href: "/dashboard/inquiries" },
       { title: "报价单", href: "/dashboard/quotes" },
       { title: "推广码", href: "/dashboard/promoters" },
+      { title: "渠道冲突", href: "/dashboard/channel-conflicts" },
     ],
   },
   {
@@ -179,6 +180,7 @@ export const breadcrumbLabels: Record<string, string> = {
   inquiries: "询价单",
   quotes: "报价单",
   promoters: "推广码管理",
+  "channel-conflicts": "渠道冲突",
   dealers: "经销商管理",
   policy: "渠道政策",
   sales: "销售报表",

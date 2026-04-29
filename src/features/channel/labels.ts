@@ -1,4 +1,14 @@
-import type { DealerPriceLevel, InquiryStatus, LeadScene, LeadSource, LeadStatus, PromoterOwnerType, QuoteStatus } from "@prisma/client";
+import type {
+  ChannelConflictStatus,
+  ChannelConflictType,
+  DealerPriceLevel,
+  InquiryStatus,
+  LeadScene,
+  LeadSource,
+  LeadStatus,
+  PromoterOwnerType,
+  QuoteStatus,
+} from "@prisma/client";
 
 export const leadSceneLabels: Record<LeadScene, string> = {
   BANQUET: "宴席配酒",
@@ -59,6 +69,22 @@ export const dealerPriceLevelLabels: Record<DealerPriceLevel, string> = {
   VIP: "重点客户价",
 };
 
+export const channelConflictTypeLabels: Record<ChannelConflictType, string> = {
+  CROSS_ZONE: "跨区下单",
+  PRICE_ANOMALY: "异常低价",
+  REJECTION: "经销商拒单",
+  COMPLAINT: "客户投诉",
+  STOCK_MISMATCH: "库存不匹配",
+  OTHER: "其他",
+};
+
+export const channelConflictStatusLabels: Record<ChannelConflictStatus, string> = {
+  OPEN: "待处理",
+  PROCESSING: "处理中",
+  RESOLVED: "已解决",
+  IGNORED: "已忽略",
+};
+
 export const leadStatusClasses: Record<LeadStatus, string> = {
   NEW: "bg-blue-50 text-blue-700",
   ASSIGNED: "bg-indigo-50 text-indigo-700",
@@ -83,4 +109,20 @@ export const quoteStatusClasses: Record<QuoteStatus, string> = {
   REJECTED: "bg-red-50 text-red-700",
   EXPIRED: "bg-amber-50 text-amber-700",
   CONVERTED: "bg-purple-50 text-purple-700",
+};
+
+export const channelConflictTypeClasses: Record<ChannelConflictType, string> = {
+  CROSS_ZONE: "bg-indigo-50 text-indigo-700",
+  PRICE_ANOMALY: "bg-amber-50 text-amber-700",
+  REJECTION: "bg-red-50 text-red-700",
+  COMPLAINT: "bg-fuchsia-50 text-fuchsia-700",
+  STOCK_MISMATCH: "bg-cyan-50 text-cyan-700",
+  OTHER: "bg-slate-100 text-slate-600",
+};
+
+export const channelConflictStatusClasses: Record<ChannelConflictStatus, string> = {
+  OPEN: "bg-blue-50 text-blue-700",
+  PROCESSING: "bg-amber-50 text-amber-700",
+  RESOLVED: "bg-emerald-50 text-emerald-700",
+  IGNORED: "bg-slate-100 text-slate-500",
 };

@@ -1,4 +1,4 @@
-import type { DealerPriceLevel, InquiryStatus, LeadScene, LeadStatus, Prisma, PromoterOwnerType, QuoteStatus } from "@prisma/client";
+import type { ChannelConflictStatus, ChannelConflictType, DealerPriceLevel, InquiryStatus, LeadScene, LeadStatus, Prisma, PromoterOwnerType, QuoteStatus } from "@prisma/client";
 
 import { firstParam, formatCurrency, formatDate, formatDateTime } from "@/features/orders/utils";
 import { prisma } from "@/lib/prisma";
@@ -14,9 +14,21 @@ const leadStatuses = ["NEW", "ASSIGNED", "FOLLOWING", "CONVERTED", "LOST"] as co
 const inquiryStatuses = ["NEW", "ASSIGNED", "QUOTED", "WON", "LOST", "CANCELLED"] as const;
 const quoteStatuses = ["DRAFT", "SENT", "ACCEPTED", "REJECTED", "EXPIRED", "CONVERTED"] as const;
 const promoterOwnerTypes = ["SALESPERSON", "DEALER", "CAMPAIGN"] as const;
+const channelConflictTypes = ["CROSS_ZONE", "PRICE_ANOMALY", "REJECTION", "COMPLAINT", "STOCK_MISMATCH", "OTHER"] as const;
+const channelConflictStatuses = ["OPEN", "PROCESSING", "RESOLVED", "IGNORED"] as const;
+const channelConflictEventStatusLabels: Record<string, string> = {
+  OPEN: "待处理",
+  PROCESSING: "处理中",
+  RESOLVED: "已解决",
+  IGNORED: "已忽略",
+};
 
 function jsonStringArray(value: Prisma.JsonValue | null | undefined) {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function jsonObject(value: Prisma.JsonValue | null | undefined) {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 
 function hasOrderItems(value: Prisma.JsonValue | null | undefined) {
@@ -39,6 +51,29 @@ function getQuoteConvertDisabledReason(item: { status: QuoteStatus; convertedOrd
   if (item.status !== "SENT" && item.status !== "ACCEPTED") return "报价尚未发送";
   if (!hasOrderItems(item.inquiry.content)) return "缺少商品明细";
   return null;
+}
+
+function getConflictDetailText(detail: Prisma.JsonValue | null | undefined) {
+  const object = jsonObject(detail);
+  const text = object?.text;
+  return typeof text === "string" && text.trim() ? text : "-";
+}
+
+function getLatestConflictEvent(detail: Prisma.JsonValue | null | undefined) {
+  const object = jsonObject(detail);
+  const events = Array.isArray(object?.events) ? object.events : [];
+  const latest = [...events].reverse().find((item) => item && typeof item === "object" && !Array.isArray(item)) as Record<string, unknown> | undefined;
+  if (!latest) return null;
+
+  const note = typeof latest.note === "string" && latest.note.trim() ? latest.note : "";
+  const status = typeof latest.status === "string" ? latest.status : "";
+  const action = typeof latest.action === "string" ? latest.action : "";
+  const at = typeof latest.at === "string" ? latest.at : "";
+
+  return {
+    label: note || (status ? `状态更新为${channelConflictEventStatusLabels[status] ?? status}` : action || "已更新"),
+    at: at ? formatDateTime(at) : null,
+  };
 }
 
 export async function getLeadDashboardData(searchParams: SearchParams) {
@@ -328,6 +363,166 @@ export async function getPromoterFormOptions() {
 }
 
 export type PromoterFormOptions = Awaited<ReturnType<typeof getPromoterFormOptions>>;
+
+export async function getChannelConflictDashboardData(searchParams: SearchParams) {
+  const filters = {
+    q: firstParam(searchParams.q).trim(),
+    type: enumOrUndefined(firstParam(searchParams.type), channelConflictTypes),
+    status: enumOrUndefined(firstParam(searchParams.status), channelConflictStatuses),
+  };
+  const matchedOrderIds = filters.q
+    ? (
+        await prisma.order.findMany({
+          where: { orderNo: { contains: filters.q, mode: "insensitive" } },
+          select: { id: true },
+          take: 50,
+        })
+      ).map((item) => item.id)
+    : [];
+
+  const searchFilters: Prisma.ChannelConflictWhereInput[] = [];
+  if (filters.q) {
+    searchFilters.push(
+      { summary: { contains: filters.q, mode: "insensitive" } },
+      { orderId: { contains: filters.q, mode: "insensitive" } },
+      { dealer: { shopName: { contains: filters.q, mode: "insensitive" } } },
+      { dealer: { customer: { name: { contains: filters.q, mode: "insensitive" } } } },
+      { dealer: { customer: { phone: { contains: filters.q, mode: "insensitive" } } } },
+      { customer: { name: { contains: filters.q, mode: "insensitive" } } },
+      { customer: { phone: { contains: filters.q, mode: "insensitive" } } },
+    );
+    if (matchedOrderIds.length > 0) {
+      searchFilters.push({ orderId: { in: matchedOrderIds } });
+    }
+  }
+
+  const where: Prisma.ChannelConflictWhereInput = {
+    ...(filters.type ? { type: filters.type as ChannelConflictType } : {}),
+    ...(filters.status ? { status: filters.status as ChannelConflictStatus } : {}),
+    ...(searchFilters.length > 0 ? { OR: searchFilters } : {}),
+  };
+
+  const [items, total, openCount, processingCount, resolvedCount, ignoredCount] = await Promise.all([
+    prisma.channelConflict.findMany({
+      where,
+      include: {
+        dealer: { include: { customer: { select: { name: true, phone: true } } } },
+        customer: { select: { name: true, phone: true } },
+        owner: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    }),
+    prisma.channelConflict.count({ where }),
+    prisma.channelConflict.count({ where: { status: "OPEN" } }),
+    prisma.channelConflict.count({ where: { status: "PROCESSING" } }),
+    prisma.channelConflict.count({ where: { status: "RESOLVED" } }),
+    prisma.channelConflict.count({ where: { status: "IGNORED" } }),
+  ]);
+
+  const orderIds = Array.from(new Set(items.map((item) => item.orderId).filter((id): id is string => Boolean(id))));
+  const orders = orderIds.length
+    ? await prisma.order.findMany({
+        where: { id: { in: orderIds } },
+        select: {
+          id: true,
+          orderNo: true,
+          status: true,
+          payableAmount: true,
+          address: { select: { district: true, detail: true } },
+        },
+      })
+    : [];
+  const orderMap = new Map(orders.map((order) => [order.id, order]));
+
+  return {
+    filters,
+    summary: { total, openCount, processingCount, resolvedCount, ignoredCount },
+    items: items.map((item) => {
+      const order = item.orderId ? orderMap.get(item.orderId) : undefined;
+      return {
+        id: item.id,
+        type: item.type,
+        status: item.status,
+        summary: item.summary,
+        detailText: getConflictDetailText(item.detail),
+        latestEvent: getLatestConflictEvent(item.detail),
+        orderId: item.orderId,
+        orderNo: order?.orderNo ?? item.orderId ?? "-",
+        orderStatus: order?.status ?? null,
+        orderAmount: order ? formatCurrency(Number(order.payableAmount)) : "-",
+        orderAddress: order ? `${order.address.district}${order.address.detail}` : "-",
+        dealer: item.dealer
+          ? {
+              id: item.dealer.id,
+              shopName: item.dealer.shopName,
+              zone: item.dealer.zone,
+              contact: `${item.dealer.customer.name} · ${item.dealer.customer.phone}`,
+            }
+          : null,
+        customer: item.customer ? { id: item.customerId, name: item.customer.name, phone: item.customer.phone } : null,
+        ownerId: item.ownerId,
+        ownerName: item.owner?.name ?? "待分派",
+        createdAt: formatDateTime(item.createdAt),
+        resolvedAt: item.resolvedAt ? formatDateTime(item.resolvedAt) : "-",
+      };
+    }),
+  };
+}
+
+export async function getChannelConflictFormOptions() {
+  const [orders, dealers, customers, owners] = await Promise.all([
+    prisma.order.findMany({
+      select: {
+        id: true,
+        orderNo: true,
+        payableAmount: true,
+        customer: { select: { name: true, phone: true } },
+        address: { select: { district: true, detail: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 150,
+    }),
+    prisma.dealer.findMany({
+      select: { id: true, shopName: true, zone: true, customer: { select: { name: true, phone: true } } },
+      orderBy: { shopName: "asc" },
+      take: 300,
+    }),
+    prisma.customer.findMany({
+      select: { id: true, name: true, phone: true },
+      orderBy: { updatedAt: "desc" },
+      take: 200,
+    }),
+    prisma.user.findMany({
+      where: { isActive: true, role: { in: ["ADMIN", "SALESPERSON", "FINANCE"] } },
+      select: { id: true, name: true, role: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
+
+  return {
+    orders: orders.map((item) => ({
+      id: item.id,
+      label: `${item.orderNo} · ${item.customer.name} · ${formatCurrency(Number(item.payableAmount))}`,
+      address: `${item.address.district}${item.address.detail}`,
+    })),
+    dealers: dealers.map((item) => ({
+      id: item.id,
+      label: `${item.shopName} · ${item.customer.name} · ${item.zone}`,
+      phone: item.customer.phone,
+    })),
+    customers: customers.map((item) => ({
+      id: item.id,
+      label: `${item.name} · ${item.phone}`,
+    })),
+    owners: owners.map((item) => ({
+      id: item.id,
+      label: `${item.name} · ${item.role}`,
+    })),
+  };
+}
+
+export type ChannelConflictFormOptions = Awaited<ReturnType<typeof getChannelConflictFormOptions>>;
 
 export async function getDealerPolicyPageData(dealerId: string) {
   const [dealer, brands] = await Promise.all([

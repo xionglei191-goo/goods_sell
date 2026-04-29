@@ -1,11 +1,19 @@
 "use server";
 
-import type { LeadScene, LeadSource, OrderType, Prisma } from "@prisma/client";
+import type { ChannelConflictStatus, LeadScene, LeadSource, OrderType, Prisma } from "@prisma/client";
 import { hash } from "bcryptjs";
 import { revalidatePath } from "next/cache";
 
 import { auth } from "@/auth";
-import { createPromoterCodeSchema, createQuoteSchema, convertQuoteToOrderSchema, dealerPolicySchema, scenarioInquirySchema } from "@/features/channel/schemas";
+import {
+  createChannelConflictSchema,
+  createPromoterCodeSchema,
+  createQuoteSchema,
+  convertQuoteToOrderSchema,
+  dealerPolicySchema,
+  scenarioInquirySchema,
+  updateChannelConflictSchema,
+} from "@/features/channel/schemas";
 import { logAction } from "@/features/logs/audit";
 import { routeOrderById } from "@/features/orders/routing";
 import { buildOrderNoSequence, toMoney } from "@/features/orders/utils";
@@ -93,6 +101,38 @@ type InquiryOrderItem = {
 
 function jsonObject(value: Prisma.JsonValue | null | undefined) {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+function appendConflictEvent(
+  detail: Prisma.JsonValue | null | undefined,
+  event: {
+    action: string;
+    at: string;
+    operatorId: string;
+    status?: ChannelConflictStatus;
+    ownerId?: string | null;
+    note?: string | null;
+  },
+) {
+  const base = jsonObject(detail) ?? {};
+  const normalizedBase = JSON.parse(JSON.stringify(base)) as Prisma.InputJsonObject;
+  const events = Array.isArray(base.events)
+    ? base.events
+        .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && !Array.isArray(item)))
+        .map((item) => JSON.parse(JSON.stringify(item)) as Prisma.InputJsonObject)
+    : [];
+  const nextEvent: Prisma.InputJsonObject = {
+    action: event.action,
+    at: event.at,
+    operatorId: event.operatorId,
+    ...(event.status ? { status: event.status } : {}),
+    ...(event.ownerId !== undefined ? { ownerId: event.ownerId } : {}),
+    ...(event.note ? { note: event.note } : {}),
+  };
+  return {
+    ...normalizedBase,
+    events: [...events, nextEvent],
+  };
 }
 
 function numberOrUndefined(value: unknown) {
@@ -657,5 +697,124 @@ export async function updateDealerPolicy(input: unknown): Promise<ActionResult> 
     return { success: true, message: "经销商政策已保存" };
   } catch (error) {
     return { success: false, error: { code: "UPDATE_POLICY_FAILED", message: getErrorMessage(error) } };
+  }
+}
+
+export async function createChannelConflict(input: unknown): Promise<ActionResult<{ id: string }>> {
+  let operatorId: string;
+  try {
+    operatorId = await requireStaff();
+  } catch (error) {
+    return { success: false, error: { code: "UNAUTHORIZED", message: getErrorMessage(error) } };
+  }
+
+  const parsed = createChannelConflictSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0]?.message ?? "冲突信息不完整" } };
+  }
+
+  try {
+    const detailText = parsed.data.detail?.trim() || null;
+    const created = await prisma.channelConflict.create({
+      data: {
+        type: parsed.data.type,
+        summary: parsed.data.summary,
+        orderId: parsed.data.orderId ?? null,
+        dealerId: parsed.data.dealerId ?? null,
+        customerId: parsed.data.customerId ?? null,
+        ownerId: parsed.data.ownerId ?? null,
+        detail: {
+          text: detailText,
+          events: [
+            {
+              action: "CREATE",
+              at: new Date().toISOString(),
+              operatorId,
+              note: detailText,
+            },
+          ],
+        },
+      },
+      select: { id: true, summary: true },
+    });
+
+    await logAction({
+      module: "渠道经营",
+      action: "创建渠道冲突",
+      targetType: "ChannelConflict",
+      targetId: created.id,
+      targetName: created.summary,
+      after: parsed.data,
+      summary: `创建渠道冲突：${created.summary}`,
+    });
+
+    revalidatePath("/dashboard/channel-conflicts");
+    revalidatePath("/dashboard/orders");
+    revalidatePath("/dashboard/dealers");
+    return { success: true, message: "渠道冲突已记录", data: { id: created.id } };
+  } catch (error) {
+    return { success: false, error: { code: "CREATE_CONFLICT_FAILED", message: getErrorMessage(error) } };
+  }
+}
+
+export async function updateChannelConflict(input: unknown): Promise<ActionResult> {
+  let operatorId: string;
+  try {
+    operatorId = await requireStaff();
+  } catch (error) {
+    return { success: false, error: { code: "UNAUTHORIZED", message: getErrorMessage(error) } };
+  }
+
+  const parsed = updateChannelConflictSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0]?.message ?? "处理信息不完整" } };
+  }
+
+  try {
+    const before = await prisma.channelConflict.findUnique({
+      where: { id: parsed.data.conflictId },
+      select: { id: true, summary: true, status: true, ownerId: true, detail: true },
+    });
+    if (!before) {
+      throw new Error("渠道冲突记录不存在");
+    }
+
+    const status = parsed.data.status as ChannelConflictStatus;
+    const note = parsed.data.note?.trim() || null;
+    const updated = await prisma.channelConflict.update({
+      where: { id: before.id },
+      data: {
+        status,
+        ownerId: parsed.data.ownerId ?? null,
+        resolvedAt: status === "RESOLVED" || status === "IGNORED" ? new Date() : null,
+        detail: appendConflictEvent(before.detail, {
+          action: "UPDATE",
+          at: new Date().toISOString(),
+          operatorId,
+          status,
+          ownerId: parsed.data.ownerId ?? null,
+          note,
+        }),
+      },
+      select: { id: true, summary: true, status: true, ownerId: true },
+    });
+
+    await logAction({
+      module: "渠道经营",
+      action: "处理渠道冲突",
+      targetType: "ChannelConflict",
+      targetId: updated.id,
+      targetName: updated.summary,
+      before,
+      after: updated,
+      summary: `处理渠道冲突：${updated.summary}`,
+    });
+
+    revalidatePath("/dashboard/channel-conflicts");
+    revalidatePath("/dashboard/orders");
+    revalidatePath("/dashboard/dealers");
+    return { success: true, message: "处理状态已更新" };
+  } catch (error) {
+    return { success: false, error: { code: "UPDATE_CONFLICT_FAILED", message: getErrorMessage(error) } };
   }
 }

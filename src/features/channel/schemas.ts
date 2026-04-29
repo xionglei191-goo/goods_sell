@@ -74,7 +74,26 @@ export const dealerPolicySchema = z
     }
   });
 
+export const createChannelConflictSchema = z.object({
+  type: z.enum(["CROSS_ZONE", "PRICE_ANOMALY", "REJECTION", "COMPLAINT", "STOCK_MISMATCH", "OTHER"]),
+  summary: z.string().trim().min(2, "请填写冲突摘要").max(120, "冲突摘要不超过 120 字"),
+  orderId: optionalId,
+  dealerId: optionalId,
+  customerId: optionalId,
+  ownerId: optionalId,
+  detail: z.string().trim().max(1000, "详细说明不超过 1000 字").optional(),
+});
+
+export const updateChannelConflictSchema = z.object({
+  conflictId: z.string().trim().min(1, "缺少冲突记录"),
+  status: z.enum(["OPEN", "PROCESSING", "RESOLVED", "IGNORED"]),
+  ownerId: optionalId,
+  note: z.string().trim().max(1000, "处理备注不超过 1000 字").optional(),
+});
+
 export type CreateQuoteInput = z.infer<typeof createQuoteSchema>;
 export type ConvertQuoteToOrderInput = z.infer<typeof convertQuoteToOrderSchema>;
 export type CreatePromoterCodeInput = z.infer<typeof createPromoterCodeSchema>;
 export type DealerPolicyInput = z.infer<typeof dealerPolicySchema>;
+export type CreateChannelConflictInput = z.infer<typeof createChannelConflictSchema>;
+export type UpdateChannelConflictInput = z.infer<typeof updateChannelConflictSchema>;

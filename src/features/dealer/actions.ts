@@ -34,6 +34,7 @@ function revalidateDealerPaths(orderId?: string) {
   revalidatePath("/dealer/settlement");
   revalidatePath("/dealer/promotion");
   revalidatePath("/dealer/leads");
+  revalidatePath("/dashboard/channel-conflicts");
   revalidatePath("/dashboard/orders");
   if (orderId) revalidatePath(`/dashboard/orders/${orderId}`);
 }
@@ -158,14 +159,36 @@ export async function rejectRouting(routingId: string, reason: string): Promise<
     const dealer = await getDealerId();
     const routing = await prisma.orderRouting.findFirst({
       where: { id: routingId, dealerId: dealer.id, status: "PENDING" },
-      select: { id: true, orderId: true },
+      select: { id: true, orderId: true, order: { select: { orderNo: true } } },
     });
 
     if (!routing) {
       throw new Error("待接订单不存在");
     }
 
-    await rejectAndRematchRouting(routing.id, reason || "经销商拒单");
+    const rejectionReason = reason.trim() || "经销商拒单";
+    await rejectAndRematchRouting(routing.id, rejectionReason);
+    await prisma.channelConflict.create({
+      data: {
+        type: "REJECTION",
+        status: "OPEN",
+        orderId: routing.orderId,
+        dealerId: dealer.id,
+        summary: `${dealer.shopName} 拒绝订单 ${routing.order.orderNo}`,
+        detail: {
+          text: rejectionReason,
+          source: "DEALER_REJECT",
+          rejectedAt: new Date().toISOString(),
+          events: [
+            {
+              action: "CREATE_FROM_DEALER_REJECT",
+              at: new Date().toISOString(),
+              note: rejectionReason,
+            },
+          ],
+        },
+      },
+    });
     revalidateDealerPaths(routing.orderId);
     return { success: true, message: "已拒单并自动重匹配" };
   } catch (error) {
