@@ -119,23 +119,24 @@ export function SalespersonManager({ filters: initialFilters, salespeople }: Sal
 
       <section className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px] text-left text-sm">
+          <table className="w-full min-w-[1500px] text-left text-sm">
             <thead className="bg-slate-50 text-slate-500">
               <tr>
                 <th className="px-4 py-3 font-medium">销售员</th>
                 <th className="px-4 py-3 font-medium">状态</th>
-                <th className="px-4 py-3 font-medium">客户数</th>
-                <th className="px-4 py-3 font-medium">订单数</th>
-                <th className="px-4 py-3 font-medium">销售额</th>
-                <th className="px-4 py-3 font-medium">应收</th>
-                <th className="px-4 py-3 font-medium">客单价</th>
+                <th className="px-4 py-3 font-medium">地推与客户</th>
+                <th className="px-4 py-3 font-medium">线索转化</th>
+                <th className="px-4 py-3 font-medium">报价转化</th>
+                <th className="px-4 py-3 font-medium">推广码</th>
+                <th className="px-4 py-3 font-medium">复购</th>
+                <th className="px-4 py-3 font-medium">销售结果</th>
                 <th className="px-4 py-3 font-medium">最近成交</th>
                 <th className="px-4 py-3 text-right font-medium">操作</th>
               </tr>
             </thead>
             <tbody>
               {salespeople.map((person) => (
-                <tr className="border-t border-slate-100 hover:bg-slate-50" key={person.id}>
+                <tr className="border-t border-slate-100 align-top hover:bg-slate-50" key={person.id}>
                   <td className="px-4 py-3">
                     <p className="font-medium text-slate-900">{person.name}</p>
                     <p className="mt-1 text-xs text-slate-500">{person.phone}</p>
@@ -145,11 +146,48 @@ export function SalespersonManager({ filters: initialFilters, salespeople }: Sal
                       {person.isActive ? "启用" : "禁用"}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{person.customerCount}</td>
-                  <td className="px-4 py-3 text-slate-600">{person.orderCount}</td>
-                  <td className="px-4 py-3 font-medium text-slate-900">{formatMoney(person.revenue)}</td>
-                  <td className="px-4 py-3 font-medium text-red-700">{formatMoney(person.receivable)}</td>
-                  <td className="px-4 py-3 text-slate-600">{formatMoney(person.avgOrderAmount)}</td>
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-slate-900">{person.dealerCount} 个地推经销商</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      绑定客户 {person.customerCount} · 普通客户 {person.consumerCustomerCount}
+                    </p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-slate-900">
+                      {person.convertedLeadCount}/{person.leadCount}
+                      <span className="ml-2 text-xs font-normal text-slate-500">{formatPercent(person.leadConversionRate)}</span>
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      询价 {person.inquiryCount} · 已报价 {person.quotedInquiryCount}
+                    </p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-slate-900">
+                      {person.convertedQuoteCount}/{person.quoteCount}
+                      <span className="ml-2 text-xs font-normal text-slate-500">{formatPercent(person.quoteConversionRate)}</span>
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">询价赢单 {person.wonInquiryCount}</p>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">
+                    <p>扫码 {person.promoterScanCount}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      线索 {person.promoterLeadCount} · 订单 {person.promoterOrderCount}
+                    </p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-slate-900">
+                      {person.repeatCustomerCount}/{person.buyingCustomerCount}
+                      <span className="ml-2 text-xs font-normal text-slate-500">{formatPercent(person.repeatRate)}</span>
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">复购客户 / 成交客户</p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-slate-900">{formatMoney(person.revenue)}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      订单 {person.orderCount} · 客单 {formatMoney(person.avgOrderAmount)}
+                    </p>
+                    {person.receivable > 0 ? <p className="mt-1 text-xs font-medium text-red-700">应收 {formatMoney(person.receivable)}</p> : null}
+                  </td>
                   <td className="px-4 py-3 text-slate-500">{person.lastOrderAt ? formatDate(person.lastOrderAt) : "-"}</td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">
@@ -167,7 +205,7 @@ export function SalespersonManager({ filters: initialFilters, salespeople }: Sal
               ))}
               {salespeople.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-8 text-center text-slate-500" colSpan={9}>
+                  <td className="px-4 py-8 text-center text-slate-500" colSpan={10}>
                     暂无销售员
                   </td>
                 </tr>
@@ -185,6 +223,14 @@ function formatMoney(value: number) {
     style: "currency",
     currency: "CNY",
     minimumFractionDigits: 2,
+  }).format(value);
+}
+
+function formatPercent(value: number) {
+  return new Intl.NumberFormat("zh-CN", {
+    style: "percent",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 1,
   }).format(value);
 }
 

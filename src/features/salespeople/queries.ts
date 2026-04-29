@@ -14,10 +14,27 @@ export type SalespersonListItem = {
   isActive: boolean;
   createdAt: string;
   customerCount: number;
+  dealerCount: number;
+  consumerCustomerCount: number;
+  leadCount: number;
+  convertedLeadCount: number;
+  leadConversionRate: number;
+  inquiryCount: number;
+  quotedInquiryCount: number;
+  wonInquiryCount: number;
+  quoteCount: number;
+  convertedQuoteCount: number;
+  quoteConversionRate: number;
+  promoterScanCount: number;
+  promoterLeadCount: number;
+  promoterOrderCount: number;
   orderCount: number;
   revenue: number;
   receivable: number;
   avgOrderAmount: number;
+  buyingCustomerCount: number;
+  repeatCustomerCount: number;
+  repeatRate: number;
   lastOrderAt: string | null;
 };
 
@@ -49,40 +66,98 @@ export async function getSalespersonManagementData(searchParams: SearchParams) {
       phone: true,
       isActive: true,
       createdAt: true,
-      assignedCustomers: { select: { id: true } },
     },
     orderBy: [{ isActive: "desc" }, { createdAt: "desc" }],
   });
 
   const salespersonIds = salespeople.map((person) => person.id);
-  const orders =
-    salespersonIds.length > 0
-      ? await prisma.order.findMany({
-          where: {
-            parentId: null,
-            status: { in: [...revenueStatuses] },
-            OR: [
-              { salesPersonId: { in: salespersonIds } },
-              {
-                salesPersonId: null,
-                customer: { salesPersonId: { in: salespersonIds } },
-              },
-            ],
+  const [orders, assignedCustomers, leads, inquiries, quotes, promoterCodes] = await Promise.all([
+    prisma.order.findMany({
+      where: {
+        parentId: null,
+        status: { in: [...revenueStatuses] },
+        OR: [
+          { salesPersonId: { in: salespersonIds } },
+          {
+            salesPersonId: null,
+            customer: { salesPersonId: { in: salespersonIds } },
           },
-          select: {
-            id: true,
-            salesPersonId: true,
-            payableAmount: true,
-            paidAmount: true,
-            createdAt: true,
-            customer: { select: { salesPersonId: true } },
-          },
-        })
-      : [];
+        ],
+      },
+      select: {
+        id: true,
+        customerId: true,
+        salesPersonId: true,
+        payableAmount: true,
+        paidAmount: true,
+        createdAt: true,
+        customer: { select: { salesPersonId: true } },
+      },
+    }),
+    prisma.customer.findMany({
+      where: { salesPersonId: { in: salespersonIds } },
+      select: {
+        id: true,
+        type: true,
+        salesPersonId: true,
+        dealer: { select: { id: true } },
+      },
+    }),
+    prisma.lead.findMany({
+      where: { salespersonId: { in: salespersonIds } },
+      select: { id: true, salespersonId: true, status: true },
+    }),
+    prisma.inquiry.findMany({
+      where: { salespersonId: { in: salespersonIds } },
+      select: { id: true, salespersonId: true, status: true },
+    }),
+    prisma.quote.findMany({
+      where: { createdById: { in: salespersonIds } },
+      select: { id: true, createdById: true, status: true, convertedOrderId: true },
+    }),
+    prisma.promoterCode.findMany({
+      where: { ownerType: "SALESPERSON", salespersonId: { in: salespersonIds }, isActive: true },
+      select: { id: true, salespersonId: true, scanCount: true, leadCount: true, orderCount: true },
+    }),
+  ]);
 
-  const statMap = new Map<string, { orderCount: number; revenue: number; receivable: number; lastOrderAt: Date | null }>();
+  const statMap = new Map<
+    string,
+    {
+      orderCount: number;
+      revenue: number;
+      receivable: number;
+      lastOrderAt: Date | null;
+      customerOrders: Map<string, number>;
+    }
+  >();
+  const customerStatMap = new Map<string, { customerCount: number; dealerCount: number; consumerCustomerCount: number }>();
+  const leadStatMap = new Map<string, { total: number; converted: number }>();
+  const inquiryStatMap = new Map<string, { total: number; quoted: number; won: number }>();
+  const quoteStatMap = new Map<string, { total: number; converted: number }>();
+  const codeStatMap = new Map<string, { scans: number; leads: number; orders: number }>();
+
   for (const id of salespersonIds) {
-    statMap.set(id, { orderCount: 0, revenue: 0, receivable: 0, lastOrderAt: null });
+    statMap.set(id, { orderCount: 0, revenue: 0, receivable: 0, lastOrderAt: null, customerOrders: new Map() });
+    customerStatMap.set(id, { customerCount: 0, dealerCount: 0, consumerCustomerCount: 0 });
+    leadStatMap.set(id, { total: 0, converted: 0 });
+    inquiryStatMap.set(id, { total: 0, quoted: 0, won: 0 });
+    quoteStatMap.set(id, { total: 0, converted: 0 });
+    codeStatMap.set(id, { scans: 0, leads: 0, orders: 0 });
+  }
+
+  for (const customer of assignedCustomers) {
+    if (!customer.salesPersonId) continue;
+
+    const current = customerStatMap.get(customer.salesPersonId);
+    if (!current) continue;
+
+    current.customerCount += 1;
+    if (customer.type === "DEALER" || customer.dealer) {
+      current.dealerCount += 1;
+    } else {
+      current.consumerCustomerCount += 1;
+    }
   }
 
   for (const order of orders) {
@@ -98,24 +173,99 @@ export async function getSalespersonManagementData(searchParams: SearchParams) {
     current.revenue += payableAmount;
     current.receivable += Math.max(0, payableAmount - paidAmount);
     current.lastOrderAt = !current.lastOrderAt || order.createdAt > current.lastOrderAt ? order.createdAt : current.lastOrderAt;
+    current.customerOrders.set(order.customerId, (current.customerOrders.get(order.customerId) ?? 0) + 1);
+  }
+
+  for (const lead of leads) {
+    if (!lead.salespersonId) continue;
+
+    const current = leadStatMap.get(lead.salespersonId);
+    if (!current) continue;
+
+    current.total += 1;
+    if (lead.status === "CONVERTED") current.converted += 1;
+  }
+
+  for (const inquiry of inquiries) {
+    if (!inquiry.salespersonId) continue;
+
+    const current = inquiryStatMap.get(inquiry.salespersonId);
+    if (!current) continue;
+
+    current.total += 1;
+    if (inquiry.status === "QUOTED" || inquiry.status === "WON") current.quoted += 1;
+    if (inquiry.status === "WON") current.won += 1;
+  }
+
+  for (const quote of quotes) {
+    if (!quote.createdById) continue;
+
+    const current = quoteStatMap.get(quote.createdById);
+    if (!current) continue;
+
+    current.total += 1;
+    if (quote.status === "CONVERTED" || quote.convertedOrderId) current.converted += 1;
+  }
+
+  for (const code of promoterCodes) {
+    if (!code.salespersonId) continue;
+
+    const current = codeStatMap.get(code.salespersonId);
+    if (!current) continue;
+
+    current.scans += code.scanCount;
+    current.leads += code.leadCount;
+    current.orders += code.orderCount;
   }
 
   const items: SalespersonListItem[] = salespeople.map((person) => {
-    const stats = statMap.get(person.id) ?? { orderCount: 0, revenue: 0, receivable: 0, lastOrderAt: null };
+    const stats = statMap.get(person.id) ?? { orderCount: 0, revenue: 0, receivable: 0, lastOrderAt: null, customerOrders: new Map<string, number>() };
+    const customerStats = customerStatMap.get(person.id) ?? { customerCount: 0, dealerCount: 0, consumerCustomerCount: 0 };
+    const leadStats = leadStatMap.get(person.id) ?? { total: 0, converted: 0 };
+    const inquiryStats = inquiryStatMap.get(person.id) ?? { total: 0, quoted: 0, won: 0 };
+    const quoteStats = quoteStatMap.get(person.id) ?? { total: 0, converted: 0 };
+    const codeStats = codeStatMap.get(person.id) ?? { scans: 0, leads: 0, orders: 0 };
+    const buyingCustomerCount = stats.customerOrders.size;
+    const repeatCustomerCount = Array.from(stats.customerOrders.values()).filter((count) => count >= 2).length;
+
     return {
       id: person.id,
       name: person.name,
       phone: person.phone,
       isActive: person.isActive,
       createdAt: person.createdAt.toISOString(),
-      customerCount: person.assignedCustomers.length,
+      customerCount: customerStats.customerCount,
+      dealerCount: customerStats.dealerCount,
+      consumerCustomerCount: customerStats.consumerCustomerCount,
+      leadCount: leadStats.total,
+      convertedLeadCount: leadStats.converted,
+      leadConversionRate: leadStats.total > 0 ? leadStats.converted / leadStats.total : 0,
+      inquiryCount: inquiryStats.total,
+      quotedInquiryCount: inquiryStats.quoted,
+      wonInquiryCount: inquiryStats.won,
+      quoteCount: quoteStats.total,
+      convertedQuoteCount: quoteStats.converted,
+      quoteConversionRate: quoteStats.total > 0 ? quoteStats.converted / quoteStats.total : 0,
+      promoterScanCount: codeStats.scans,
+      promoterLeadCount: codeStats.leads,
+      promoterOrderCount: codeStats.orders,
       orderCount: stats.orderCount,
       revenue: stats.revenue,
       receivable: stats.receivable,
       avgOrderAmount: stats.orderCount > 0 ? stats.revenue / stats.orderCount : 0,
+      buyingCustomerCount,
+      repeatCustomerCount,
+      repeatRate: buyingCustomerCount > 0 ? repeatCustomerCount / buyingCustomerCount : 0,
       lastOrderAt: stats.lastOrderAt?.toISOString() ?? null,
     };
   });
+
+  const totalLeads = items.reduce((sum, item) => sum + item.leadCount, 0);
+  const convertedLeads = items.reduce((sum, item) => sum + item.convertedLeadCount, 0);
+  const totalQuotes = items.reduce((sum, item) => sum + item.quoteCount, 0);
+  const convertedQuotes = items.reduce((sum, item) => sum + item.convertedQuoteCount, 0);
+  const buyingCustomers = items.reduce((sum, item) => sum + item.buyingCustomerCount, 0);
+  const repeatCustomers = items.reduce((sum, item) => sum + item.repeatCustomerCount, 0);
 
   return {
     filters,
@@ -123,6 +273,17 @@ export async function getSalespersonManagementData(searchParams: SearchParams) {
       total: items.length,
       active: items.filter((item) => item.isActive).length,
       customers: items.reduce((sum, item) => sum + item.customerCount, 0),
+      dealers: items.reduce((sum, item) => sum + item.dealerCount, 0),
+      leads: totalLeads,
+      convertedLeads,
+      leadConversionRate: totalLeads > 0 ? convertedLeads / totalLeads : 0,
+      quotes: totalQuotes,
+      convertedQuotes,
+      quoteConversionRate: totalQuotes > 0 ? convertedQuotes / totalQuotes : 0,
+      buyingCustomers,
+      repeatCustomers,
+      repeatRate: buyingCustomers > 0 ? repeatCustomers / buyingCustomers : 0,
+      promoterScans: items.reduce((sum, item) => sum + item.promoterScanCount, 0),
       revenue: items.reduce((sum, item) => sum + item.revenue, 0),
       receivable: items.reduce((sum, item) => sum + item.receivable, 0),
     },

@@ -128,6 +128,31 @@ createChannelConflict(data: ChannelConflictInput): Promise<ChannelConflict>
 updateChannelConflict(id: string, status: ConflictStatus, ownerId?: string, note?: string): Promise<ChannelConflict>
 ```
 
+### 2.12 业务员绩效（Phase 9 已上线）
+```typescript
+getSalespersonManagementData(filters: SalespersonFilters): Promise<{
+  summary: {
+    total: number
+    active: number
+    dealers: number
+    customers: number
+    leads: number
+    convertedLeads: number
+    leadConversionRate: number
+    quotes: number
+    convertedQuotes: number
+    quoteConversionRate: number
+    buyingCustomers: number
+    repeatCustomers: number
+    repeatRate: number
+    promoterScans: number
+    revenue: number
+    receivable: number
+  }
+  items: SalespersonPerformanceItem[]
+}>
+```
+
 ## 3. API Routes（外部接口）
 
 仅用于第三方回调：
