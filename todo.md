@@ -1,6 +1,6 @@
 # 华启商城 — 开发任务总控 (TODO)
 
-> 最后更新：2026-04-25
+> 最后更新：2026-04-29
 > 角色说明：架构师负责审核验收，代码组负责编码实现
 > 状态：`[ ]` 待做 | `[/]` 进行中 | `[x]` 已完成 | `[!]` 验收不通过
 
@@ -305,14 +305,28 @@
 
 ---
 
+## 🚢 上线运维收尾（2026-04-29）
+
+- [x] 生产域名 `shop.xionglei.online` 已接入 Cloudflare，公网 `/shop` 返回 200
+- [x] 服务器 `103.229.126.92` 已配置 SSH key 登录，本项目部署不再依赖明文 root 密码
+- [x] 服务器 `/data/goods_sell/.env` 已备份并更新生产域名、高德地图 Key、安全密钥、微信支付回调 URL
+- [x] Nginx 已确认 `shop.xionglei.online` 反代到 `127.0.0.1:3005`
+- [x] PM2 应用 `goods_sell` 已重启并保持 online
+- [x] 生产构建已确认包含高德地图 Key
+- [x] 线上验证通过：`/shop`、`/login`、`/api/auth/session`、`/api/wechat/mini/home`
+- [x] 线上 smoke 通过：`PHASE5_BASE_URL=https://shop.xionglei.online pnpm run test:phase5`
+- [x] 线上 smoke 通过：`PHASE6_BASE_URL=https://shop.xionglei.online pnpm run test:phase6`
+
+---
+
 ## 📋 待决事项
 
 | 事项 | 状态 | 阻塞阶段 | 说明 |
 |------|------|---------|------|
 | PostgreSQL 安装 | 待确认 | Phase 1 | 本地开发环境需先安装 |
-| 域名 + SSL | 待定 | 部署 | 需用户购买域名 |
+| 域名 + SSL | 已配置 | 部署 | `shop.xionglei.online` 由 Cloudflare 托管，公网访问正常 |
 | 微信支付商户号 | 待定 | Phase 2 | 第一版用模拟支付替代 |
-| 高德地图 Key | 待定 | Phase 3 | 需注册高德开放平台申请 |
+| 高德地图 Key | 已配置 | Phase 3 | 生产 `.env` 已配置 Key 与安全密钥，构建产物已包含前端 Key |
 | AI API Key | 已配置 | Phase 4 | 本地 `.env` 已配置 Anthropic 格式接口，真实接口已联调通过 |
 | 微信小程序 AppID/Secret | 待定 | Phase 5 | 当前代码支持真实配置，未配置时小程序登录使用 mock code 联调 |
 | 微信公众号资质/模板 ID | 待定 | Phase 5 | 当前代码支持菜单同步和模板消息，未配置时写入 MOCKED/SKIPPED 日志 |

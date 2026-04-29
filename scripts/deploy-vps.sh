@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+if [[ -f .env.deploy.local ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source .env.deploy.local
+  set +a
+fi
+
 DEPLOY_HOST="${DEPLOY_HOST:-103.229.126.92}"
 DEPLOY_USER="${DEPLOY_USER:-root}"
 DEPLOY_PATH="${DEPLOY_PATH:-/data/goods_sell}"
@@ -11,6 +18,7 @@ RUN_LOCAL_CHECKS="${RUN_LOCAL_CHECKS:-1}"
 RUN_MIGRATIONS="${RUN_MIGRATIONS:-1}"
 RUN_SEED="${RUN_SEED:-0}"
 SSH_STRICT_HOST_KEY="${SSH_STRICT_HOST_KEY:-accept-new}"
+DEPLOY_SSH_KEY="${DEPLOY_SSH_KEY:-}"
 
 usage() {
   cat <<'USAGE'
@@ -30,6 +38,7 @@ Environment overrides:
   RUN_LOCAL_CHECKS=1     # run lint, tsc, build locally before deploying
   RUN_MIGRATIONS=1       # run prisma migrate deploy on the server
   RUN_SEED=0             # run prisma db seed on the server
+  DEPLOY_SSH_KEY=~/.ssh/goods_sell_deploy_ed25519
   DEPLOY_PASSWORD=...    # optional; requires sshpass. Prefer SSH keys.
 
 Examples:
@@ -85,6 +94,9 @@ fi
 ssh_options=(-o "ServerAliveInterval=30" -o "ServerAliveCountMax=6")
 if [[ -n "$SSH_STRICT_HOST_KEY" ]]; then
   ssh_options+=(-o "StrictHostKeyChecking=$SSH_STRICT_HOST_KEY")
+fi
+if [[ -n "$DEPLOY_SSH_KEY" ]]; then
+  ssh_options+=(-i "$DEPLOY_SSH_KEY" -o "IdentitiesOnly=yes")
 fi
 
 ssh_cmd=(ssh "${ssh_options[@]}")
