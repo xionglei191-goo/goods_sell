@@ -1,4 +1,5 @@
 import { inquiryStatusLabels, leadSceneLabels, quoteStatusClasses, quoteStatusLabels } from "@/features/channel/labels";
+import { QuoteConvertButton } from "@/features/channel/QuoteConvertButton";
 import { QuoteCreateForm } from "@/features/channel/QuoteCreateForm";
 import { getQuoteDashboardData, getQuoteFormOptions } from "@/features/channel/queries";
 
@@ -29,7 +30,7 @@ export default async function QuotesPage({ searchParams }: PageProps) {
 
       <section className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px] text-left text-sm">
+          <table className="w-full min-w-[1240px] text-left text-sm">
             <thead className="bg-slate-50 text-slate-500">
               <tr>
                 <th className="px-4 py-3 font-medium">报价单</th>
@@ -41,6 +42,7 @@ export default async function QuotesPage({ searchParams }: PageProps) {
                 <th className="px-4 py-3 font-medium">有效期</th>
                 <th className="px-4 py-3 font-medium">创建人</th>
                 <th className="px-4 py-3 font-medium">创建时间</th>
+                <th className="px-4 py-3 text-right font-medium">操作</th>
               </tr>
             </thead>
             <tbody>
@@ -63,11 +65,21 @@ export default async function QuotesPage({ searchParams }: PageProps) {
                   <td className="px-4 py-3 text-slate-600">{quote.validUntil}</td>
                   <td className="px-4 py-3 text-slate-600">{quote.creator}</td>
                   <td className="px-4 py-3 text-slate-500">{quote.createdAt}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex justify-end">
+                      <QuoteConvertButton
+                        canConvert={quote.canConvert}
+                        convertedOrderId={quote.convertedOrderId}
+                        disabledReason={quote.convertDisabledReason}
+                        quoteId={quote.id}
+                      />
+                    </div>
+                  </td>
                 </tr>
               ))}
               {data.items.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-8 text-center text-slate-500" colSpan={9}>
+                  <td className="px-4 py-8 text-center text-slate-500" colSpan={10}>
                     暂无报价单
                   </td>
                 </tr>

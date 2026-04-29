@@ -26,6 +26,10 @@ export const createQuoteSchema = z.object({
   content: z.string().trim().min(1, "请填写报价说明").max(1000, "报价说明不超过 1000 字"),
 });
 
+export const convertQuoteToOrderSchema = z.object({
+  quoteId: z.string().trim().min(1, "缺少报价单"),
+});
+
 export const createPromoterCodeSchema = z
   .object({
     ownerType: z.enum(["SALESPERSON", "DEALER", "CAMPAIGN"]),
@@ -71,5 +75,6 @@ export const dealerPolicySchema = z
   });
 
 export type CreateQuoteInput = z.infer<typeof createQuoteSchema>;
+export type ConvertQuoteToOrderInput = z.infer<typeof convertQuoteToOrderSchema>;
 export type CreatePromoterCodeInput = z.infer<typeof createPromoterCodeSchema>;
 export type DealerPolicyInput = z.infer<typeof dealerPolicySchema>;

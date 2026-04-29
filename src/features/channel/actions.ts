@@ -1,11 +1,14 @@
 "use server";
 
-import type { LeadScene, LeadSource, Prisma } from "@prisma/client";
+import type { LeadScene, LeadSource, OrderType, Prisma } from "@prisma/client";
+import { hash } from "bcryptjs";
 import { revalidatePath } from "next/cache";
 
 import { auth } from "@/auth";
-import { createPromoterCodeSchema, createQuoteSchema, dealerPolicySchema, scenarioInquirySchema } from "@/features/channel/schemas";
-import { toMoney } from "@/features/orders/utils";
+import { createPromoterCodeSchema, createQuoteSchema, convertQuoteToOrderSchema, dealerPolicySchema, scenarioInquirySchema } from "@/features/channel/schemas";
+import { logAction } from "@/features/logs/audit";
+import { routeOrderById } from "@/features/orders/routing";
+import { buildOrderNoSequence, toMoney } from "@/features/orders/utils";
 import { prisma } from "@/lib/prisma";
 
 type ActionResult<T = unknown> =
@@ -49,6 +52,14 @@ async function buildQuoteNo(tx: Prisma.TransactionClient) {
   return `BJ${formatDateSequence(now)}${String(count + 1).padStart(5, "0")}`;
 }
 
+async function buildOrderNo(tx: Prisma.TransactionClient) {
+  const now = new Date();
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  const count = await tx.order.count({ where: { createdAt: { gte: start } } });
+  return buildOrderNoSequence(count, now);
+}
+
 function normalizeExpectedDate(value?: string) {
   if (!value) return undefined;
   const date = new Date(value);
@@ -72,6 +83,121 @@ function normalizePromoterCode(value: string | undefined, ownerType: "SALESPERSO
   if (manual) return manual;
   const prefix = ownerType === "SALESPERSON" ? "SP" : ownerType === "DEALER" ? "DL" : "CP";
   return `${prefix}${Date.now().toString(36).toUpperCase().slice(-8)}`;
+}
+
+type InquiryOrderItem = {
+  productId: string;
+  quantity: number;
+  amountHint?: number;
+};
+
+function jsonObject(value: Prisma.JsonValue | null | undefined) {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+function numberOrUndefined(value: unknown) {
+  const next = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
+  return Number.isFinite(next) ? next : undefined;
+}
+
+function extractInquiryOrderItems(content: Prisma.JsonValue | null | undefined): InquiryOrderItem[] {
+  const object = jsonObject(content);
+  const items = object?.items;
+  if (!Array.isArray(items)) return [];
+
+  const result: InquiryOrderItem[] = [];
+  for (const item of items) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const row = item as Record<string, unknown>;
+    const productId = typeof row.productId === "string" ? row.productId : "";
+    const quantity = numberOrUndefined(row.quantity);
+    if (!productId || !quantity || quantity < 1) continue;
+    const amountHint = numberOrUndefined(row.totalAmount) ?? ((numberOrUndefined(row.unitPrice) ?? 0) * quantity || undefined);
+    result.push({
+      productId,
+      quantity: Math.floor(quantity),
+      ...(amountHint === undefined ? {} : { amountHint }),
+    });
+  }
+  return result;
+}
+
+function orderTypeFromScene(scene: LeadScene): OrderType {
+  if (scene === "RESTOCK") return "WHOLESALE";
+  if (scene === "BANQUET" || scene === "GROUP_BUY") return "GROUP_BUY";
+  return "RETAIL";
+}
+
+const districts = ["雨湖区", "岳塘区", "湘潭县", "湘乡市", "韶山市"];
+
+function normalizeAddressDetail(value: string | null | undefined) {
+  const raw = value?.trim() || "报价转订单待确认地址";
+  const district = districts.find((item) => raw.includes(item)) ?? "雨湖区";
+  const detail = raw
+    .replace("湖南省", "")
+    .replace("湘潭市", "")
+    .replace(district, "")
+    .trim();
+  return { district, detail: detail || raw };
+}
+
+async function ensureQuoteCustomer(tx: Prisma.TransactionClient, inquiry: { customerId: string | null; contactName: string; contactPhone: string }) {
+  if (inquiry.customerId) return inquiry.customerId;
+
+  const existing = await tx.customer.findUnique({
+    where: { phone: inquiry.contactPhone },
+    select: { id: true },
+  });
+  if (existing) return existing.id;
+
+  const password = await hash(`quote-${inquiry.contactPhone}-${Date.now()}`, 12);
+  const customer = await tx.customer.create({
+    data: {
+      name: inquiry.contactName,
+      phone: inquiry.contactPhone,
+      password,
+      type: "CONSUMER",
+      isVerified: true,
+    },
+    select: { id: true },
+  });
+  return customer.id;
+}
+
+async function ensureQuoteAddress(
+  tx: Prisma.TransactionClient,
+  input: {
+    customerId: string;
+    contactName: string;
+    contactPhone: string;
+    deliveryAddress: string | null;
+  },
+) {
+  if (!input.deliveryAddress) {
+    const existing = await tx.address.findFirst({
+      where: { customerId: input.customerId, city: "湘潭市" },
+      orderBy: [{ isDefault: "desc" }, { updatedAt: "desc" }],
+      select: { id: true },
+    });
+    if (existing) return existing.id;
+  }
+
+  const count = await tx.address.count({ where: { customerId: input.customerId } });
+  const normalized = normalizeAddressDetail(input.deliveryAddress);
+  const address = await tx.address.create({
+    data: {
+      customerId: input.customerId,
+      name: input.contactName,
+      phone: input.contactPhone,
+      province: "湖南省",
+      city: "湘潭市",
+      district: normalized.district,
+      detail: normalized.detail,
+      isDefault: count === 0,
+    },
+    select: { id: true },
+  });
+  return address.id;
 }
 
 export async function createScenarioInquiry(input: unknown): Promise<ActionResult<{ inquiryNo: string; inquiryId: string; leadId: string }>> {
@@ -244,6 +370,210 @@ export async function createQuote(input: unknown): Promise<ActionResult<{ quoteN
     return { success: true, message: `报价单 ${result.quoteNo} 已生成`, data: result };
   } catch (error) {
     return { success: false, error: { code: "CREATE_QUOTE_FAILED", message: getErrorMessage(error) } };
+  }
+}
+
+export async function convertQuoteToOrder(input: unknown): Promise<ActionResult<{ orderId: string; orderNo: string }>> {
+  let operatorId: string;
+  try {
+    operatorId = await requireStaff();
+  } catch (error) {
+    return { success: false, error: { code: "UNAUTHORIZED", message: getErrorMessage(error) } };
+  }
+
+  const parsed = convertQuoteToOrderSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0]?.message ?? "报价单信息不完整" } };
+  }
+
+  try {
+    const order = await prisma.$transaction(async (tx) => {
+      const quote = await tx.quote.findUnique({
+        where: { id: parsed.data.quoteId },
+        include: {
+          inquiry: {
+            select: {
+              id: true,
+              inquiryNo: true,
+              scene: true,
+              status: true,
+              leadId: true,
+              customerId: true,
+              contactName: true,
+              contactPhone: true,
+              deliveryAddress: true,
+              content: true,
+              notes: true,
+            },
+          },
+        },
+      });
+
+      if (!quote) {
+        throw new Error("报价单不存在");
+      }
+      if (quote.convertedOrderId || quote.status === "CONVERTED") {
+        throw new Error("该报价单已转订单");
+      }
+      if (quote.status === "REJECTED" || quote.status === "EXPIRED") {
+        throw new Error("已拒绝或已过期的报价单不能转订单");
+      }
+      if (quote.status !== "SENT" && quote.status !== "ACCEPTED") {
+        throw new Error("只有已发送或已接受的报价单可以转订单");
+      }
+      if (quote.validUntil && quote.validUntil.getTime() < Date.now()) {
+        throw new Error("报价单已过有效期，不能转订单");
+      }
+
+      const inquiryItems = extractInquiryOrderItems(quote.inquiry.content);
+      if (inquiryItems.length === 0) {
+        throw new Error("该询价没有商品明细，请先通过购物车分流生成询价，或使用后台手动开单补齐商品");
+      }
+
+      const productIds = inquiryItems.map((item) => item.productId);
+      const products = await tx.product.findMany({ where: { id: { in: productIds } } });
+      const productMap = new Map(products.map((product) => [product.id, product]));
+      for (const item of inquiryItems) {
+        const product = productMap.get(item.productId);
+        if (!product || product.status !== "ACTIVE") {
+          throw new Error("报价商品不存在或已下架");
+        }
+        if (product.stock < item.quantity) {
+          throw new Error(`${product.name} 库存不足，无法转订单`);
+        }
+      }
+
+      const customerId = await ensureQuoteCustomer(tx, quote.inquiry);
+      const addressId = await ensureQuoteAddress(tx, {
+        customerId,
+        contactName: quote.inquiry.contactName,
+        contactPhone: quote.inquiry.contactPhone,
+        deliveryAddress: quote.inquiry.deliveryAddress,
+      });
+      const quoteAmount = Number(quote.totalAmount);
+      const rawTotal = inquiryItems.reduce((sum, item) => {
+        const product = productMap.get(item.productId);
+        return sum + (item.amountHint && item.amountHint > 0 ? item.amountHint : Number(product?.retailPrice ?? 0) * item.quantity);
+      }, 0);
+      const ratio = rawTotal > 0 ? quoteAmount / rawTotal : 1;
+      const orderNo = await buildOrderNo(tx);
+      const isCredit = quote.inquiry.scene === "RESTOCK";
+      const orderType = orderTypeFromScene(quote.inquiry.scene);
+
+      const created = await tx.order.create({
+        data: {
+          orderNo,
+          customerId,
+          type: orderType,
+          source: "MANUAL",
+          status: isCredit ? "CONFIRMED" : "PAID",
+          totalAmount: toMoney(quoteAmount),
+          discountAmount: "0.00",
+          payableAmount: toMoney(quoteAmount),
+          paidAmount: isCredit ? "0.00" : toMoney(quoteAmount),
+          payMethod: isCredit ? "CREDIT" : "TRANSFER",
+          addressId,
+          routingType: "WAREHOUSE",
+          salesPersonId: operatorId,
+          remark: `报价单 ${quote.quoteNo} 转订单；询价单 ${quote.inquiry.inquiryNo}${quote.inquiry.notes ? `；${quote.inquiry.notes}` : ""}`,
+          items: {
+            create: inquiryItems.map((item) => {
+              const product = productMap.get(item.productId);
+              if (!product) throw new Error("报价商品不存在");
+              const baseLineAmount = item.amountHint && item.amountHint > 0 ? item.amountHint : Number(product.retailPrice) * item.quantity;
+              const lineAmount = baseLineAmount * ratio;
+              return {
+                productId: item.productId,
+                productName: product.name,
+                sku: product.sku,
+                unitPrice: toMoney(lineAmount / item.quantity),
+                quantity: item.quantity,
+                totalAmount: toMoney(lineAmount),
+              };
+            }),
+          },
+          payments: {
+            create: {
+              customerId,
+              type: "RECEIVE",
+              amount: toMoney(quoteAmount),
+              method: isCredit ? "CREDIT" : "TRANSFER",
+              status: isCredit ? "PENDING" : "COMPLETED",
+              dueDate: isCredit ? new Date(Date.now() + 30 * 86400000) : null,
+              paidAt: isCredit ? null : new Date(),
+              transactionId: isCredit ? null : `QUOTE-${quote.quoteNo}`,
+              operatorId,
+            },
+          },
+        },
+        select: { id: true, orderNo: true },
+      });
+
+      for (const item of inquiryItems) {
+        const product = productMap.get(item.productId);
+        if (!product) throw new Error("报价商品不存在");
+        const afterStock = product.stock - item.quantity;
+        await tx.product.update({
+          where: { id: item.productId },
+          data: {
+            stock: afterStock,
+            salesCount: { increment: item.quantity },
+            status: afterStock === 0 ? "OUT_OF_STOCK" : "ACTIVE",
+          },
+        });
+        await tx.stockRecord.create({
+          data: {
+            productId: item.productId,
+            type: "OUT",
+            quantity: -item.quantity,
+            beforeStock: product.stock,
+            afterStock,
+            relatedOrderId: created.id,
+            operatorId,
+            remark: `报价单 ${quote.quoteNo} 转订单出库`,
+          },
+        });
+      }
+
+      await tx.quote.update({
+        where: { id: quote.id },
+        data: { status: "CONVERTED", convertedOrderId: created.id, customerId },
+      });
+      await tx.inquiry.update({
+        where: { id: quote.inquiry.id },
+        data: { status: "WON", customerId },
+      });
+      if (quote.inquiry.leadId) {
+        await tx.lead.update({
+          where: { id: quote.inquiry.leadId },
+          data: { status: "CONVERTED", customerId },
+        });
+      }
+
+      return { orderId: created.id, orderNo: created.orderNo, quoteNo: quote.quoteNo };
+    });
+
+    await routeOrderById(order.orderId);
+    await logAction({
+      module: "渠道经营",
+      action: "报价转订单",
+      targetType: "Quote",
+      targetId: parsed.data.quoteId,
+      targetName: order.quoteNo,
+      after: order,
+      summary: `报价单 ${order.quoteNo} 转为订单 ${order.orderNo}`,
+    });
+
+    revalidatePath("/dashboard/quotes");
+    revalidatePath("/dashboard/inquiries");
+    revalidatePath("/dashboard/leads");
+    revalidatePath("/dashboard/orders");
+    revalidatePath(`/dashboard/orders/${order.orderId}`);
+    revalidatePath("/dashboard/inventory");
+    revalidatePath("/dashboard/finance");
+    return { success: true, message: `已生成订单 ${order.orderNo}`, data: { orderId: order.orderId, orderNo: order.orderNo } };
+  } catch (error) {
+    return { success: false, error: { code: "CONVERT_QUOTE_FAILED", message: getErrorMessage(error) } };
   }
 }
 

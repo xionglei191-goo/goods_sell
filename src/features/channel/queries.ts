@@ -19,6 +19,28 @@ function jsonStringArray(value: Prisma.JsonValue | null | undefined) {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
+function hasOrderItems(value: Prisma.JsonValue | null | undefined) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const items = (value as { items?: unknown }).items;
+  if (!Array.isArray(items)) return false;
+  return items.some((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return false;
+    const row = item as Record<string, unknown>;
+    const productId = typeof row.productId === "string" ? row.productId.trim() : "";
+    const quantity = typeof row.quantity === "number" ? row.quantity : typeof row.quantity === "string" ? Number(row.quantity) : 0;
+    return Boolean(productId && Number.isFinite(quantity) && quantity > 0);
+  });
+}
+
+function getQuoteConvertDisabledReason(item: { status: QuoteStatus; convertedOrderId: string | null; validUntil: Date | null; inquiry: { content: Prisma.JsonValue } }) {
+  if (item.convertedOrderId || item.status === "CONVERTED") return "已转订单";
+  if (item.status === "REJECTED") return "报价已拒绝";
+  if (item.status === "EXPIRED" || (item.validUntil && item.validUntil.getTime() < Date.now())) return "报价已过期";
+  if (item.status !== "SENT" && item.status !== "ACCEPTED") return "报价尚未发送";
+  if (!hasOrderItems(item.inquiry.content)) return "缺少商品明细";
+  return null;
+}
+
 export async function getLeadDashboardData(searchParams: SearchParams) {
   const filters = {
     q: firstParam(searchParams.q),
@@ -209,7 +231,7 @@ export async function getQuoteDashboardData(searchParams: SearchParams) {
     prisma.quote.findMany({
       where,
       include: {
-        inquiry: { select: { inquiryNo: true, scene: true, contactName: true, contactPhone: true, status: true } },
+        inquiry: { select: { inquiryNo: true, scene: true, contactName: true, contactPhone: true, status: true, content: true } },
         creator: { select: { name: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -224,20 +246,26 @@ export async function getQuoteDashboardData(searchParams: SearchParams) {
   return {
     filters,
     summary: { total, sentCount, acceptedCount, convertedCount },
-    items: items.map((item) => ({
-      id: item.id,
-      quoteNo: item.quoteNo,
-      status: item.status,
-      inquiryNo: item.inquiry.inquiryNo,
-      inquiryStatus: item.inquiry.status,
-      scene: item.inquiry.scene,
-      contactName: item.inquiry.contactName,
-      contactPhone: item.inquiry.contactPhone,
-      totalAmount: formatCurrency(Number(item.totalAmount)),
-      validUntil: item.validUntil ? formatDate(item.validUntil) : "-",
-      creator: item.creator?.name ?? "-",
-      createdAt: formatDateTime(item.createdAt),
-    })),
+    items: items.map((item) => {
+      const convertDisabledReason = getQuoteConvertDisabledReason(item);
+      return {
+        id: item.id,
+        quoteNo: item.quoteNo,
+        status: item.status,
+        convertedOrderId: item.convertedOrderId,
+        inquiryNo: item.inquiry.inquiryNo,
+        inquiryStatus: item.inquiry.status,
+        scene: item.inquiry.scene,
+        contactName: item.inquiry.contactName,
+        contactPhone: item.inquiry.contactPhone,
+        totalAmount: formatCurrency(Number(item.totalAmount)),
+        validUntil: item.validUntil ? formatDate(item.validUntil) : "-",
+        creator: item.creator?.name ?? "-",
+        canConvert: !convertDisabledReason,
+        convertDisabledReason,
+        createdAt: formatDateTime(item.createdAt),
+      };
+    }),
   };
 }
 
