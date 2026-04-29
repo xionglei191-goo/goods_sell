@@ -144,6 +144,7 @@ export const dashboardNavItems: DashboardNavItem[] = [
 
 export const breadcrumbLabels: Record<string, string> = {
   dashboard: "仪表盘",
+  pending: "待处理事项",
   products: "产品管理",
   categories: "分类管理",
   brands: "品牌管理",

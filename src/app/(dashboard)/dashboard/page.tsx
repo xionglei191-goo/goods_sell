@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AlertTriangle, Banknote, ClipboardList, ShoppingBag, TrendingDown, TrendingUp, Users } from "lucide-react";
 
 import { DashboardCharts } from "@/components/charts/DashboardCharts";
@@ -12,6 +13,7 @@ type MetricCard = {
   trend: number;
   icon: typeof ShoppingBag;
   tone: "blue" | "green" | "purple" | "orange";
+  href?: string;
 };
 
 type LowStockItem = {
@@ -231,7 +233,7 @@ async function getDashboardData(): Promise<DashboardData> {
         { title: "今日订单数", value: todayOrders.toString(), trend: orderTrend, icon: ShoppingBag, tone: "blue" },
         { title: "今日销售额", value: formatCurrency(todaySalesAmount), trend: salesTrend, icon: Banknote, tone: "green" },
         { title: "新增客户数", value: newCustomers.toString(), trend: customerTrend, icon: Users, tone: "purple" },
-        { title: "待处理事项", value: pendingCount.toString(), trend: pendingCount, icon: ClipboardList, tone: "orange" },
+        { title: "待处理事项", value: pendingCount.toString(), trend: pendingCount, icon: ClipboardList, tone: "orange", href: "/dashboard/pending" },
       ],
       trend: trend.some((item) => item.sales > 0) ? trend : fallback.trend,
       status: status.length > 0 ? status : fallback.status,
@@ -259,8 +261,8 @@ export default async function DashboardPage() {
           const Icon = metric.icon;
           const isPositive = metric.trend >= 0;
 
-          return (
-            <div className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200 transition hover:-translate-y-0.5 hover:shadow-md" key={metric.title}>
+          const cardContent = (
+            <>
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-sm text-slate-500">{metric.title}</p>
@@ -274,6 +276,20 @@ export default async function DashboardPage() {
                 {isPositive ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
                 <span>{Math.abs(metric.trend)}% 较昨日</span>
               </div>
+            </>
+          );
+
+          return metric.href ? (
+            <Link
+              className="block rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200 transition hover:-translate-y-0.5 hover:shadow-md"
+              href={metric.href}
+              key={metric.title}
+            >
+              {cardContent}
+            </Link>
+          ) : (
+            <div className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200 transition hover:-translate-y-0.5 hover:shadow-md" key={metric.title}>
+              {cardContent}
             </div>
           );
         })}
