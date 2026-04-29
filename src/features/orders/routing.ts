@@ -17,6 +17,7 @@ type RoutingAddress = Coordinate & {
 type RoutingContext = {
   amount: number;
   brandIds: string[];
+  items: Array<{ productId: string; quantity: number }>;
   zone?: string | null;
 };
 
@@ -37,6 +38,7 @@ type DealerWithPolicy = Prisma.DealerGetPayload<{
   include: {
     customer: { select: { name: true } };
     policy: true;
+    stocks: { select: { productId: true; stock: true } };
   };
 }>;
 
@@ -65,6 +67,7 @@ function buildRoutingContext(items: RoutingItem[], zone?: string | null): Routin
   return {
     amount: items.reduce((sum, item) => sum + Number(item.totalAmount), 0),
     brandIds: Array.from(new Set(items.map((item) => item.product.brandId))),
+    items: items.map((item) => ({ productId: item.productId, quantity: item.quantity })),
     zone,
   };
 }
@@ -100,6 +103,11 @@ function matchesDealerPolicy(dealer: DealerWithPolicy, context: RoutingContext, 
   return true;
 }
 
+function hasDealerStock(dealer: DealerWithPolicy, context: RoutingContext) {
+  const stockMap = new Map(dealer.stocks.map((stock) => [stock.productId, stock.stock]));
+  return context.items.every((item) => (stockMap.get(item.productId) ?? 0) >= item.quantity);
+}
+
 async function generateChildOrderNo(tx: DbLike, suffix: string) {
   const now = new Date();
   const start = new Date(now);
@@ -117,6 +125,7 @@ async function findNearestDealer(tx: DbLike, address: RoutingAddress, context: R
     include: {
       customer: { select: { name: true } },
       policy: true,
+      stocks: { select: { productId: true, stock: true } },
     },
   });
   const dealerIds = dealers.map((dealer) => dealer.id);
@@ -138,6 +147,7 @@ async function findNearestDealer(tx: DbLike, address: RoutingAddress, context: R
 
   const candidates = dealers
     .filter((dealer) => matchesDealerPolicy(dealer, context, rejectedCountByDealer.get(dealer.id) ?? 0))
+    .filter((dealer) => hasDealerStock(dealer, context))
     .map((dealer) => {
       const distance = calculateDistanceKm(address, {
         latitude: Number(dealer.latitude),
@@ -172,7 +182,7 @@ async function assignDealer(tx: DbLike, orderId: string, address: RoutingAddress
       dealerId: nearest.dealer.id,
       status: "PENDING",
       distance: toMoney(nearest.distance),
-      reason: nearest.dealer.policy ? "匹配经销商政策" : "默认距离分单",
+      reason: nearest.dealer.policy ? "匹配经销商政策和库存" : "匹配距离和库存",
     },
     select: { id: true },
   });

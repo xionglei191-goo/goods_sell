@@ -1,6 +1,8 @@
 "use server";
 
+import type { LeadScene } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 import { auth } from "@/auth";
 import { rejectAndRematchRouting } from "@/features/orders/routing";
@@ -14,12 +16,12 @@ async function getDealerId() {
     throw new Error("请使用经销商账号登录");
   }
 
-  const dealer = await prisma.dealer.findUnique({ where: { customerId: session.user.id }, select: { id: true } });
+  const dealer = await prisma.dealer.findUnique({ where: { customerId: session.user.id }, select: { id: true, shopName: true } });
   if (!dealer) {
     throw new Error("经销商档案不存在");
   }
 
-  return dealer.id;
+  return dealer;
 }
 
 function getErrorMessage(error: unknown) {
@@ -30,15 +32,102 @@ function revalidateDealerPaths(orderId?: string) {
   revalidatePath("/dealer/incoming");
   revalidatePath("/dealer/my-orders");
   revalidatePath("/dealer/settlement");
+  revalidatePath("/dealer/promotion");
+  revalidatePath("/dealer/leads");
   revalidatePath("/dashboard/orders");
   if (orderId) revalidatePath(`/dashboard/orders/${orderId}`);
 }
 
+const dealerPromoterScenes = new Set<LeadScene>(["BANQUET", "GROUP_BUY", "RESTOCK"]);
+
+const dealerStockReportSchema = z.object({
+  productId: z.string().trim().min(1, "请选择商品"),
+  stock: z.coerce.number().int("库存必须是整数").min(0, "库存不能为负数").max(99999, "库存数量过大"),
+});
+
+const dealerPromoterSceneLabels: Record<Extract<LeadScene, "BANQUET" | "GROUP_BUY" | "RESTOCK">, string> = {
+  BANQUET: "宴席配酒",
+  GROUP_BUY: "企业团购",
+  RESTOCK: "门店补货",
+};
+
+function normalizeDealerCode(scene: LeadScene) {
+  return `DL${scene.slice(0, 2)}${Date.now().toString(36).toUpperCase().slice(-7)}`;
+}
+
+export async function createDealerPromoterCode(scene: LeadScene): Promise<ActionResult<{ id: string; code: string }>> {
+  try {
+    if (!dealerPromoterScenes.has(scene)) {
+      throw new Error("暂不支持该推广场景");
+    }
+
+    const dealer = await getDealerId();
+    const existing = await prisma.promoterCode.findFirst({
+      where: { dealerId: dealer.id, ownerType: "DEALER", scene, isActive: true },
+      select: { id: true, code: true },
+    });
+    if (existing) {
+      return { success: true, message: "该场景推广码已存在", data: existing };
+    }
+
+    const promoter = await prisma.promoterCode.create({
+      data: {
+        code: normalizeDealerCode(scene),
+        ownerType: "DEALER",
+        label: `${dealer.shopName} · ${dealerPromoterSceneLabels[scene as Extract<LeadScene, "BANQUET" | "GROUP_BUY" | "RESTOCK">]}`,
+        scene,
+        dealerId: dealer.id,
+      },
+      select: { id: true, code: true },
+    });
+
+    revalidatePath("/dealer/promotion");
+    revalidatePath("/dashboard/promoters");
+    return { success: true, message: "推广码已生成", data: promoter };
+  } catch (error) {
+    return { success: false, error: { code: "CREATE_DEALER_PROMOTER_FAILED", message: getErrorMessage(error) } };
+  }
+}
+
+export async function reportDealerStock(input: unknown): Promise<ActionResult> {
+  try {
+    const dealer = await getDealerId();
+    const parsed = dealerStockReportSchema.safeParse(input);
+    if (!parsed.success) {
+      throw new Error(parsed.error.issues[0]?.message ?? "库存信息不完整");
+    }
+
+    const product = await prisma.product.findUnique({
+      where: { id: parsed.data.productId },
+      select: { id: true, status: true },
+    });
+    if (!product || product.status !== "ACTIVE") {
+      throw new Error("商品不存在或已下架");
+    }
+
+    await prisma.dealerStock.upsert({
+      where: { dealerId_productId: { dealerId: dealer.id, productId: parsed.data.productId } },
+      update: { stock: parsed.data.stock, reportedAt: new Date() },
+      create: {
+        dealerId: dealer.id,
+        productId: parsed.data.productId,
+        stock: parsed.data.stock,
+      },
+    });
+
+    revalidatePath("/dealer/stock");
+    revalidatePath("/dashboard/dealers");
+    return { success: true, message: "库存已上报" };
+  } catch (error) {
+    return { success: false, error: { code: "REPORT_DEALER_STOCK_FAILED", message: getErrorMessage(error) } };
+  }
+}
+
 export async function acceptRouting(routingId: string): Promise<ActionResult> {
   try {
-    const dealerId = await getDealerId();
+    const dealer = await getDealerId();
     const routing = await prisma.orderRouting.findFirst({
-      where: { id: routingId, dealerId, status: "PENDING" },
+      where: { id: routingId, dealerId: dealer.id, status: "PENDING" },
       select: { id: true, orderId: true, order: { select: { status: true } } },
     });
 
@@ -66,9 +155,9 @@ export async function acceptRouting(routingId: string): Promise<ActionResult> {
 
 export async function rejectRouting(routingId: string, reason: string): Promise<ActionResult> {
   try {
-    const dealerId = await getDealerId();
+    const dealer = await getDealerId();
     const routing = await prisma.orderRouting.findFirst({
-      where: { id: routingId, dealerId, status: "PENDING" },
+      where: { id: routingId, dealerId: dealer.id, status: "PENDING" },
       select: { id: true, orderId: true },
     });
 
@@ -86,8 +175,8 @@ export async function rejectRouting(routingId: string, reason: string): Promise<
 
 export async function shipDealerOrder(orderId: string): Promise<ActionResult> {
   try {
-    const dealerId = await getDealerId();
-    const routing = await prisma.orderRouting.findFirst({ where: { orderId, dealerId, status: "ACCEPTED" }, select: { id: true } });
+    const dealer = await getDealerId();
+    const routing = await prisma.orderRouting.findFirst({ where: { orderId, dealerId: dealer.id, status: "ACCEPTED" }, select: { id: true } });
     if (!routing) throw new Error("订单不属于当前经销商");
 
     await prisma.$transaction([
@@ -109,8 +198,8 @@ export async function shipDealerOrder(orderId: string): Promise<ActionResult> {
 
 export async function completeDealerOrder(orderId: string): Promise<ActionResult> {
   try {
-    const dealerId = await getDealerId();
-    const routing = await prisma.orderRouting.findFirst({ where: { orderId, dealerId, status: "ACCEPTED" }, select: { id: true } });
+    const dealer = await getDealerId();
+    const routing = await prisma.orderRouting.findFirst({ where: { orderId, dealerId: dealer.id, status: "ACCEPTED" }, select: { id: true } });
     if (!routing) throw new Error("订单不属于当前经销商");
 
     await prisma.$transaction([
