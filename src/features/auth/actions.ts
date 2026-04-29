@@ -51,7 +51,14 @@ export async function registerCustomer(input: RegisterInput): Promise<AuthAction
       profile: {
         create: {
           preferredCategories: [],
-          tags: ["新客"],
+          tags: { labels: ["画像:普通散客", "生命周期:NEW"] },
+        },
+      },
+      tags: {
+        create: {
+          name: "画像:普通散客",
+          color: "#f1f5f9",
+          source: "AI_PROFILE",
         },
       },
     },
