@@ -153,6 +153,32 @@ getSalespersonManagementData(filters: SalespersonFilters): Promise<{
 }>
 ```
 
+### 2.13 公司经营看板（Phase 9 已上线）
+```typescript
+getCompanyOperationsData(): Promise<{
+  summary: {
+    revenue30d: number
+    orderCount30d: number
+    zoneCount: number
+    dealerCount: number
+    activeDealerCount: number
+    riskDealerCount: number
+    customerCount: number
+    leadCount30d: number
+    salespersonScanCount: number
+    salespersonLeadCount: number
+    pushConversionRate: number
+    openConflicts: number
+  }
+  zones: ZoneOperationItem[]
+  dealerTiers: Record<DealerTier, number>
+  customerSegments: CustomerSegmentOperationItem[]
+  salespeople: SalespersonGroundPushItem[]
+  productPushes: ProductPushReviewItem[]
+  conflictTrend: ChannelConflictTrendItem[]
+}>
+```
+
 ## 3. API Routes（外部接口）
 
 仅用于第三方回调：
