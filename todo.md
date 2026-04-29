@@ -329,12 +329,12 @@
 - [x] 已具备渠道经营雏形：`Dealer`、`OrderRouting`、`DealerStock`、`salesPersonId`、`CustomerTag`、`UserProfile`、`ChatHistory`、`Campaign/Coupon` 等模型已经存在。
 - [x] 已具备分单闭环：`src/features/orders/routing.ts` 支持按 `bulkThreshold` 拆分大单/小单、就近经销商、拒单重匹配。
 - [x] 已具备 AI/营销雏形：`src/features/ai` 有聊天、画像、节气推荐、性格测试；`src/features/marketing` 有优惠券和运营看板。
-- [!] 当前主要偏差：文档、首页和商城路径仍以“B2C商城、在线支付、商品列表”为第一优先级，弱化了渠道保护、业务员地推、经销商协同和大单询价。
+- [x] 当前主要偏差已修复：README、核心文档、`/shop` 首页和商城路径已转向“区域供货 + 渠道保护 + 业务员地推 + 经销商协同 + 大单询价”，普通购物车保留为小单入口。
 - [x] Phase 7 基础模型已补齐：`Lead` 线索、`Inquiry` 询价、`Quote` 报价、`PromoterCode` 推广码、`DealerPolicy` 经销商政策、`ProductPush` 新品推送记录、`ChannelConflict` 渠道冲突台账。
 - [x] 订单分流已升级：`submitOrder` 普通小单继续创建 `PAID` 订单并扣库存；宴席、团购、门店补货和超阈值购物车会先进入 `Inquiry`，报价确认后再转订单。
 - [x] 分单策略已升级：`routeOrder` 在数量阈值和距离之外读取 `DealerPolicy`，纳入最低/最高接单金额、品牌权限、跨区规则、经销商优先级、当日拒单上限。
 - [x] 当前 AI 缺口已修复：`/shop/ai-chat` 已从客服问答升级为 AI 选品与询价助手，首页明确提供宴席配酒、企业团购/送礼、门店补货、新品试饮四类获客场景，并支持结构化识别生成线索/询价建议。
-- [!] 当前合规缺口：缺少显著的个人信息收集告知、未成年人禁售、适度饮酒、酒类广告边界提示。
+- [x] 当前合规缺口已修复：`AlcoholComplianceNotice` 已升级为显著分条提示，并覆盖首页、AI互动、场景询价、结算和趣味/新品试饮入口；场景询价提交前需确认个人信息用途、未成年人禁售、适度饮酒和广告边界。
 
 ### 7.1 文档与产品定位修正
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { ScenarioInquiryForm } from "@/features/channel/ScenarioInquiryForm";
+import { AlcoholComplianceNotice } from "@/features/shop/AlcoholComplianceNotice";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,8 @@ export default async function RestockScenePage({ searchParams }: PageProps) {
           输入门店类型、畅销品类和补货周期，平台会沉淀为门店线索，后续由业务员或经销商给出补货组合。
         </p>
       </section>
+
+      <AlcoholComplianceNotice />
 
       <ScenarioInquiryForm
         description="适合门店老板快速补货、了解新品、确认批发价和配送安排。"

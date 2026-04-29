@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { ScenarioInquiryForm } from "@/features/channel/ScenarioInquiryForm";
+import { AlcoholComplianceNotice } from "@/features/shop/AlcoholComplianceNotice";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,8 @@ export default async function BanquetScenePage({ searchParams }: PageProps) {
           留下桌数、预算和品牌偏好后，平台会先生成询价单，由公司或对应业务员确认库存、报价、配送和开票方案。
         </p>
       </section>
+
+      <AlcoholComplianceNotice />
 
       <ScenarioInquiryForm
         description="适合婚宴、寿宴、升学宴、乔迁宴等大额场景，先询价再报价，避免直接进入普通购物车支付。"

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { ScenarioInquiryForm } from "@/features/channel/ScenarioInquiryForm";
+import { AlcoholComplianceNotice } from "@/features/shop/AlcoholComplianceNotice";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,8 @@ export default async function GroupBuyScenePage({ searchParams }: PageProps) {
           面向企业福利、节日礼盒、商务拜访和单位采购，先记录预算、包装、开票和配送批次，再由公司统一报价。
         </p>
       </section>
+
+      <AlcoholComplianceNotice />
 
       <ScenarioInquiryForm
         description="适合需要开票、分批配送、礼盒组合或对公采购的订单。"

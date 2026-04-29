@@ -114,7 +114,9 @@ export function ScenarioInquiryForm({ scene, title, description, fields, promote
         </label>
         <label className="flex items-start gap-2">
           <input className="mt-1" checked={base.consentAccepted} disabled={disabled} onChange={(event) => updateBase("consentAccepted", event.target.checked)} type="checkbox" />
-          <span>同意平台仅为询价、报价、配送和售后联系使用以上信息；酒类商品仅面向成年人，饮酒请适量。</span>
+          <span>
+            我已阅读并同意本页合规提示，授权平台仅为线索登记、询价报价、配送售后和必要回访处理以上信息；本人为成年人，知悉酒类商品不面向未成年人销售，饮酒请适量。
+          </span>
         </label>
       </div>
 

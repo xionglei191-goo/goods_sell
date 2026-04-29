@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { FunClient } from "@/features/ai/FunClient";
 import { getCheckInState, getSolarTermRecommendation } from "@/features/ai/fun";
+import { AlcoholComplianceNotice } from "@/features/shop/AlcoholComplianceNotice";
 import { formatCurrency } from "@/features/shop/utils";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +25,8 @@ export default async function FunPage() {
         <p className="mt-1 text-sm text-white/75">{seasonLabels[solar.term.season]} · 湘潭本地推荐</p>
         <p className="mt-4 max-w-2xl leading-7 text-white/90">{solar.content.advice}</p>
       </section>
+
+      <AlcoholComplianceNotice />
 
       <section className="space-y-4">
         <h2 className="text-xl font-bold text-stone-950">节气相关商品</h2>
