@@ -424,10 +424,15 @@ function mapCartItem(item: {
     price: product.retailPrice,
     quantity: item.quantity,
     stock: product.stock,
+    bulkThreshold: product.bulkThreshold,
     selected: item.selected,
     subtotal: product.retailPrice * quantity,
     isAvailable: product.stock > 0 && item.quantity <= product.stock,
   };
+}
+
+function configNumberValue(value: unknown, fallback: number) {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
 async function getConsumerId(callbackUrl: string) {
@@ -488,6 +493,11 @@ export async function getCheckoutData(cartItemIds: string[]): Promise<CheckoutDa
   });
   const mappedItems = items.map((item) => mapCartItem(item as unknown as { id: string; quantity: number; selected: boolean; product: RawShopProduct }));
   const totalAmount = mappedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const bulkOrderConfig = await prisma.systemConfig.findUnique({
+    where: { key: "bulkOrderAmount" },
+    select: { value: true },
+  });
+  const bulkOrderAmount = configNumberValue(bulkOrderConfig?.value, 500);
   const coupons = await prisma.customerCoupon.findMany({
     where: { customerId, status: "UNUSED" },
     include: { coupon: true },
@@ -539,6 +549,7 @@ export async function getCheckoutData(cartItemIds: string[]): Promise<CheckoutDa
     defaultAddressId: addresses.find((address) => address.isDefault)?.id ?? addresses[0]?.id ?? null,
     coupons: couponViews,
     totalAmount,
+    bulkOrderAmount,
   };
 }
 

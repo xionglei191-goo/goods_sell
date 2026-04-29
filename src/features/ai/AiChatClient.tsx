@@ -1,9 +1,12 @@
 "use client";
 
-import { Bot, Send, UserRound } from "lucide-react";
+import { ArrowRight, Bot, Gift, PartyPopper, Send, Store, UserRound } from "lucide-react";
+import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import type { ChannelAiSuggestion } from "@/features/ai/channel-intent";
+import { AlcoholComplianceNotice } from "@/features/shop/AlcoholComplianceNotice";
 import { cn } from "@/lib/utils";
 
 type ChatMessage = {
@@ -16,7 +19,12 @@ type AiChatClientProps = {
   initialMessages: ChatMessage[];
 };
 
-const quickQuestions = ["茅台多少钱？", "有什么推荐？", "怎么下单？", "配送多久？"];
+const quickQuestions = [
+  { label: "宴席预算", value: "20桌婚宴，预算每桌600元，想配白酒、啤酒和饮料，怎么安排？", icon: PartyPopper },
+  { label: "团购送礼", value: "公司端午礼盒100份，每份预算200元，需要开票，有什么组合建议？", icon: Gift },
+  { label: "门店补货", value: "我是烟酒店，每周补货，想配白酒、啤酒、饮料，重视周转和利润，怎么选？", icon: Store },
+  { label: "配送多久", value: "湘潭配送多久？", icon: Send },
+];
 
 function parseSseChunk(buffer: string) {
   const events = buffer.split("\n\n");
@@ -29,6 +37,7 @@ export function AiChatClient({ initialMessages }: AiChatClientProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<Record<string, ChannelAiSuggestion>>({});
   const [isPending, startTransition] = useTransition();
   const assistantIdRef = useRef("");
 
@@ -68,9 +77,14 @@ export function AiChatClient({ initialMessages }: AiChatClientProps) {
           const parsed = parseSseChunk(buffer);
           buffer = parsed.rest;
           for (const event of parsed.complete) {
+            const eventName = event.split("\n").find((line) => line.startsWith("event: "))?.slice(7) ?? "message";
             const dataLine = event.split("\n").find((line) => line.startsWith("data: "));
             if (!dataLine) continue;
-            const data = JSON.parse(dataLine.slice(6)) as { text?: string; message?: string };
+            const data = JSON.parse(dataLine.slice(6)) as { text?: string; message?: string; suggestion?: ChannelAiSuggestion };
+            if (eventName === "suggestion" && data.suggestion) {
+              setSuggestions((current) => ({ ...current, [assistantIdRef.current]: data.suggestion as ChannelAiSuggestion }));
+              continue;
+            }
             if (data.text) appendAssistantText(data.text);
             if (data.message) setError(data.message);
           }
@@ -88,6 +102,10 @@ export function AiChatClient({ initialMessages }: AiChatClientProps) {
         <p className="mt-1 text-sm text-stone-500">产品、价格、配送、支付问题都可以问我</p>
       </div>
 
+      <div className="px-4 pt-4">
+        <AlcoholComplianceNotice compact />
+      </div>
+
       <div className="flex-1 space-y-4 overflow-y-auto px-4 py-5">
         {messages.length === 0 ? (
           <div className="rounded-lg bg-stone-50 px-4 py-8 text-center text-sm text-stone-500">欢迎来到华启商城，我是小启。</div>
@@ -103,6 +121,7 @@ export function AiChatClient({ initialMessages }: AiChatClientProps) {
               ) : null}
               <div className={cn("max-w-[78%] rounded-lg px-3 py-2 text-sm leading-6", isUser ? "bg-blue-600 text-white" : "bg-stone-100 text-stone-800")}>
                 {message.content || "正在输入..."}
+                {!isUser && suggestions[message.id] ? <SuggestionCard suggestion={suggestions[message.id]} /> : null}
               </div>
               {isUser ? (
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
@@ -116,11 +135,15 @@ export function AiChatClient({ initialMessages }: AiChatClientProps) {
 
       <div className="border-t border-stone-100 p-4">
         <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
-          {quickQuestions.map((question) => (
-            <button className="shrink-0 rounded-full bg-red-50 px-3 py-1.5 text-sm font-medium text-[#dc2626]" key={question} onClick={() => send(question)} type="button">
-              {question}
+          {quickQuestions.map((question) => {
+            const Icon = question.icon;
+            return (
+            <button className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-red-50 px-3 py-1.5 text-sm font-medium text-[#dc2626]" key={question.label} onClick={() => send(question.value)} type="button">
+              <Icon className="h-3.5 w-3.5" />
+              {question.label}
             </button>
-          ))}
+            );
+          })}
         </div>
         {error ? <p className="mb-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
         <div className="flex gap-2">
@@ -139,6 +162,34 @@ export function AiChatClient({ initialMessages }: AiChatClientProps) {
           </Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function SuggestionCard({ suggestion }: { suggestion: ChannelAiSuggestion }) {
+  return (
+    <div className="mt-3 rounded-md bg-white p-3 text-stone-800 shadow-sm ring-1 ring-stone-200">
+      <p className="font-semibold text-stone-950">{suggestion.title}</p>
+      <p className="mt-1 text-xs leading-5 text-stone-500">{suggestion.summary}</p>
+      {suggestion.details.length > 0 ? (
+        <div className="mt-3 grid gap-2">
+          {suggestion.details.map((detail) => (
+            <p className="flex justify-between gap-3 text-xs" key={`${detail.label}-${detail.value}`}>
+              <span className="text-stone-400">{detail.label}</span>
+              <span className="text-right font-medium text-stone-700">{detail.value}</span>
+            </p>
+          ))}
+        </div>
+      ) : null}
+      {suggestion.missingFields.length > 0 ? (
+        <p className="mt-3 text-xs leading-5 text-amber-700">还需补充：{suggestion.missingFields.join("、")}</p>
+      ) : null}
+      <Button asChild className="mt-3 h-9 w-full bg-[#dc2626] text-white hover:bg-[#b91c1c]" size="sm">
+        <Link href={suggestion.href}>
+          提交询价
+          <ArrowRight className="h-4 w-4" />
+        </Link>
+      </Button>
     </div>
   );
 }

@@ -98,6 +98,7 @@ export type CartItemView = {
   price: number;
   quantity: number;
   stock: number;
+  bulkThreshold: number;
   selected: boolean;
   subtotal: number;
   isAvailable: boolean;
@@ -120,6 +121,7 @@ export type CheckoutData = {
   defaultAddressId: string | null;
   coupons: CheckoutCouponView[];
   totalAmount: number;
+  bulkOrderAmount: number;
 };
 
 export type CheckoutCouponView = {

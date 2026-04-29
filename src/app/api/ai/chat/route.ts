@@ -25,11 +25,14 @@ export async function POST(request: NextRequest) {
     async start(controller) {
       const encoder = new TextEncoder();
       try {
-        const answer = await answerCustomerQuestion(customerId, message);
+        const { answer, suggestion } = await answerCustomerQuestion(customerId, message);
         const chars = Array.from(answer);
         for (const char of chars) {
           controller.enqueue(encoder.encode(encoderPayload("delta", { text: char })));
           await new Promise((resolve) => setTimeout(resolve, 12));
+        }
+        if (suggestion) {
+          controller.enqueue(encoder.encode(encoderPayload("suggestion", { suggestion })));
         }
         controller.enqueue(encoder.encode(encoderPayload("done", { ok: true })));
       } catch {

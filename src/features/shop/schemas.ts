@@ -33,6 +33,7 @@ export type AddressInput = z.infer<typeof addressSchema>;
 export const checkoutSchema = z.object({
   addressId: z.string().min(1, "请选择收货地址"),
   cartItemIds: z.array(z.string().min(1)).min(1, "请选择要结算的商品"),
+  checkoutMode: z.enum(["DIRECT_ORDER", "BANQUET", "GROUP_BUY", "RESTOCK"]).default("DIRECT_ORDER"),
   payMethod: z.enum(["WECHAT", "CASH", "TRANSFER", "CREDIT"]).default("WECHAT"),
   customerCouponId: z.string().min(1).optional(),
   remark: z.string().trim().max(200, "备注不超过 200 字").optional(),

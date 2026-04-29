@@ -1,13 +1,14 @@
 "use client";
 
-import { CheckCircle2, MapPin, Plus, TicketPercent } from "lucide-react";
+import { CheckCircle2, ClipboardList, MapPin, Plus, TicketPercent } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { AlcoholComplianceNotice } from "@/features/shop/AlcoholComplianceNotice";
 import { saveAddress, submitOrder } from "@/features/shop/actions";
-import type { AddressInput } from "@/features/shop/schemas";
+import type { AddressInput, CheckoutInput } from "@/features/shop/schemas";
 import type { CheckoutData } from "@/features/shop/types";
 import { formatCouponBenefit, formatCurrency } from "@/features/shop/utils";
 import { cn } from "@/lib/utils";
@@ -18,9 +19,17 @@ type CheckoutClientProps = {
 
 const districts = ["雨湖区", "岳塘区", "湘潭县", "湘乡市", "韶山市"];
 
+const checkoutModes: Array<{ value: CheckoutInput["checkoutMode"]; label: string; desc: string }> = [
+  { value: "DIRECT_ORDER", label: "普通散单", desc: "小额现货直接支付下单" },
+  { value: "BANQUET", label: "宴席配酒", desc: "桌数、预算、配送时间先核价" },
+  { value: "GROUP_BUY", label: "企业团购", desc: "福利、节礼、开票和批量配送" },
+  { value: "RESTOCK", label: "门店补货", desc: "门店常备货和批量补货" },
+];
+
 export function CheckoutClient({ data }: CheckoutClientProps) {
   const router = useRouter();
   const [addressId, setAddressId] = useState(data.defaultAddressId ?? "");
+  const [checkoutMode, setCheckoutMode] = useState<CheckoutInput["checkoutMode"]>("DIRECT_ORDER");
   const [payMethod, setPayMethod] = useState<"WECHAT" | "CASH" | "TRANSFER" | "CREDIT">("WECHAT");
   const [selectedCouponId, setSelectedCouponId] = useState(data.coupons.find((coupon) => coupon.isUsable)?.id ?? "");
   const [remark, setRemark] = useState("");
@@ -29,7 +38,10 @@ export function CheckoutClient({ data }: CheckoutClientProps) {
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const selectedCoupon = useMemo(() => data.coupons.find((coupon) => coupon.id === selectedCouponId && coupon.isUsable), [data.coupons, selectedCouponId]);
-  const discountAmount = selectedCoupon?.discountAmount ?? 0;
+  const hasBulkQuantity = data.items.some((item) => item.quantity >= item.bulkThreshold);
+  const autoInquiry = data.totalAmount >= data.bulkOrderAmount || hasBulkQuantity;
+  const shouldCreateInquiry = checkoutMode !== "DIRECT_ORDER" || autoInquiry;
+  const discountAmount = shouldCreateInquiry ? 0 : (selectedCoupon?.discountAmount ?? 0);
   const payableAmount = Math.max(0, data.totalAmount - discountAmount);
 
   function createAddress() {
@@ -53,8 +65,9 @@ export function CheckoutClient({ data }: CheckoutClientProps) {
       const result = await submitOrder({
         addressId,
         cartItemIds: data.items.map((item) => item.id),
+        checkoutMode,
         payMethod,
-        customerCouponId: selectedCoupon?.id,
+        customerCouponId: shouldCreateInquiry ? undefined : selectedCoupon?.id,
         remark,
       });
 
@@ -63,7 +76,11 @@ export function CheckoutClient({ data }: CheckoutClientProps) {
         return;
       }
 
-      router.push(`/shop/checkout/success?orderNo=${result.data.orderNo}&orderId=${result.data.orderId}`);
+      if (result.data.kind === "INQUIRY") {
+        router.push(`/shop/checkout/success?type=inquiry&inquiryNo=${result.data.inquiryNo}&inquiryId=${result.data.inquiryId}`);
+      } else {
+        router.push(`/shop/checkout/success?orderNo=${result.data.orderNo}&orderId=${result.data.orderId}`);
+      }
       router.refresh();
     });
   }
@@ -89,6 +106,36 @@ export function CheckoutClient({ data }: CheckoutClientProps) {
         </div>
 
         {message ? <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{message}</p> : null}
+
+        <AlcoholComplianceNotice compact />
+
+        <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-stone-200">
+          <div className="flex items-center gap-2">
+            <ClipboardList className="h-4 w-4 text-[#dc2626]" />
+            <h2 className="font-bold text-stone-950">采购类型</h2>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {checkoutModes.map((mode) => (
+              <label
+                className={cn("block rounded-lg border p-3 text-sm", checkoutMode === mode.value ? "border-red-200 bg-red-50" : "border-stone-200 bg-white")}
+                key={mode.value}
+              >
+                <span className="flex items-start gap-2">
+                  <input checked={checkoutMode === mode.value} className="mt-1 h-4 w-4 accent-[#dc2626]" onChange={() => setCheckoutMode(mode.value)} type="radio" />
+                  <span>
+                    <span className="block font-semibold text-stone-950">{mode.label}</span>
+                    <span className="mt-1 block text-xs leading-5 text-stone-500">{mode.desc}</span>
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+          {autoInquiry ? (
+            <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              当前商品金额达到 {formatCurrency(data.bulkOrderAmount)} 或存在大单数量，系统将转为询价，报价确认后再生成订单。
+            </p>
+          ) : null}
+        </section>
 
         <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-stone-200">
           <div className="flex items-center justify-between gap-3">
@@ -188,6 +235,7 @@ export function CheckoutClient({ data }: CheckoutClientProps) {
               </option>
             ))}
           </select>
+          {shouldCreateInquiry ? <p className="mt-2 text-xs text-stone-500">询价单不会锁定或核销优惠券，正式转订单时再计算优惠。</p> : null}
           {data.coupons.length === 0 ? (
             <p className="mt-2 text-xs text-stone-500">暂无可用优惠券</p>
           ) : (
@@ -222,7 +270,7 @@ export function CheckoutClient({ data }: CheckoutClientProps) {
           </div>
           <Button className="mt-4 h-12 w-full bg-[#dc2626] text-white hover:bg-[#b91c1c]" disabled={!addressId || isPending} onClick={placeOrder}>
             <CheckCircle2 className="h-4 w-4" />
-            {isPending ? "提交中" : "模拟支付并下单"}
+            {isPending ? "提交中" : shouldCreateInquiry ? "提交询价" : "模拟支付并下单"}
           </Button>
         </section>
       </aside>

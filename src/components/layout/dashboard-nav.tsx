@@ -14,6 +14,7 @@ import {
   Tags,
   Truck,
   Users,
+  UserRoundPlus,
   Warehouse,
   MessageSquareText,
 } from "lucide-react";
@@ -75,6 +76,17 @@ export const dashboardNavItems: DashboardNavItem[] = [
     title: "客户管理",
     href: "/dashboard/customers",
     icon: Users,
+  },
+  {
+    title: "渠道经营",
+    href: "/dashboard/leads",
+    icon: UserRoundPlus,
+    children: [
+      { title: "线索池", href: "/dashboard/leads" },
+      { title: "询价单", href: "/dashboard/inquiries" },
+      { title: "报价单", href: "/dashboard/quotes" },
+      { title: "推广码", href: "/dashboard/promoters" },
+    ],
   },
   {
     title: "经销商管理",
@@ -162,7 +174,12 @@ export const breadcrumbLabels: Record<string, string> = {
   suppliers: "供应商管理",
   orders: "订单管理",
   customers: "客户管理",
+  leads: "线索池",
+  inquiries: "询价单",
+  quotes: "报价单",
+  promoters: "推广码管理",
   dealers: "经销商管理",
+  policy: "渠道政策",
   sales: "销售报表",
   salespeople: "销售员管理",
   finance: "财务管理",

@@ -10,6 +10,16 @@ type Coordinate = {
   longitude: number;
 };
 
+type RoutingAddress = Coordinate & {
+  zone?: string | null;
+};
+
+type RoutingContext = {
+  amount: number;
+  brandIds: string[];
+  zone?: string | null;
+};
+
 type RoutingItem = {
   productId: string;
   productName: string;
@@ -18,9 +28,17 @@ type RoutingItem = {
   quantity: number;
   totalAmount: Prisma.Decimal;
   product: {
+    brandId: string;
     bulkThreshold: number;
   };
 };
+
+type DealerWithPolicy = Prisma.DealerGetPayload<{
+  include: {
+    customer: { select: { name: true } };
+    policy: true;
+  };
+}>;
 
 function toNumber(value: Prisma.Decimal | number | string | null | undefined) {
   if (value === null || value === undefined) return null;
@@ -43,6 +61,45 @@ function splitItems(items: RoutingItem[]) {
   return { largeItems, smallItems };
 }
 
+function buildRoutingContext(items: RoutingItem[], zone?: string | null): RoutingContext {
+  return {
+    amount: items.reduce((sum, item) => sum + Number(item.totalAmount), 0),
+    brandIds: Array.from(new Set(items.map((item) => item.product.brandId))),
+    zone,
+  };
+}
+
+function jsonStringArray(value: Prisma.JsonValue | null | undefined) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function matchesDealerPolicy(dealer: DealerWithPolicy, context: RoutingContext, rejectedToday: number) {
+  if (!dealer.policy) return true;
+  const minOrderAmount = Number(dealer.policy.minOrderAmount);
+  const maxOrderAmount = dealer.policy.maxOrderAmount === null ? null : Number(dealer.policy.maxOrderAmount);
+  if (context.amount < minOrderAmount) return false;
+  if (maxOrderAmount !== null && context.amount > maxOrderAmount) return false;
+
+  const allowedBrandIds = jsonStringArray(dealer.policy.brandIds);
+  if (allowedBrandIds.length > 0 && !context.brandIds.every((brandId) => allowedBrandIds.includes(brandId))) {
+    return false;
+  }
+
+  if (!dealer.policy.allowCrossZone && context.zone && dealer.zone !== context.zone) {
+    return false;
+  }
+
+  if (!dealer.policy.allowReject && rejectedToday > 0) {
+    return false;
+  }
+
+  if (dealer.policy.allowReject && dealer.policy.rejectLimitPerDay > 0 && rejectedToday >= dealer.policy.rejectLimitPerDay) {
+    return false;
+  }
+
+  return true;
+}
+
 async function generateChildOrderNo(tx: DbLike, suffix: string) {
   const now = new Date();
   const start = new Date(now);
@@ -51,7 +108,7 @@ async function generateChildOrderNo(tx: DbLike, suffix: string) {
   return `${buildOrderNoSequence(count, now)}-${suffix}`;
 }
 
-async function findNearestDealer(tx: DbLike, address: Coordinate, excludedDealerIds: string[] = []) {
+async function findNearestDealer(tx: DbLike, address: RoutingAddress, context: RoutingContext, excludedDealerIds: string[] = []) {
   const dealers = await tx.dealer.findMany({
     where: {
       isAccepting: true,
@@ -59,10 +116,28 @@ async function findNearestDealer(tx: DbLike, address: Coordinate, excludedDealer
     },
     include: {
       customer: { select: { name: true } },
+      policy: true,
     },
   });
+  const dealerIds = dealers.map((dealer) => dealer.id);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const rejectedGroups =
+    dealerIds.length === 0
+      ? []
+      : await tx.orderRouting.groupBy({
+          by: ["dealerId"],
+          where: {
+            dealerId: { in: dealerIds },
+            status: "REJECTED",
+            respondedAt: { gte: today },
+          },
+          _count: { _all: true },
+        });
+  const rejectedCountByDealer = new Map(rejectedGroups.map((item) => [item.dealerId, item._count._all]));
 
   const candidates = dealers
+    .filter((dealer) => matchesDealerPolicy(dealer, context, rejectedCountByDealer.get(dealer.id) ?? 0))
     .map((dealer) => {
       const distance = calculateDistanceKm(address, {
         latitude: Number(dealer.latitude),
@@ -70,12 +145,12 @@ async function findNearestDealer(tx: DbLike, address: Coordinate, excludedDealer
       });
       return { dealer, distance };
     })
-    .sort((a, b) => a.distance - b.distance);
+    .sort((a, b) => (b.dealer.policy?.priority ?? 0) - (a.dealer.policy?.priority ?? 0) || a.distance - b.distance);
 
   return candidates.find((candidate) => candidate.distance * 1000 <= candidate.dealer.serviceRadius) ?? candidates[0] ?? null;
 }
 
-async function assignDealer(tx: DbLike, orderId: string, address: Coordinate, excludedDealerIds: string[] = []) {
+async function assignDealer(tx: DbLike, orderId: string, address: RoutingAddress, context: RoutingContext, excludedDealerIds: string[] = []) {
   const existingActive = await tx.orderRouting.findFirst({
     where: { orderId, status: { in: ["PENDING", "ACCEPTED"] } },
     select: { id: true },
@@ -85,7 +160,7 @@ async function assignDealer(tx: DbLike, orderId: string, address: Coordinate, ex
     return { assigned: true as const, routingId: existingActive.id };
   }
 
-  const nearest = await findNearestDealer(tx, address, excludedDealerIds);
+  const nearest = await findNearestDealer(tx, address, context, excludedDealerIds);
   if (!nearest) {
     await tx.order.update({ where: { id: orderId }, data: { routingType: "WAREHOUSE" } });
     return { assigned: false as const };
@@ -97,6 +172,7 @@ async function assignDealer(tx: DbLike, orderId: string, address: Coordinate, ex
       dealerId: nearest.dealer.id,
       status: "PENDING",
       distance: toMoney(nearest.distance),
+      reason: nearest.dealer.policy ? "匹配经销商政策" : "默认距离分单",
     },
     select: { id: true },
   });
@@ -155,7 +231,7 @@ export async function routeOrder(tx: DbLike, orderId: string) {
     include: {
       address: true,
       children: { select: { id: true } },
-      items: { include: { product: { select: { bulkThreshold: true } } } },
+      items: { include: { product: { select: { brandId: true, bulkThreshold: true } } } },
     },
   });
 
@@ -170,7 +246,7 @@ export async function routeOrder(tx: DbLike, orderId: string) {
     return { routingType: "WAREHOUSE" as const, reason: "NO_COORDINATE" };
   }
 
-  const address = { latitude, longitude };
+  const address = { latitude, longitude, zone: order.address.district };
   const { largeItems, smallItems } = splitItems(order.items);
 
   if (smallItems.length === 0) {
@@ -183,7 +259,7 @@ export async function routeOrder(tx: DbLike, orderId: string) {
   }
 
   if (largeItems.length === 0) {
-    const assigned = await assignDealer(tx, order.id, address);
+    const assigned = await assignDealer(tx, order.id, address, buildRoutingContext(order.items, order.address.district));
     return { routingType: assigned.assigned ? ("DEALER" as const) : ("WAREHOUSE" as const), assigned };
   }
 
@@ -191,7 +267,7 @@ export async function routeOrder(tx: DbLike, orderId: string) {
   if (order.children.length === 0) {
     const warehouseChild = await createSplitChild(tx, order, largeItems, "W", "WAREHOUSE");
     const dealerChild = await createSplitChild(tx, order, smallItems, "D", "DEALER");
-    await assignDealer(tx, dealerChild.id, address);
+    await assignDealer(tx, dealerChild.id, address, buildRoutingContext(smallItems, order.address.district));
     return { routingType: "MIXED" as const, warehouseOrderId: warehouseChild.id, dealerOrderId: dealerChild.id };
   }
 
@@ -206,7 +282,7 @@ export async function rejectAndRematchRouting(routingId: string, reason: string)
   return prisma.$transaction(async (tx) => {
     const routing = await tx.orderRouting.findUnique({
       where: { id: routingId },
-      include: { order: { include: { address: true } } },
+      include: { order: { include: { address: true, items: { include: { product: { select: { brandId: true, bulkThreshold: true } } } } } } },
     });
 
     if (!routing) {
@@ -232,7 +308,8 @@ export async function rejectAndRematchRouting(routingId: string, reason: string)
     return assignDealer(
       tx,
       routing.orderId,
-      { latitude, longitude },
+      { latitude, longitude, zone: routing.order.address.district },
+      buildRoutingContext(routing.order.items, routing.order.address.district),
       previous.map((item) => item.dealerId),
     );
   });

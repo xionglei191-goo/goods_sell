@@ -1,5 +1,6 @@
 "use server";
 
+import type { LeadScene, Prisma } from "@prisma/client";
 import { compare, hash } from "bcryptjs";
 import { revalidatePath, revalidateTag } from "next/cache";
 
@@ -21,6 +22,10 @@ import {
 import type { ActionResult } from "@/features/shop/types";
 import { calculateCouponDiscount, makeLoginRedirect, toMoney } from "@/features/shop/utils";
 import { prisma } from "@/lib/prisma";
+
+type CheckoutResult =
+  | { kind: "ORDER"; orderNo: string; orderId: string }
+  | { kind: "INQUIRY"; inquiryNo: string; inquiryId: string; leadId: string };
 
 async function getCustomerId() {
   const session = await auth();
@@ -84,12 +89,30 @@ function formatOrderDate(date: Date) {
   return `${yyyy}${mm}${dd}`;
 }
 
-async function generateOrderNo() {
+async function generateOrderNo(tx: Prisma.TransactionClient) {
   const now = new Date();
   const start = new Date(now);
   start.setHours(0, 0, 0, 0);
-  const count = await prisma.order.count({ where: { createdAt: { gte: start } } });
+  const count = await tx.order.count({ where: { createdAt: { gte: start } } });
   return `HQ${formatOrderDate(now)}${String(count + 1).padStart(6, "0")}`;
+}
+
+async function generateInquiryNo(tx: Prisma.TransactionClient) {
+  const now = new Date();
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  const count = await tx.inquiry.count({ where: { createdAt: { gte: start } } });
+  return `XJ${formatOrderDate(now)}${String(count + 1).padStart(5, "0")}`;
+}
+
+function configNumberValue(value: unknown, fallback: number) {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function inferInquiryScene(mode: CheckoutInput["checkoutMode"]): LeadScene {
+  if (mode === "BANQUET") return "BANQUET";
+  if (mode === "RESTOCK") return "RESTOCK";
+  return "GROUP_BUY";
 }
 
 export async function addToCart(input: { productId: string; quantity: number; replaceQuantity?: boolean }): Promise<ActionResult<{ cartCount: number; itemId: string }>> {
@@ -339,24 +362,22 @@ export async function deleteAddress(addressId: string): Promise<ActionResult> {
   }
 }
 
-export async function submitOrder(input: CheckoutInput): Promise<ActionResult<{ orderNo: string; orderId: string }>> {
+export async function submitOrder(input: CheckoutInput): Promise<ActionResult<CheckoutResult>> {
   const customerId = await getCustomerId();
   if (!customerId) {
-    return authError("/shop/checkout") as ActionResult<{ orderNo: string; orderId: string }>;
+    return authError("/shop/checkout") as ActionResult<CheckoutResult>;
   }
 
   const parsed = checkoutSchema.safeParse(input);
   if (!parsed.success) {
-    return validationError(parsed.error.issues[0]?.message ?? "订单信息不完整") as ActionResult<{ orderNo: string; orderId: string }>;
+    return validationError(parsed.error.issues[0]?.message ?? "订单信息不完整") as ActionResult<CheckoutResult>;
   }
 
   try {
-    const operatorId = await getStockOperatorId();
-    const orderNo = await generateOrderNo();
-    const order = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx): Promise<CheckoutResult> => {
       const address = await tx.address.findFirst({
         where: { id: parsed.data.addressId, customerId },
-        select: { id: true, city: true },
+        select: { id: true, name: true, phone: true, city: true, district: true, detail: true },
       });
 
       if (!address) {
@@ -380,13 +401,111 @@ export async function submitOrder(input: CheckoutInput): Promise<ActionResult<{ 
         if (item.product.status !== "ACTIVE") {
           throw new Error(`${item.product.name} 已下架`);
         }
+      }
 
+      const totalAmount = cartItems.reduce((sum, item) => sum + Number(item.product.retailPrice) * item.quantity, 0);
+      const bulkConfig = await tx.systemConfig.findUnique({
+        where: { key: "bulkOrderAmount" },
+        select: { value: true },
+      });
+      const bulkOrderAmount = configNumberValue(bulkConfig?.value, 500);
+      const hasBulkQuantity = cartItems.some((item) => item.quantity >= item.product.bulkThreshold);
+      const shouldCreateInquiry = parsed.data.checkoutMode !== "DIRECT_ORDER" || totalAmount >= bulkOrderAmount || hasBulkQuantity;
+
+      if (shouldCreateInquiry) {
+        const customer = await tx.customer.findUnique({
+          where: { id: customerId },
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            salesPersonId: true,
+            dealer: { select: { id: true } },
+          },
+        });
+
+        if (!customer) {
+          throw new Error("客户不存在");
+        }
+
+        const scene = inferInquiryScene(parsed.data.checkoutMode);
+        const inquiryNo = await generateInquiryNo(tx);
+        const salespersonId = customer.salesPersonId ?? null;
+        const dealerId = customer.dealer?.id ?? null;
+        const items = cartItems.map((item) => ({
+          productId: item.productId,
+          sku: item.product.sku,
+          name: item.product.name,
+          unitPrice: Number(item.product.retailPrice),
+          quantity: item.quantity,
+          totalAmount: Number(item.product.retailPrice) * item.quantity,
+          bulkThreshold: item.product.bulkThreshold,
+        }));
+        const metadata = {
+          checkoutMode: parsed.data.checkoutMode,
+          totalAmount,
+          bulkOrderAmount,
+          hasBulkQuantity,
+          cartItemIds: cartItems.map((item) => item.id),
+        };
+
+        const lead = await tx.lead.create({
+          data: {
+            source: "SHOP",
+            scene,
+            status: salespersonId || dealerId ? "ASSIGNED" : "NEW",
+            name: customer.name,
+            phone: customer.phone,
+            customerId,
+            salespersonId,
+            dealerId,
+            notes: parsed.data.remark || null,
+            metadata,
+            consentAccepted: true,
+          },
+          select: { id: true },
+        });
+        const inquiry = await tx.inquiry.create({
+          data: {
+            inquiryNo,
+            scene,
+            status: salespersonId || dealerId ? "ASSIGNED" : "NEW",
+            leadId: lead.id,
+            customerId,
+            salespersonId,
+            dealerId,
+            contactName: address.name || customer.name,
+            contactPhone: address.phone || customer.phone,
+            budget: toMoney(totalAmount),
+            deliveryAddress: `湘潭市${address.district}${address.detail}`,
+            needsInvoice: parsed.data.checkoutMode === "GROUP_BUY",
+            content: {
+              source: "CHECKOUT",
+              checkoutMode: parsed.data.checkoutMode,
+              items,
+              totalAmount,
+              bulkOrderAmount,
+              payMethod: parsed.data.payMethod,
+            },
+            notes: parsed.data.remark || null,
+          },
+          select: { id: true, inquiryNo: true },
+        });
+
+        await tx.cartItem.updateMany({
+          where: { id: { in: cartItems.map((item) => item.id) }, customerId },
+          data: { selected: false },
+        });
+
+        return { kind: "INQUIRY", inquiryNo: inquiry.inquiryNo, inquiryId: inquiry.id, leadId: lead.id };
+      }
+
+      for (const item of cartItems) {
         if (item.product.stock < item.quantity) {
           throw new Error(`${item.product.name} 库存不足`);
         }
       }
 
-      const totalAmount = cartItems.reduce((sum, item) => sum + Number(item.product.retailPrice) * item.quantity, 0);
       let discountAmount = 0;
       let couponToUseId: string | null = null;
       let couponIdToIncrement: string | null = null;
@@ -431,6 +550,16 @@ export async function submitOrder(input: CheckoutInput): Promise<ActionResult<{ 
       }
 
       const payableAmount = Math.max(0, totalAmount - discountAmount);
+      const operator = await tx.user.findFirst({
+        where: { role: "ADMIN" },
+        select: { id: true },
+      });
+
+      if (!operator) {
+        throw new Error("未找到库存操作员，请先创建管理员账号");
+      }
+
+      const orderNo = await generateOrderNo(tx);
       const createdOrder = await tx.order.create({
         data: {
           orderNo,
@@ -499,21 +628,29 @@ export async function submitOrder(input: CheckoutInput): Promise<ActionResult<{ 
             beforeStock: item.product.stock,
             afterStock,
             relatedOrderId: createdOrder.id,
-            operatorId,
+            operatorId: operator.id,
             remark: `商城订单 ${orderNo} 出库`,
           },
         });
       }
 
       await tx.cartItem.deleteMany({ where: { id: { in: cartItems.map((item) => item.id) }, customerId } });
-      return createdOrder;
+      return { kind: "ORDER", orderNo: createdOrder.orderNo, orderId: createdOrder.id };
     });
 
-    await routeOrderById(order.id);
-    await sendOrderStatusTemplate(order.id, "paid");
+    if (result.kind === "ORDER") {
+      await routeOrderById(result.orderId);
+      await sendOrderStatusTemplate(result.orderId, "paid");
+      revalidatePath(`/shop/checkout/success`);
+      revalidateShopPaths();
+      return { success: true, message: "支付成功，订单已生成", data: result };
+    }
+
     revalidateShopPaths();
+    revalidatePath("/dashboard/leads");
+    revalidatePath("/dashboard/inquiries");
     revalidatePath(`/shop/checkout/success`);
-    return { success: true, message: "支付成功，订单已生成", data: { orderNo: order.orderNo, orderId: order.id } };
+    return { success: true, message: "已提交询价需求，业务员会尽快联系报价", data: result };
   } catch (error) {
     return { success: false, error: { code: "SUBMIT_ORDER_FAILED", message: getErrorMessage(error) } };
   }

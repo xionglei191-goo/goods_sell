@@ -1,5 +1,8 @@
+import Link from "next/link";
+
+import { dealerPriceLevelLabels } from "@/features/channel/labels";
+import { formatCurrency, formatDate } from "@/features/orders/utils";
 import { prisma } from "@/lib/prisma";
-import { formatDate } from "@/features/orders/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -7,6 +10,7 @@ export default async function DealersPage() {
   const dealers = await prisma.dealer.findMany({
     include: {
       customer: { select: { name: true, phone: true } },
+      policy: true,
       routings: { select: { status: true } },
     },
     orderBy: { createdAt: "desc" },
@@ -46,7 +50,7 @@ export default async function DealersPage() {
       {/* Table */}
       <div className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-left text-sm">
+          <table className="w-full min-w-[1100px] text-left text-sm">
             <thead className="bg-slate-50 text-slate-500">
               <tr>
                 <th className="px-4 py-3 font-medium">店铺名称</th>
@@ -55,6 +59,7 @@ export default async function DealersPage() {
                 <th className="px-4 py-3 font-medium">区域</th>
                 <th className="px-4 py-3 font-medium">服务半径</th>
                 <th className="px-4 py-3 font-medium">接单状态</th>
+                <th className="px-4 py-3 font-medium">渠道政策</th>
                 <th className="px-4 py-3 font-medium">已接订单</th>
                 <th className="px-4 py-3 font-medium">创建时间</th>
               </tr>
@@ -93,6 +98,24 @@ export default async function DealersPage() {
                         </span>
                       )}
                     </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {dealer.policy ? (
+                        <div>
+                          <p>{dealerPriceLevelLabels[dealer.policy.priceLevel]} · 优先级 {dealer.policy.priority}</p>
+                          <p className="mt-1 text-xs text-slate-400">
+                            {formatCurrency(Number(dealer.policy.minOrderAmount))} 起
+                            {dealer.policy.maxOrderAmount ? ` · 封顶 ${formatCurrency(Number(dealer.policy.maxOrderAmount))}` : " · 不限上限"}
+                          </p>
+                          <Link className="mt-1 inline-flex text-xs font-medium text-blue-700 hover:text-blue-900" href={`/dashboard/dealers/${dealer.id}/policy`}>
+                            编辑政策
+                          </Link>
+                        </div>
+                      ) : (
+                        <Link className="text-sm font-medium text-blue-700 hover:text-blue-900" href={`/dashboard/dealers/${dealer.id}/policy`}>
+                          设置政策
+                        </Link>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-slate-600">{acceptedCount}</td>
                     <td className="px-4 py-3 text-slate-500">
                       {formatDate(dealer.createdAt)}
@@ -102,7 +125,7 @@ export default async function DealersPage() {
               })}
               {dealers.length === 0 && (
                 <tr>
-                  <td className="px-4 py-8 text-center text-slate-400" colSpan={8}>
+                  <td className="px-4 py-8 text-center text-slate-400" colSpan={9}>
                     暂无经销商数据
                   </td>
                 </tr>
