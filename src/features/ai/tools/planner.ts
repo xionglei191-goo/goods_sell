@@ -40,14 +40,43 @@ function parseQuantity(message: string) {
   };
 }
 
+function parseOrderNo(message: string) {
+  return message.match(/HQ[A-Z0-9-]{6,}/i)?.[0] ?? message.match(/订单\s*([A-Za-z0-9-]{6,})/)?.[1] ?? "";
+}
+
+function parseSku(message: string) {
+  return message.match(/[A-Z]{2,}-[A-Z0-9-]{2,}/i)?.[0] ?? "";
+}
+
+function parseStockQuantity(message: string) {
+  const explicit = message.match(/(?:库存|上报为|报为|设为|设置为|为|有|剩)\s*(\d+)/)?.[1];
+  if (explicit) return Number(explicit);
+  const matches = Array.from(message.matchAll(/(\d+)\s*(?:件|箱|瓶|个)?/g)).map((match) => Number(match[1]));
+  return matches.at(-1) ?? parseQuantity(message).quantity;
+}
+
 function cleanProductQuery(message: string) {
   const quantity = parseQuantity(message);
   return message
-    .replace(/帮我|我要|我想|请|麻烦|下单|购买|买|来|订|要/g, "")
+    .replace(/帮我|我要|我想|请|麻烦|查一下|查询|查|看看|搜索|找|下单|购买|买|来|订|要|上报|门店/g, "")
+    .replace(/^(给|把|将|帮我|请|麻烦)\s*/g, "")
     .replace(quantity.raw, "")
     .replace(/一箱|两箱|一件|两件/g, "")
     .replace(/[，。,.！!？?]/g, "")
+    .replace(/(入库|出库|上报库存|报库存|库存|涨价|降价|调价|改价|价格|零售价|售价)\s*$/g, "")
     .trim();
+}
+
+function parseDealerStockReport(message: string) {
+  const sku = parseSku(message);
+  const productQuery = cleanProductQuery(message)
+    .replace(/(?:库存|上报为|报为|设为|设置为|为|有|剩)\s*\d+\s*(?:件|箱|瓶|个)?/g, "")
+    .replace(/(?:库存(?:上报)?为?|上报为|报为|设为|设置为|为|有|剩)\s*$/g, "")
+    .trim();
+  return {
+    productQuery: sku || productQuery,
+    stock: parseStockQuantity(message),
+  };
 }
 
 function parseSalespersonName(message: string) {
@@ -65,15 +94,26 @@ function parseProductPriceChange(message: string) {
   const newPrice = message.match(/(?:调到|改成|设为|设置为|到)\s*(\d+(?:\.\d+)?)/)?.[1];
   const up = message.match(/(?:涨|上涨|加)\s*(\d+(?:\.\d+)?)/)?.[1];
   const down = message.match(/(?:降|降低|减)\s*(\d+(?:\.\d+)?)/)?.[1];
+  const absolutePrice = message.match(/(?:改成|调到|调整到|设为|设置为)\s*(\d+(?:\.\d+)?)/)?.[1];
+  const relativeUp = message.match(/(?:涨价|上调|加价|增加)\s*(\d+(?:\.\d+)?)/)?.[1];
+  const relativeDown = message.match(/(?:降价|下调|减价|减少|降低)\s*(\d+(?:\.\d+)?)/)?.[1];
   return {
     productQuery,
-    newRetailPrice: newPrice ? Number(newPrice) : undefined,
-    adjustRetailPrice: up ? Number(up) : down ? -Number(down) : undefined,
+    newRetailPrice: newPrice ? Number(newPrice) : absolutePrice ? Number(absolutePrice) : undefined,
+    adjustRetailPrice: up ? Number(up) : relativeUp ? Number(relativeUp) : down ? -Number(down) : relativeDown ? -Number(relativeDown) : undefined,
   };
 }
 
 function parsePhone(message: string) {
   return message.match(/1[3-9]\d{9}/)?.[0] ?? "";
+}
+
+function parsePaymentRegistration(message: string) {
+  const phone = parsePhone(message);
+  const orderNo = message.match(/HQ[A-Z0-9-]{6,}/i)?.[0] ?? "";
+  const amount = Number(message.match(/(?:收款|回款|登记|到账|收到)\s*(\d+(?:\.\d+)?)/)?.[1] ?? message.match(/(\d+(?:\.\d+)?)\s*(?:元|块)/)?.[1] ?? 0);
+  const method = /微信/.test(message) ? "WECHAT" : /现金/.test(message) ? "CASH" : "TRANSFER";
+  return { customerQuery: phone, orderNo, amount, method };
 }
 
 function parseCustomerName(message: string) {
@@ -119,7 +159,7 @@ function planConsumer(message: string, tools: readonly AiToolDefinition[]): AiTo
     };
   }
   if (hasTool(tools, "search_products")) {
-    return { toolName: "search_products", args: { query: message, limit: 5 }, reason: "商品咨询" };
+    return { toolName: "search_products", args: { query: cleanProductQuery(message) || message, limit: 5 }, reason: "商品咨询" };
   }
   return null;
 }
@@ -128,16 +168,26 @@ function planDealer(message: string, tools: readonly AiToolDefinition[]): AiTool
   if (/结算|佣金|账款/.test(message) && hasTool(tools, "dealer_settlement_summary")) {
     return { toolName: "dealer_settlement_summary", args: {}, reason: "经销商查询结算" };
   }
-  if (/待接|接单|新订单/.test(message) && hasTool(tools, "dealer_incoming_orders")) {
-    return { toolName: "dealer_incoming_orders", args: {}, reason: "经销商查询待接订单" };
+  if (/拒单|拒绝/.test(message)) {
+    const orderNo = parseOrderNo(message);
+    return {
+      toolName: "dealer_reject_routing",
+      args: { routingId: orderNo, reason: message.replace(orderNo, "").replace(/拒单|拒绝|订单/g, "").trim() || "AI 助手拒单" },
+      reason: "经销商拒绝待接订单",
+    };
   }
-  if (/上报库存|报库存|库存有/.test(message) && hasTool(tools, "dealer_report_stock")) {
-    const quantity = parseQuantity(message);
+  if (/接单|接受/.test(message) && !/待接|新订单/.test(message)) {
+    return { toolName: "dealer_accept_routing", args: { routingId: parseOrderNo(message) }, reason: "经销商接受待接订单" };
+  }
+  if (/上报.*库存|库存.*上报|报库存|库存有|门店库存/.test(message) && hasTool(tools, "dealer_report_stock")) {
     return {
       toolName: "dealer_report_stock",
-      args: { productQuery: cleanProductQuery(message), stock: quantity.quantity },
+      args: parseDealerStockReport(message),
       reason: "经销商上报库存",
     };
+  }
+  if (/待接|新订单/.test(message) && hasTool(tools, "dealer_incoming_orders")) {
+    return { toolName: "dealer_incoming_orders", args: {}, reason: "经销商查询待接订单" };
   }
   return { toolName: "search_products", args: { query: message, limit: 5 }, reason: "经销商商品查询" };
 }
@@ -147,6 +197,15 @@ function toolPlan(tools: readonly AiToolDefinition[], toolName: string, args: Re
 }
 
 function planStaff(message: string, tools: readonly AiToolDefinition[]): AiToolPlan | null {
+  if (/上线|发布|部署|就绪|还差|待决|配置检查|上线检查/.test(message)) {
+    return { toolName: "system_launch_readiness", args: {}, reason: "上线就绪检查" };
+  }
+  if (/登记|收款|回款|到账|收到/.test(message) && /HQ[A-Z0-9-]{6,}/i.test(message)) {
+    const payment = parsePaymentRegistration(message);
+    if (payment.customerQuery && payment.orderNo && payment.amount > 0) {
+      return toolPlan(tools, "finance_register_payment", payment, "财务登记收款");
+    }
+  }
   if (/业绩|绩效/.test(message)) {
     return toolPlan(tools, "salesperson_performance", { salespersonName: parseSalespersonName(message), period: /今天|今日/.test(message) ? "day" : "month" }, "查询销售员业绩");
   }
@@ -190,9 +249,6 @@ function planStaff(message: string, tools: readonly AiToolDefinition[]): AiToolP
     const threshold = Number(message.match(/满\s*(\d+(?:\.\d+)?)/)?.[1] ?? 0);
     const totalQuantity = Number(message.match(/(\d+)\s*张/)?.[1] ?? 100);
     return toolPlan(tools, "marketing_create_coupon", { name: message.replace(/创建优惠券|新增优惠券/g, "").trim() || "AI 优惠券", couponType: "AMOUNT", ...(amount > 0 ? { amount } : {}), threshold, totalQuantity }, "创建优惠券");
-  }
-  if (/上线|发布|部署|就绪|还差|待决|配置检查|上线检查/.test(message)) {
-    return toolPlan(tools, "system_launch_readiness", {}, "上线就绪检查");
   }
   if (/应收|回款|欠款|财务|收款/.test(message)) {
     return toolPlan(tools, "finance_summary", { period: /今天|今日/.test(message) ? "day" : "month" }, "财务查询");

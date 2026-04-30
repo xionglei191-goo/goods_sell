@@ -73,6 +73,10 @@ export function AiChatClient({ initialMessages }: AiChatClientProps) {
     setMessages((current) => current.map((item) => (item.id === assistantIdRef.current ? { ...item, content: item.content + text } : item)));
   }
 
+  function setAssistantText(text: string) {
+    setMessages((current) => current.map((item) => (item.id === assistantIdRef.current ? { ...item, content: item.content || text } : item)));
+  }
+
   function send(question = input) {
     const content = question.trim();
     if (!content || isPending) return;
@@ -113,12 +117,20 @@ export function AiChatClient({ initialMessages }: AiChatClientProps) {
               setSuggestions((current) => ({ ...current, [assistantIdRef.current]: data.suggestion as ChannelAiSuggestion }));
               continue;
             }
+            if (eventName === "error" && data.message) {
+              setAssistantText(data.message);
+              setError(data.message);
+              continue;
+            }
             if (data.text) appendAssistantText(data.text);
             if (data.message) setError(data.message);
           }
         }
+        setAssistantText("已处理完成。");
       } catch {
-        setError("小启暂时开小差了，请稍后再试或联系人工客服。");
+        const messageText = "小启暂时开小差了，请稍后再试或联系人工客服。";
+        setAssistantText(messageText);
+        setError(messageText);
       }
     });
   }

@@ -103,6 +103,22 @@ async function findOrderByNoOrId(value: string, context: AiToolContext) {
   return order;
 }
 
+async function findDealerRoutingByInput(value: string, customerId: string) {
+  const input = value.trim();
+  if (!input) throw new Error("请提供待接订单号");
+  const dealer = await prisma.dealer.findUnique({ where: { customerId } });
+  if (!dealer) throw new Error("经销商档案不存在");
+  const routing = await prisma.orderRouting.findFirst({
+    where: {
+      dealerId: dealer.id,
+      OR: [{ id: input }, { order: { orderNo: { equals: input, mode: "insensitive" } } }],
+    },
+    include: { order: true },
+  });
+  if (!routing) throw new Error("待接订单不存在");
+  return routing;
+}
+
 async function findCustomerByQuery(customerQuery: string, context: AiToolContext) {
   const query = customerQuery.trim();
   if (!query) throw new Error("请说明客户姓名或手机号");
@@ -2117,11 +2133,7 @@ export const aiTools: AiToolDefinition[] = [
     access: { roles: ["DEALER"] },
     inputSchema: z.object({ routingId: z.string().trim().min(1) }),
     buildConfirmation: async (input, context) => {
-      const dealer = await prisma.dealer.findUnique({ where: { customerId: context.user.id } });
-      const routing = dealer
-        ? await prisma.orderRouting.findFirst({ where: { id: input.routingId, dealerId: dealer.id }, include: { order: true } })
-        : null;
-      if (!routing) throw new Error("待接订单不存在");
+      const routing = await findDealerRoutingByInput(input.routingId, context.user.id);
       return {
         title: "确认接单",
         summary: `准备接受订单 ${routing.order.orderNo}。`,
@@ -2132,8 +2144,9 @@ export const aiTools: AiToolDefinition[] = [
         confirmLabel: "确认接单",
       };
     },
-    handler: async (input) => {
-      const result = await acceptRouting(input.routingId);
+    handler: async (input, context) => {
+      const routing = await findDealerRoutingByInput(input.routingId, context.user.id);
+      const result = await acceptRouting(routing.id);
       errorFromAction(result, "接单失败");
       return { title: "已接单", summary: "订单已接受，请及时处理配送。", details: [] };
     },
@@ -2145,14 +2158,21 @@ export const aiTools: AiToolDefinition[] = [
     riskLevel: "WRITE",
     access: { roles: ["DEALER"] },
     inputSchema: z.object({ routingId: z.string().trim().min(1), reason: z.string().trim().min(1).max(200) }),
-    buildConfirmation: async (input) => ({
-      title: "确认拒单",
-      summary: `准备拒绝该订单，原因：${input.reason}。系统会自动重匹配并记录渠道冲突。`,
-      details: details([["原因", input.reason]]),
-      confirmLabel: "确认拒单",
-    }),
-    handler: async (input) => {
-      const result = await rejectRouting(input.routingId, input.reason);
+    buildConfirmation: async (input, context) => {
+      const routing = await findDealerRoutingByInput(input.routingId, context.user.id);
+      return {
+        title: "确认拒单",
+        summary: `准备拒绝订单 ${routing.order.orderNo}，原因：${input.reason}。系统会自动重匹配并记录渠道冲突。`,
+        details: details([
+          ["订单号", routing.order.orderNo],
+          ["原因", input.reason],
+        ]),
+        confirmLabel: "确认拒单",
+      };
+    },
+    handler: async (input, context) => {
+      const routing = await findDealerRoutingByInput(input.routingId, context.user.id);
+      const result = await rejectRouting(routing.id, input.reason);
       errorFromAction(result, "拒单失败");
       return { title: "已拒单", summary: "订单已拒绝并自动重匹配。", details: details([["原因", input.reason]]) };
     },

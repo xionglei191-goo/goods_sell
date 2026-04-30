@@ -9,10 +9,9 @@ export function redactAiAuditValue(value: unknown): unknown {
   if (typeof value !== "object") return value;
 
   return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>).map(([key, item]) => [
-      key,
-      sensitiveKeyPattern.test(key) ? "[REDACTED]" : redactAiAuditValue(item),
-    ]),
+    Object.entries(value as Record<string, unknown>)
+      .filter(([key]) => !sensitiveKeyPattern.test(key))
+      .map(([key, item]) => [key, redactAiAuditValue(item)]),
   );
 }
 

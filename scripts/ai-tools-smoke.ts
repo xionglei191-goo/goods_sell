@@ -69,6 +69,11 @@ function main() {
 
   const pricePlan = planAiToolCall("把剑兰春涨价 5 块", context("ADMIN"), aiTools);
   assert(pricePlan?.toolName === "admin_update_product_price", "管理员调价应命中调价工具");
+  assert(pricePlan.args.adjustRetailPrice === 5, "相对涨价应提取调价金额");
+
+  const absolutePricePlan = planAiToolCall("把剑兰春价格改成 16", context("ADMIN"), aiTools);
+  assert(absolutePricePlan?.toolName === "admin_update_product_price", "管理员绝对改价应命中调价工具");
+  assert(absolutePricePlan.args.newRetailPrice === 16, "绝对改价应提取新零售价");
 
   const orderTool = tool("order_status_action");
   type DynamicInput = Parameters<NonNullable<typeof orderTool.resolvePermission>>[0];
@@ -79,15 +84,50 @@ function main() {
   const blockedWarehousePlan = planAiToolCall("这个月张军业绩怎么样", context("WAREHOUSE"), warehouseTools);
   assert(blockedWarehousePlan?.toolName !== "salesperson_performance", "仓管不应被启发式规划到销售员业绩工具");
 
+  const stockInPlan = planAiToolCall("给香脆薯片组合装入库 2 件", context("WAREHOUSE"), warehouseTools);
+  assert(stockInPlan?.toolName === "inventory_stock_in", "仓管自然语言入库应命中入库工具");
+  assert(stockInPlan.args.productQuery === "香脆薯片组合装", "入库商品名应清理动作词");
+  assert(stockInPlan.args.quantity === 2, "入库数量应被提取");
+
+  const financeTools = aiTools.filter((item) => canRoleUseTool("FINANCE", item.name));
+  const paymentPlan = planAiToolCall("给13900139001的订单HQAI-FIN-15348961登记收款1元", context("FINANCE"), financeTools);
+  assert(paymentPlan?.toolName === "finance_register_payment", "财务自然语言收款应命中登记收款工具");
+  assert(paymentPlan.args.customerQuery === "13900139001", "财务收款应提取客户手机号");
+  assert(paymentPlan.args.orderNo === "HQAI-FIN-15348961", "财务收款应提取订单号");
+  assert(paymentPlan.args.amount === 1, "财务收款应提取金额");
+
   const readinessPlan = planAiToolCall("现在上线还差什么配置", context("ADMIN"), aiTools);
   assert(readinessPlan?.toolName === "system_launch_readiness", "管理员应可自然语言触发上线就绪检查");
 
+  const salespersonTools = aiTools.filter((item) => canRoleUseTool("SALESPERSON", item.name));
+  const salespersonReadinessPlan = planAiToolCall("现在上线还差什么配置", context("SALESPERSON"), salespersonTools);
+  assert(salespersonReadinessPlan?.toolName === "system_launch_readiness", "销售员询问上线配置应进入权限拦截，而不是误规划到经营总览");
+
+  const dealerTools = aiTools.filter((item) => canRoleUseTool("DEALER", item.name));
+  const dealerStockPlan = planAiToolCall("把青岛经典啤酒门店库存上报为9", context("DEALER"), dealerTools);
+  assert(dealerStockPlan?.toolName === "dealer_report_stock", "经销商库存上报应命中库存上报工具");
+  assert(dealerStockPlan.args.productQuery === "青岛经典啤酒", "经销商库存上报应清理商品名");
+  assert(dealerStockPlan.args.stock === 9, "经销商库存上报应提取库存数");
+
+  const dealerSkuStockPlan = planAiToolCall("上报 HQ-BEER-001 门店库存 9 件", context("DEALER"), dealerTools);
+  assert(dealerSkuStockPlan?.toolName === "dealer_report_stock", "经销商 SKU 库存上报应命中库存上报工具");
+  assert(dealerSkuStockPlan.args.productQuery === "HQ-BEER-001", "经销商 SKU 库存上报应保留 SKU");
+  assert(dealerSkuStockPlan.args.stock === 9, "经销商 SKU 库存上报应提取最后的库存数");
+
+  const dealerAcceptPlan = planAiToolCall("接单 HQ20260430000007", context("DEALER"), dealerTools);
+  assert(dealerAcceptPlan?.toolName === "dealer_accept_routing", "经销商接单应命中接单工具");
+  assert(dealerAcceptPlan.args.routingId === "HQ20260430000007", "经销商接单应支持订单号作为确认入口");
+
+  const consumerSearchPlan = planAiToolCall("查一下青岛经典啤酒", context("CONSUMER"), aiTools);
+  assert(consumerSearchPlan?.toolName === "search_products", "消费者商品查询应命中商品查询工具");
+  assert(consumerSearchPlan.args.query === "青岛经典啤酒", "消费者商品查询应清理查询前缀");
+
   const redacted = redactAiAuditValue({ password: "secret", nested: { confirmationToken: "abc", name: "张三" } }) as {
-    password: string;
-    nested: { confirmationToken: string; name: string };
+    password?: string;
+    nested: { confirmationToken?: string; name: string };
   };
-  assert(redacted.password === "[REDACTED]", "审计日志应脱敏密码");
-  assert(redacted.nested.confirmationToken === "[REDACTED]", "审计日志应脱敏确认凭证");
+  assert(!("password" in redacted), "审计日志应移除密码字段");
+  assert(!("confirmationToken" in redacted.nested), "审计日志应移除确认凭证字段");
   assert(redacted.nested.name === "张三", "审计日志不应误删普通字段");
 
   const readiness = getLaunchReadinessReport({

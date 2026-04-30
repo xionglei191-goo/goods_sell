@@ -133,6 +133,10 @@ export function AiFloatingBubble({ className, contextLabel = "AI 助手" }: AiFl
     setMessages((current) => current.map((item) => (item.id === assistantIdRef.current ? { ...item, content: item.content + text } : item)));
   }
 
+  function setAssistantText(text: string) {
+    setMessages((current) => current.map((item) => (item.id === assistantIdRef.current ? { ...item, content: item.content || text } : item)));
+  }
+
   function attachCard(card: AiAssistantCard) {
     setMessages((current) => current.map((item) => (item.id === assistantIdRef.current ? { ...item, card } : item)));
   }
@@ -170,12 +174,20 @@ export function AiFloatingBubble({ className, contextLabel = "AI 助手" }: AiFl
               attachCard(parsedEvent.data.card);
               continue;
             }
+            if (parsedEvent.eventName === "error" && parsedEvent.data.message) {
+              setAssistantText(parsedEvent.data.message);
+              setError(parsedEvent.data.message);
+              continue;
+            }
             if (parsedEvent.data.text) appendAssistantText(parsedEvent.data.text);
             if (parsedEvent.data.message) setError(parsedEvent.data.message);
           }
         }
+        setAssistantText("已处理完成。");
       } catch (err) {
-        setError(err instanceof Error ? err.message : "AI 助手暂时不可用");
+        const messageText = err instanceof Error ? err.message : "AI 助手暂时不可用";
+        setAssistantText(messageText);
+        setError(messageText);
       }
     });
   }
