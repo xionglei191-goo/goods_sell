@@ -40,6 +40,10 @@ function parseQuantity(message: string) {
   };
 }
 
+function isPurchaseIntent(message: string) {
+  return /下单|购买|买|来\d|来一|来两|要\d|要一|要两/.test(message);
+}
+
 function parseOrderNo(message: string) {
   return message.match(/HQ[A-Z0-9-]{6,}/i)?.[0] ?? message.match(/订单\s*([A-Za-z0-9-]{6,})/)?.[1] ?? "";
 }
@@ -150,7 +154,7 @@ function planConsumer(message: string, tools: readonly AiToolDefinition[]): AiTo
   if (/订单|配送|物流|发货|送达/.test(message) && hasTool(tools, "customer_orders")) {
     return { toolName: "customer_orders", args: { limit: 5 }, reason: "客户查询自己的订单" };
   }
-  if (/下单|购买|买|来\d|来一|来两|要\d|要一|要两/.test(message) && hasTool(tools, "customer_submit_order")) {
+  if (isPurchaseIntent(message) && hasTool(tools, "customer_submit_order")) {
     const quantity = parseQuantity(message);
     return {
       toolName: "customer_submit_order",
@@ -165,6 +169,9 @@ function planConsumer(message: string, tools: readonly AiToolDefinition[]): AiTo
 }
 
 function planDealer(message: string, tools: readonly AiToolDefinition[]): AiToolPlan | null {
+  if (isPurchaseIntent(message) && hasTool(tools, "search_products")) {
+    return { toolName: "search_products", args: { query: cleanProductQuery(message) || message, limit: 5 }, reason: "经销商下单意图商品查询" };
+  }
   if (/结算|佣金|账款/.test(message) && hasTool(tools, "dealer_settlement_summary")) {
     return { toolName: "dealer_settlement_summary", args: {}, reason: "经销商查询结算" };
   }
@@ -199,6 +206,10 @@ function toolPlan(tools: readonly AiToolDefinition[], toolName: string, args: Re
 function planStaff(message: string, tools: readonly AiToolDefinition[]): AiToolPlan | null {
   if (/上线|发布|部署|就绪|还差|待决|配置检查|上线检查/.test(message)) {
     return { toolName: "system_launch_readiness", args: {}, reason: "上线就绪检查" };
+  }
+  if (isPurchaseIntent(message)) {
+    return toolPlan(tools, "orders_manual_order_draft", { text: message }, "后台开单草稿")
+      ?? toolPlan(tools, "search_products", { query: cleanProductQuery(message) || message, limit: 5 }, "下单意图商品查询");
   }
   if (/登记|收款|回款|到账|收到/.test(message) && /HQ[A-Z0-9-]{6,}/i.test(message)) {
     const payment = parsePaymentRegistration(message);

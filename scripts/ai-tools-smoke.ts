@@ -64,6 +64,9 @@ function main() {
   const consumerPlan = planAiToolCall("我要下单 1 箱剑兰春", context("CONSUMER"), aiTools);
   assert(consumerPlan?.toolName === "customer_submit_order", "客户自然语言下单应命中下单工具");
 
+  const staffOrderPlan = planAiToolCall("我要下单 1 箱剑兰春", context("ADMIN"), aiTools);
+  assert(staffOrderPlan?.toolName === "orders_manual_order_draft", "员工侧下单意图应进入后台开单草稿，不能误命中经营总览");
+
   const adminPlan = planAiToolCall("这个月张军业绩怎么样", context("ADMIN"), aiTools);
   assert(adminPlan?.toolName === "salesperson_performance", "管理员查询业绩应命中销售员业绩工具");
 
@@ -104,6 +107,10 @@ function main() {
   assert(salespersonReadinessPlan?.toolName === "system_launch_readiness", "销售员询问上线配置应进入权限拦截，而不是误规划到经营总览");
 
   const dealerTools = aiTools.filter((item) => canRoleUseTool("DEALER", item.name));
+  const dealerOrderPlan = planAiToolCall("我要下单 1 箱剑兰春", context("DEALER"), dealerTools);
+  assert(dealerOrderPlan?.toolName === "search_products", "经销商侧下单意图应先进入商品查询，不能误命中经营总览");
+  assert(dealerOrderPlan.args.query === "剑兰春", "经销商侧下单意图应清理商品名");
+
   const dealerStockPlan = planAiToolCall("把青岛经典啤酒门店库存上报为9", context("DEALER"), dealerTools);
   assert(dealerStockPlan?.toolName === "dealer_report_stock", "经销商库存上报应命中库存上报工具");
   assert(dealerStockPlan.args.productQuery === "青岛经典啤酒", "经销商库存上报应清理商品名");
