@@ -1,13 +1,13 @@
 "use server";
 
 import type { Prisma } from "@prisma/client";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireDashboardPermission } from "@/features/auth/guards";
 import { logAction } from "@/features/logs/audit";
 import type { ActionResult } from "@/features/orders/types";
 import { prisma } from "@/lib/prisma";
+import { revalidatePath } from "@/lib/revalidate";
 
 const approveDealerApplicationSchema = z.object({
   leadId: z.string().trim().min(1, "缺少申请线索"),

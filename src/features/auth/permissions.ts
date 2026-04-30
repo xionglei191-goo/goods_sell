@@ -54,7 +54,8 @@ export const permissionRoles: Record<DashboardPermission, readonly AppRole[]> = 
 };
 
 type RouteRule = {
-  prefix: string;
+  prefix?: string;
+  pattern?: RegExp;
   roles: readonly AppRole[];
 };
 
@@ -72,6 +73,7 @@ const dashboardRouteRules: RouteRule[] = [
   { prefix: "/dashboard/products/categories", roles: permissionRoles["products:write"] },
   { prefix: "/dashboard/products/brands", roles: permissionRoles["products:write"] },
   { prefix: "/dashboard/products/materials", roles: permissionRoles["products:write"] },
+  { pattern: /^\/dashboard\/products\/[^/]+\/edit\/?$/, roles: permissionRoles["products:write"] },
   { prefix: "/dashboard/products", roles: permissionRoles["products:view"] },
   { prefix: "/dashboard/orders/new", roles: permissionRoles["orders:write"] },
   { prefix: "/dashboard/orders", roles: permissionRoles["orders:view"] },
@@ -85,6 +87,7 @@ const dashboardRouteRules: RouteRule[] = [
   { prefix: "/dashboard/channel-conflicts", roles: permissionRoles["channel:manage"] },
   { prefix: "/dashboard/product-pushes", roles: permissionRoles["marketing:manage"] },
   { prefix: "/dashboard/marketing", roles: permissionRoles["marketing:manage"] },
+  { prefix: "/dashboard/salespeople", roles: permissionRoles["settings:manage"] },
   { prefix: "/dashboard/sales", roles: permissionRoles["sales:view"] },
   { prefix: "/dashboard/map", roles: ["ADMIN", "SALESPERSON", "WAREHOUSE"] },
   { prefix: "/dashboard/pending", roles: staffRoles },
@@ -110,6 +113,11 @@ export function normalizeRole(role?: string | null): AppRole | null {
 
 function pathMatches(pathname: string, prefix: string) {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
+function routeRuleMatches(pathname: string, rule: RouteRule) {
+  if (rule.pattern) return rule.pattern.test(pathname);
+  return rule.prefix ? pathMatches(pathname, rule.prefix) : false;
 }
 
 export function isPublicPath(pathname: string) {
@@ -139,7 +147,7 @@ export function canAccessPath(role: string | null | undefined, pathname: string)
   if (!normalized) return false;
 
   if (pathname.startsWith("/dashboard")) {
-    const rule = dashboardRouteRules.find((item) => pathMatches(pathname, item.prefix));
+    const rule = dashboardRouteRules.find((item) => routeRuleMatches(pathname, item));
     return Boolean(rule && rule.roles.includes(normalized));
   }
 

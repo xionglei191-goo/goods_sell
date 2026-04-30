@@ -1,13 +1,13 @@
 "use server";
 
 import { StockType } from "@prisma/client";
-import { revalidatePath, revalidateTag } from "next/cache";
 
 import { requireDashboardPermission } from "@/features/auth/guards";
 import { stockMovementSchema, type StockMovementInput } from "@/features/inventory/schemas";
 import { logAction } from "@/features/logs/audit";
 import { SHOP_PRODUCTS_CACHE_TAG } from "@/features/shop/cache";
 import { prisma } from "@/lib/prisma";
+import { revalidatePath, revalidateTag } from "@/lib/revalidate";
 
 type ActionResult =
   | { success: true; message?: string }

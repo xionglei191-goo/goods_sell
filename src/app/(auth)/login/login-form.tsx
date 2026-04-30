@@ -29,21 +29,25 @@ export function LoginForm() {
     setError(null);
 
     startTransition(async () => {
-      const result = await signIn("credentials", {
-        phone: values.phone,
-        password: values.password,
-        redirect: false,
-      });
+      try {
+        const result = await signIn("credentials", {
+          phone: values.phone,
+          password: values.password,
+          redirect: false,
+        });
 
-      if (!result?.ok) {
-        setError("手机号或密码错误；经销商申请需审核通过后才能登录");
-        return;
+        if (!result?.ok || result.error) {
+          setError("手机号或密码错误；员工账号可能已被禁用，经销商申请需审核通过后才能登录");
+          return;
+        }
+
+        const session = await getSession();
+        const redirectUrl = isSafeLocalPath(callbackUrl) ? callbackUrl : getDefaultRedirect(session?.user.role);
+        router.replace(redirectUrl);
+        router.refresh();
+      } catch {
+        setError("手机号或密码错误；员工账号可能已被禁用，经销商申请需审核通过后才能登录");
       }
-
-      const session = await getSession();
-      const redirectUrl = isSafeLocalPath(callbackUrl) ? callbackUrl : getDefaultRedirect(session?.user.role);
-      router.replace(redirectUrl);
-      router.refresh();
     });
   }
 

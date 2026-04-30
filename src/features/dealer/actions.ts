@@ -1,16 +1,26 @@
 "use server";
 
 import type { LeadScene } from "@prisma/client";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { auth } from "@/auth";
+import { getTestSessionUserFromEnv } from "@/features/auth/test-session";
 import { rejectAndRematchRouting } from "@/features/orders/routing";
 import type { ActionResult } from "@/features/orders/types";
 import { sendOrderStatusTemplate } from "@/features/wechat/official";
 import { prisma } from "@/lib/prisma";
+import { revalidatePath } from "@/lib/revalidate";
 
 async function getDealerId() {
+  const testUser = getTestSessionUserFromEnv();
+  if (testUser?.role === "DEALER") {
+    const dealer = await prisma.dealer.findUnique({ where: { customerId: testUser.id }, select: { id: true, shopName: true } });
+    if (!dealer) {
+      throw new Error("经销商档案不存在");
+    }
+    return dealer;
+  }
+
   const session = await auth();
   if (!session?.user.id || session.user.role !== "DEALER") {
     throw new Error("请使用经销商账号登录");

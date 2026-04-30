@@ -1,13 +1,13 @@
 "use server";
 
 import { hash } from "bcryptjs";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireDashboardPermission } from "@/features/auth/guards";
 import { logAction } from "@/features/logs/audit";
 import type { ActionResult } from "@/features/orders/types";
 import { prisma } from "@/lib/prisma";
+import { revalidatePath } from "@/lib/revalidate";
 
 const configSchema = z.object({
   values: z.record(z.string(), z.coerce.number().min(0)),

@@ -62,11 +62,11 @@ export default async function WechatDashboardPage() {
             </div>
           ))}
         </div>
-        <p className="mt-4 text-xs text-stone-500">支付回调地址：{data.status.notifyUrl}</p>
+        <p className="mt-4 break-all text-xs text-stone-500">支付回调地址：{data.status.notifyUrl}</p>
       </section>
 
       <div className="grid gap-5 xl:grid-cols-2">
-        <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-stone-200">
+        <section className="min-w-0 rounded-lg bg-white p-5 shadow-sm ring-1 ring-stone-200">
           <h2 className="font-bold text-stone-950">模板消息日志</h2>
           <div className="mt-4 overflow-x-auto">
             <table className="w-full min-w-[620px] text-left text-sm">
@@ -95,7 +95,7 @@ export default async function WechatDashboardPage() {
           {data.messageLogs.length === 0 ? <p className="mt-6 text-center text-sm text-stone-500">暂无消息日志</p> : null}
         </section>
 
-        <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-stone-200">
+        <section className="min-w-0 rounded-lg bg-white p-5 shadow-sm ring-1 ring-stone-200">
           <h2 className="font-bold text-stone-950">分享裂变记录</h2>
           <div className="mt-4 space-y-3">
             {data.shareEvents.map((event) => (

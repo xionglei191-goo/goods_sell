@@ -17,6 +17,12 @@
     "test:ai-tools": "tsx scripts/ai-tools-smoke.ts",
     "test:ai-provider": "tsx scripts/ai-provider-smoke.ts",
     "test:ai-runtime": "tsx scripts/ai-runtime-regression.ts",
+    "test:ai-full-provider": "tsx scripts/ai-full-provider-coverage.ts",
+    "test:third-party": "tsx scripts/third-party-boundary-smoke.ts",
+    "test:browser-compat": "tsx scripts/browser-compat-smoke.ts",
+    "test:field-permissions": "tsx scripts/field-permission-smoke.ts",
+    "test:role-acceptance": "tsx scripts/role-acceptance-smoke.ts",
+    "sync:ai-provider-env": "tsx scripts/sync-ai-provider-env.ts",
     "check:launch": "tsx scripts/launch-readiness.ts"
   },
   "dependencies": {

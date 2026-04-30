@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 
 import { requireDashboardPermission } from "@/features/auth/guards";
@@ -8,6 +7,7 @@ import { logAction } from "@/features/logs/audit";
 import type { ActionResult } from "@/features/orders/types";
 import { SHOP_PRODUCTS_CACHE_TAG } from "@/features/shop/cache";
 import { prisma } from "@/lib/prisma";
+import { revalidatePath, revalidateTag } from "@/lib/revalidate";
 
 const safeStockSchema = z.object({
   productId: z.string().min(1),

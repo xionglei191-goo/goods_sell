@@ -1,4 +1,4 @@
-import { redactAiAuditValue } from "@/features/ai/tools/audit";
+import { redactAiAuditText, redactAiAuditValue } from "@/features/ai/tools/audit";
 import { aiTools, canRoleUseTool } from "@/features/ai/tools/registry";
 import { planAiToolCall, validateAiToolPlan } from "@/features/ai/tools/planner";
 import { getLaunchReadinessReport } from "@/features/system/launch-readiness";
@@ -63,6 +63,17 @@ function main() {
 
   const consumerPlan = planAiToolCall("我要下单 1 箱剑兰春", context("CONSUMER"), aiTools);
   assert(consumerPlan?.toolName === "customer_submit_order", "客户自然语言下单应命中下单工具");
+  assert(consumerPlan.args.productQuery === "剑兰春", "客户自然语言下单应清理商品名");
+
+  const consumerSkuPlan = planAiToolCall("我要下单 1 箱 AIFULL-JLC-MOKZNWYX 剑兰春，微信支付", context("CONSUMER"), aiTools);
+  assert(consumerSkuPlan?.toolName === "customer_submit_order", "客户带 SKU 和支付方式的自然语言下单应命中下单工具");
+  assert(consumerSkuPlan.args.productQuery === "AIFULL-JLC-MOKZNWYX", "客户带 SKU 下单应优先使用 SKU 作为商品查询条件");
+  assert(consumerSkuPlan.args.payMethod === "WECHAT", "客户带微信支付下单应提取微信支付方式");
+
+  const consumerTransferPlan = planAiToolCall("我要下单 2 箱剑兰春，转账支付", context("CONSUMER"), aiTools);
+  assert(consumerTransferPlan?.toolName === "customer_submit_order", "客户带转账支付的自然语言下单应命中下单工具");
+  assert(consumerTransferPlan.args.productQuery === "剑兰春", "客户带支付方式下单不应把支付词拼进商品名");
+  assert(consumerTransferPlan.args.payMethod === "TRANSFER", "客户带转账支付下单应提取转账支付方式");
 
   const staffOrderPlan = planAiToolCall("我要下单 1 箱剑兰春", context("ADMIN"), aiTools);
   assert(staffOrderPlan?.toolName === "orders_manual_order_draft", "员工侧下单意图应进入后台开单草稿，不能误命中经营总览");
@@ -99,6 +110,12 @@ function main() {
   assert(stockInPlan.args.productQuery === "香脆薯片组合装", "入库商品名应清理动作词");
   assert(stockInPlan.args.quantity === 2, "入库数量应被提取");
 
+  const skuStockInPlan = planAiToolCall("给 SKU AIFULL-STK-MOKZNWYX 入库 1 件，备注 浏览器回归", context("WAREHOUSE"), warehouseTools);
+  assert(skuStockInPlan?.toolName === "inventory_stock_in", "仓管 SKU 入库应命中入库工具");
+  assert(skuStockInPlan.args.productQuery === "AIFULL-STK-MOKZNWYX", "SKU 入库应优先使用 SKU 作为商品查询条件");
+  assert(skuStockInPlan.args.quantity === 1, "SKU 入库应提取最后的业务数量");
+  assert(skuStockInPlan.args.remark === "浏览器回归", "SKU 入库应提取备注");
+
   const financeTools = aiTools.filter((item) => canRoleUseTool("FINANCE", item.name));
   const paymentPlan = planAiToolCall("给13900139001的订单HQAI-FIN-15348961登记收款1元", context("FINANCE"), financeTools);
   assert(paymentPlan?.toolName === "finance_register_payment", "财务自然语言收款应命中登记收款工具");
@@ -106,10 +123,64 @@ function main() {
   assert(paymentPlan.args.orderNo === "HQAI-FIN-15348961", "财务收款应提取订单号");
   assert(paymentPlan.args.amount === 1, "财务收款应提取金额");
 
+  const orderOnlyPaymentPlan = planAiToolCall("给订单 HQAI-FIN-15348961 登记收款 1 元", context("FINANCE"), financeTools);
+  assert(orderOnlyPaymentPlan?.toolName === "finance_register_payment", "财务只提供订单号时也应命中登记收款工具");
+  assert(!("customerQuery" in orderOnlyPaymentPlan.args), "只提供订单号时不应生成空客户查询条件");
+  assert(orderOnlyPaymentPlan.args.orderNo === "HQAI-FIN-15348961", "财务只提供订单号时应提取订单号");
+  assert(orderOnlyPaymentPlan.args.amount === 1, "财务只提供订单号时应提取金额");
+
+  const invoicePlan = planAiToolCall("给订单 HQBROWSERINV166053 开普票，购方 浏览器测试公司，税号 91430000BROWSERTEST", context("FINANCE"), financeTools);
+  assert(invoicePlan?.toolName === "receipts_issue_invoice", "财务开票话术应命中开票工具，不能误命中经营总览");
+  assert(invoicePlan.args.orderNo === "HQBROWSERINV166053", "财务开票应提取订单号");
+  assert(invoicePlan.args.type === "NORMAL", "开普票应提取 NORMAL 类型");
+  assert(invoicePlan.args.buyerName === "浏览器测试公司", "财务开票应提取购方名称");
+  assert(invoicePlan.args.buyerTaxNo === "91430000BROWSERTEST", "财务开票应提取税号");
+
+  const correctedInvoicePlan = validateAiToolPlan("给订单 HQBROWSERINV166053 开普票，购方 浏览器测试公司", context("FINANCE"), financeTools, {
+    toolName: "business_overview",
+    args: { period: "month" },
+    reason: "模拟错误模型规划",
+  });
+  assert(correctedInvoicePlan?.toolName === "receipts_issue_invoice", "开票意图若被 AI 误规划为经营总览，应被计划校验层纠偏");
+
   const readinessPlan = planAiToolCall("现在上线还差什么配置", context("ADMIN"), aiTools);
   assert(readinessPlan?.toolName === "system_launch_readiness", "管理员应可自然语言触发上线就绪检查");
 
   const salespersonTools = aiTools.filter((item) => canRoleUseTool("SALESPERSON", item.name));
+  const productPushPlan = planAiToolCall("把新品 SKU AIFULL-PUSH-MOKZNWYX 推送给 高价值 人群，话术 新品试饮可咨询", context("SALESPERSON"), salespersonTools);
+  assert(productPushPlan?.toolName === "marketing_create_product_push", "销售员新品推送写操作应命中新品推送工具，不能误命中渠道摘要");
+  assert(productPushPlan.args.productQuery === "AIFULL-PUSH-MOKZNWYX", "新品推送应优先使用 SKU 作为商品查询条件");
+  assert(productPushPlan.args.targetTag === "高价值", "新品推送应提取目标人群标签");
+  assert(productPushPlan.args.message === "新品试饮可咨询", "新品推送应提取推送话术");
+
+  const correctedProductPushPlan = validateAiToolPlan("把新品 SKU AIFULL-PUSH-MOKZNWYX 推送给 高价值 人群", context("SALESPERSON"), salespersonTools, {
+    toolName: "channel_summary",
+    args: {},
+    reason: "模拟错误模型规划",
+  });
+  assert(correctedProductPushPlan?.toolName === "marketing_create_product_push", "新品推送意图若被 AI 误规划为渠道摘要，应被计划校验层纠偏");
+
+  const staffDisablePlan = planAiToolCall("禁用员工 13900139088", context("ADMIN"), aiTools);
+  assert(staffDisablePlan?.toolName === "settings_set_staff_status", "管理员禁用员工应命中员工状态工具");
+  assert(staffDisablePlan.args.userQuery === "13900139088", "禁用员工应提取员工手机号");
+  assert(staffDisablePlan.args.isActive === false, "禁用员工应设置目标状态为禁用");
+
+  const staffEnablePlan = planAiToolCall("启用员工 13900139088", context("ADMIN"), aiTools);
+  assert(staffEnablePlan?.toolName === "settings_set_staff_status", "管理员启用员工应命中员工状态工具");
+  assert(staffEnablePlan.args.isActive === true, "启用员工应设置目标状态为启用");
+
+  const staffResetPlan = planAiToolCall("重置员工 13900139088 密码为 AiFull456", context("ADMIN"), aiTools);
+  assert(staffResetPlan?.toolName === "settings_reset_staff_password", "管理员重置员工密码应命中重置密码工具");
+  assert(staffResetPlan.args.userQuery === "13900139088", "重置密码应提取员工手机号");
+  assert(staffResetPlan.args.password === "AiFull456", "重置密码应提取新密码");
+
+  const correctedStaffStatusPlan = validateAiToolPlan("禁用员工 13900139088", context("ADMIN"), aiTools, {
+    toolName: "business_overview",
+    args: { period: "month" },
+    reason: "模拟错误模型规划",
+  });
+  assert(correctedStaffStatusPlan?.toolName === "settings_set_staff_status", "员工禁用意图若被 AI 误规划为经营总览，应被计划校验层纠偏");
+
   const salespersonReadinessPlan = planAiToolCall("现在上线还差什么配置", context("SALESPERSON"), salespersonTools);
   assert(salespersonReadinessPlan?.toolName === "system_launch_readiness", "销售员询问上线配置应进入权限拦截，而不是误规划到经营总览");
 
@@ -117,6 +188,10 @@ function main() {
   const dealerOrderPlan = planAiToolCall("我要下单 1 箱剑兰春", context("DEALER"), dealerTools);
   assert(dealerOrderPlan?.toolName === "search_products", "经销商侧下单意图应先进入商品查询，不能误命中经营总览");
   assert(dealerOrderPlan.args.query === "剑兰春", "经销商侧下单意图应清理商品名");
+
+  const dealerSkuOrderPlan = planAiToolCall("我要下单 1 箱 AIFULL-JLC-MOKZNWYX 剑兰春，微信支付", context("DEALER"), dealerTools);
+  assert(dealerSkuOrderPlan?.toolName === "search_products", "经销商侧带 SKU 和支付方式的下单意图应先进入商品查询");
+  assert(dealerSkuOrderPlan.args.query === "AIFULL-JLC-MOKZNWYX", "经销商侧带 SKU 下单意图应优先用 SKU 查询商品");
 
   const correctedDealerOrderPlan = validateAiToolPlan("我要下单 1 箱剑兰春", context("DEALER"), dealerTools, {
     toolName: "dealer_settlement_summary",
@@ -139,6 +214,11 @@ function main() {
   assert(dealerAcceptPlan?.toolName === "dealer_accept_routing", "经销商接单应命中接单工具");
   assert(dealerAcceptPlan.args.routingId === "HQ20260430000007", "经销商接单应支持订单号作为确认入口");
 
+  const dealerRejectReasonPlan = planAiToolCall("拒单 HQ20260430000008 原因 太远", context("DEALER"), dealerTools);
+  assert(dealerRejectReasonPlan?.toolName === "dealer_reject_routing", "经销商拒单应命中拒单工具");
+  assert(dealerRejectReasonPlan.args.routingId === "HQ20260430000008", "经销商拒单应支持订单号作为确认入口");
+  assert(dealerRejectReasonPlan.args.reason === "太远", "经销商拒单原因应清理原因前缀");
+
   const consumerSearchPlan = planAiToolCall("查一下青岛经典啤酒", context("CONSUMER"), aiTools);
   assert(consumerSearchPlan?.toolName === "search_products", "消费者商品查询应命中商品查询工具");
   assert(consumerSearchPlan.args.query === "青岛经典啤酒", "消费者商品查询应清理查询前缀");
@@ -150,6 +230,9 @@ function main() {
   assert(!("password" in redacted), "审计日志应移除密码字段");
   assert(!("confirmationToken" in redacted.nested), "审计日志应移除确认凭证字段");
   assert(redacted.nested.name === "张三", "审计日志不应误删普通字段");
+  const redactedText = redactAiAuditText("创建员工账号 浏览器越权员工 手机号 13933138999 角色 WAREHOUSE 密码 AiFull123，并输入 确认执行");
+  assert(!redactedText.includes("AiFull123"), "审计日志自由文本应脱敏密码值");
+  assert(!redactedText.includes("确认执行"), "审计日志自由文本应脱敏高风险确认文字");
 
   const readiness = getLaunchReadinessReport({
     DATABASE_URL: "postgresql://user:pass@localhost:5432/app",

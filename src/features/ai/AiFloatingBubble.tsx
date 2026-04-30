@@ -1,6 +1,7 @@
 "use client";
 
 import { Bot, ChevronDown, Loader2, Maximize2, Mic, Send, Sparkles, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -89,7 +90,7 @@ function CardView({ card, onConfirm, isPending }: { card: AiAssistantCard; onCon
             value={confirmText}
           />
         ) : null}
-        <Button className="mt-3 h-9 w-full bg-[#dc2626] text-white hover:bg-[#b91c1c]" disabled={!canConfirm || isPending} onClick={() => onConfirm(action, confirmText)} size="sm">
+        <Button className="mt-3 h-9 w-full bg-[#dc2626] text-white hover:bg-[#b91c1c]" disabled={!canConfirm || isPending} onClick={() => onConfirm(action, confirmText)} size="sm" type="button">
           {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {action.confirmLabel}
         </Button>
@@ -121,6 +122,7 @@ function CardView({ card, onConfirm, isPending }: { card: AiAssistantCard; onCon
 }
 
 export function AiFloatingBubble({ className, contextLabel = "AI 助手" }: AiFloatingBubbleProps) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [messages, setMessages] = useState<BubbleMessage[]>([]);
@@ -211,6 +213,7 @@ export function AiFloatingBubble({ className, contextLabel = "AI 助手" }: AiFl
             item.id === assistantId ? { ...item, content: data.result?.summary ?? "操作已执行。", card: data.card } : item,
           ),
         );
+        router.refresh();
       } catch (err) {
         setMessages((current) => current.map((item) => (item.id === assistantId ? { ...item, content: err instanceof Error ? err.message : "确认执行失败" } : item)));
       }

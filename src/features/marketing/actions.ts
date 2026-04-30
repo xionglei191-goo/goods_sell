@@ -1,7 +1,6 @@
 "use server";
 
 import type { ProductPushStatus } from "@prisma/client";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getSessionUser, requireDashboardPermission } from "@/features/auth/guards";
@@ -9,6 +8,7 @@ import { customerSegmentLabels, evaluateCustomerSegment } from "@/features/custo
 import type { ActionResult } from "@/features/orders/types";
 import { toMoney } from "@/features/orders/utils";
 import { prisma } from "@/lib/prisma";
+import { revalidatePath } from "@/lib/revalidate";
 
 const couponSchema = z
   .object({

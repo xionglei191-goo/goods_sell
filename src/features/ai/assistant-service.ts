@@ -4,7 +4,7 @@ import { getAiToolContext } from "@/features/ai/tools/context";
 import { executeAiTool, getAvailableAiTools, AiToolError } from "@/features/ai/tools/executor";
 import { planAiToolCall, validateAiToolPlan } from "@/features/ai/tools/planner";
 import { describeAiToolsForPrompt } from "@/features/ai/tools/registry";
-import type { AiAssistantCard, AiToolPlan } from "@/features/ai/tools/types";
+import type { AiAssistantCard, AiToolDefinition, AiToolPlan } from "@/features/ai/tools/types";
 
 type AssistantResponse = {
   answer: string;
@@ -23,13 +23,15 @@ function extractJsonObject(text: string) {
   }
 }
 
-async function planWithModel(message: string, toolsText: string): Promise<AiToolPlan | null> {
+async function planWithModel(message: string, tools: readonly AiToolDefinition[]): Promise<AiToolPlan | null> {
   if (!hasAiProvider()) return null;
   try {
+    const toolsText = describeAiToolsForPrompt(tools);
+    const toolNames = tools.map((tool) => tool.name).join(", ");
     const text = await callAnthropicCompatible({
       maxTokens: 512,
       system:
-        "你是业务系统的工具规划器。只返回 JSON，不要解释。JSON 格式：{\"toolName\":\"工具名\",\"args\":{},\"reason\":\"原因\"}。如果没有合适工具，toolName 为空字符串。",
+        `你是业务系统的工具规划器。只返回 JSON，不要解释。JSON 格式：{"toolName":"工具名","args":{},"reason":"原因"}。toolName 必须逐字复制可用工具名之一，不能缩写、翻译或自造别名。可用工具名全集：${toolNames}。如果没有合适工具，toolName 为空字符串。`,
       messages: [
         {
           role: "user",
@@ -39,6 +41,7 @@ async function planWithModel(message: string, toolsText: string): Promise<AiTool
     });
     const parsed = extractJsonObject(text);
     if (!parsed?.toolName) return null;
+    if (!tools.some((tool) => tool.name === parsed.toolName)) return null;
     return { toolName: parsed.toolName, args: parsed.args ?? {}, reason: parsed.reason ?? "模型规划" };
   } catch {
     return null;
@@ -56,7 +59,7 @@ export async function answerAssistantMessage(message: string): Promise<Assistant
   const context = await getAiToolContext();
   const tools = getAvailableAiTools(context);
   const heuristicPlan = planAiToolCall(message, context, tools);
-  const modelPlan = heuristicPlan ? null : await planWithModel(message, describeAiToolsForPrompt(tools));
+  const modelPlan = heuristicPlan ? null : await planWithModel(message, tools);
   const plan = validateAiToolPlan(message, context, tools, heuristicPlan ?? modelPlan);
 
   if (!plan) {

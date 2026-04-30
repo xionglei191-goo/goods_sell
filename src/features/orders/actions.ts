@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import type { OrderStatus, Prisma } from "@prisma/client";
 
 import { requireDashboardPermission } from "@/features/auth/guards";
@@ -11,6 +10,7 @@ import type { ActionResult } from "@/features/orders/types";
 import { buildOrderNoSequence, toMoney } from "@/features/orders/utils";
 import { sendOrderStatusTemplate } from "@/features/wechat/official";
 import { prisma } from "@/lib/prisma";
+import { revalidatePath } from "@/lib/revalidate";
 
 async function getOrderOperatorId(permission: "orders:write" | "orders:fulfill") {
   const user = await requireDashboardPermission(permission, permission === "orders:fulfill" ? "无权限执行订单履约操作" : "无权限维护订单");

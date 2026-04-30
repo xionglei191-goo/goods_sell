@@ -325,7 +325,7 @@ export default async function DashboardPage() {
   const maxConflictTotal = Math.max(1, ...data.company.conflictTrend.map((item) => item.total));
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">仪表盘</h1>
         <p className="mt-1 text-sm text-slate-500">实时掌握订单、销售、库存和回款情况</p>
@@ -395,8 +395,8 @@ export default async function DashboardPage() {
         <OperationCard href="/dashboard/channel-conflicts" icon={Siren} label="渠道冲突" tone="red" value={String(data.company.summary.openConflicts)} helper="待处理/处理中" />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
-        <div className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
+      <section className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
+        <div className="min-w-0 rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold text-slate-900">区域经营排行</h2>
@@ -406,7 +406,7 @@ export default async function DashboardPage() {
               地图
             </Link>
           </div>
-          <div className="overflow-x-auto">
+          <div className="max-w-full overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead className="text-slate-500">
                 <tr className="border-b border-slate-100">
@@ -446,7 +446,7 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <div className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <div className="min-w-0 rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold text-slate-900">渠道资产概览</h2>
@@ -479,8 +479,8 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-3">
-        <div className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
+      <section className="grid min-w-0 gap-6 xl:grid-cols-3">
+        <div className="min-w-0 rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
           <div className="mb-4 flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-slate-900">业务员地推效果</h2>
             <Link className="text-sm font-medium text-blue-600 hover:text-blue-700" href="/dashboard/salespeople">
@@ -504,7 +504,7 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <div className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <div className="min-w-0 rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
           <div className="mb-4 flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-slate-900">新品推送复盘</h2>
             <Link className="text-sm font-medium text-blue-600 hover:text-blue-700" href="/dashboard/product-pushes">
@@ -527,7 +527,7 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <div className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <div className="min-w-0 rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
           <div className="mb-4 flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-slate-900">渠道冲突趋势</h2>
             <Link className="text-sm font-medium text-blue-600 hover:text-blue-700" href="/dashboard/channel-conflicts">
@@ -556,13 +556,13 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-3">
-        <div className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
+      <section className="grid min-w-0 gap-6 xl:grid-cols-3">
+        <div className="min-w-0 rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-slate-900">库存预警 TOP10</h2>
             <AlertTriangle className="h-5 w-5 text-amber-500" />
           </div>
-          <div className="overflow-x-auto">
+          <div className="max-w-full overflow-x-auto">
             <table className="w-full min-w-96 text-left text-sm">
               <thead className="text-slate-500">
                 <tr className="border-b border-slate-100">
@@ -584,9 +584,9 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <div className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <div className="min-w-0 rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
           <h2 className="mb-4 text-lg font-semibold text-slate-900">应收账款 TOP10</h2>
-          <div className="overflow-x-auto">
+          <div className="max-w-full overflow-x-auto">
             <table className="w-full min-w-96 text-left text-sm">
               <thead className="text-slate-500">
                 <tr className="border-b border-slate-100">
@@ -608,7 +608,7 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <div className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <div className="min-w-0 rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
           <h2 className="mb-4 text-lg font-semibold text-slate-900">最近订单</h2>
           <div className="space-y-3">
             {data.recentOrders.map((order) => (

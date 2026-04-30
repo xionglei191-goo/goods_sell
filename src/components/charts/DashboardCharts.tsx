@@ -33,13 +33,13 @@ const statusColors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#6366f1", "#1
 
 export function DashboardCharts({ trend, status }: DashboardChartsProps) {
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.8fr)]">
-      <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
+    <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.8fr)]">
+      <section className="min-w-0 rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
         <div className="mb-5">
           <h2 className="text-lg font-semibold text-slate-900">销售趋势</h2>
           <p className="mt-1 text-sm text-slate-500">近 7 天销售额</p>
         </div>
-        <div className="h-72 w-full">
+        <div className="h-72 min-w-0 overflow-hidden">
           <ResponsiveContainer height="100%" width="100%">
             <AreaChart data={trend} margin={{ left: 0, right: 16, top: 10 }}>
               <defs>
@@ -58,12 +58,12 @@ export function DashboardCharts({ trend, status }: DashboardChartsProps) {
         </div>
       </section>
 
-      <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
+      <section className="min-w-0 rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
         <div className="mb-5">
           <h2 className="text-lg font-semibold text-slate-900">订单状态分布</h2>
           <p className="mt-1 text-sm text-slate-500">按当前订单状态统计</p>
         </div>
-        <div className="h-72 w-full">
+        <div className="h-72 min-w-0 overflow-hidden">
           <ResponsiveContainer height="100%" width="100%">
             <PieChart>
               <Pie data={status} dataKey="value" innerRadius={58} nameKey="name" outerRadius={92} paddingAngle={3}>

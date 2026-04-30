@@ -2,7 +2,6 @@
 
 import type { ChannelConflictStatus, LeadScene, LeadSource, OrderType, Prisma } from "@prisma/client";
 import { hash } from "bcryptjs";
-import { revalidatePath } from "next/cache";
 
 import { getSessionUser, requireDashboardPermission } from "@/features/auth/guards";
 import {
@@ -18,6 +17,7 @@ import { logAction } from "@/features/logs/audit";
 import { routeOrderById } from "@/features/orders/routing";
 import { buildOrderNoSequence, toMoney } from "@/features/orders/utils";
 import { prisma } from "@/lib/prisma";
+import { revalidatePath } from "@/lib/revalidate";
 
 type ActionResult<T = unknown> =
   | { success: true; message?: string; data?: T }

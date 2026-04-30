@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireDashboardPermission } from "@/features/auth/guards";
@@ -8,6 +7,7 @@ import { logAction } from "@/features/logs/audit";
 import type { ActionResult } from "@/features/orders/types";
 import { toMoney } from "@/features/orders/utils";
 import { prisma } from "@/lib/prisma";
+import { revalidatePath } from "@/lib/revalidate";
 
 const paymentSchema = z.object({
   customerId: z.string().min(1),

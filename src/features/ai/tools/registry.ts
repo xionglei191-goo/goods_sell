@@ -1,6 +1,5 @@
 import type { OrderStatus, PayMethod, ProductStatus, Prisma } from "@prisma/client";
 import { hash } from "bcryptjs";
-import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 
 import { updateDealerPolicy } from "@/features/channel/actions";
@@ -20,6 +19,7 @@ import { roleHasPermission } from "@/features/auth/permissions";
 import { logAction } from "@/features/logs/audit";
 import { getLaunchReadinessReport } from "@/features/system/launch-readiness";
 import { prisma } from "@/lib/prisma";
+import { revalidatePath, revalidateTag } from "@/lib/revalidate";
 import type { AiToolDefinition, AiToolResult, AiToolContext, AiToolDetail } from "@/features/ai/tools/types";
 
 const revenueStatuses: OrderStatus[] = ["PAID", "CONFIRMED", "SHIPPING", "DELIVERED", "COMPLETED"];
@@ -140,6 +140,34 @@ async function findCustomerByQuery(customerQuery: string, context: AiToolContext
   });
   if (!customer) throw new Error("客户不存在或无权限操作");
   return customer;
+}
+
+async function resolvePaymentTarget(input: { customerQuery?: string; orderNo: string }) {
+  const orderNo = input.orderNo.trim();
+  if (!orderNo) throw new Error("请提供订单号");
+  const orderWhere: Prisma.OrderWhereInput = {
+    OR: [{ id: orderNo }, { orderNo: { equals: orderNo, mode: "insensitive" } }],
+  };
+
+  if (input.customerQuery?.trim()) {
+    const query = input.customerQuery.trim();
+    const customer = await prisma.customer.findFirst({
+      where: {
+        OR: [{ id: query }, { name: { contains: query, mode: "insensitive" } }, { phone: { contains: query } }],
+      },
+    });
+    if (!customer) throw new Error("客户不存在");
+    const order = await prisma.order.findFirst({ where: { customerId: customer.id, ...orderWhere } });
+    if (!order) throw new Error("订单不存在");
+    return { customer, order };
+  }
+
+  const order = await prisma.order.findFirst({
+    where: orderWhere,
+    include: { customer: true },
+  });
+  if (!order) throw new Error("订单不存在");
+  return { customer: order.customer, order };
 }
 
 async function findSalespersonByQuery(salesPersonQuery?: string | null) {
@@ -1429,16 +1457,13 @@ export const aiTools: AiToolDefinition[] = [
     riskLevel: "HIGH_RISK",
     access: { permission: "finance:manage" },
     inputSchema: z.object({
-      customerQuery: z.string().trim().min(1),
+      customerQuery: z.string().trim().optional().transform((value) => value || undefined),
       orderNo: z.string().trim().min(1),
       amount: z.coerce.number().positive(),
       method: z.enum(["WECHAT", "CASH", "TRANSFER"]).default("TRANSFER"),
     }),
     buildConfirmation: async (input) => {
-      const customer = await prisma.customer.findFirst({ where: { OR: [{ id: input.customerQuery }, { name: { contains: input.customerQuery, mode: "insensitive" } }, { phone: { contains: input.customerQuery } }] } });
-      if (!customer) throw new Error("客户不存在");
-      const order = await prisma.order.findFirst({ where: { customerId: customer.id, OR: [{ id: input.orderNo }, { orderNo: { equals: input.orderNo, mode: "insensitive" } }] } });
-      if (!order) throw new Error("订单不存在");
+      const { customer, order } = await resolvePaymentTarget(input);
       return {
         title: "二次确认登记收款",
         summary: `准备给 ${customer.name} 的订单 ${order.orderNo} 登记收款 ${money(input.amount)}。`,
@@ -1454,10 +1479,7 @@ export const aiTools: AiToolDefinition[] = [
       };
     },
     handler: async (input) => {
-      const customer = await prisma.customer.findFirst({ where: { OR: [{ id: input.customerQuery }, { name: { contains: input.customerQuery, mode: "insensitive" } }, { phone: { contains: input.customerQuery } }] } });
-      if (!customer) throw new Error("客户不存在");
-      const order = await prisma.order.findFirst({ where: { customerId: customer.id, OR: [{ id: input.orderNo }, { orderNo: { equals: input.orderNo, mode: "insensitive" } }] } });
-      if (!order) throw new Error("订单不存在");
+      const { customer, order } = await resolvePaymentTarget(input);
       const result = await registerPayment({ customerId: customer.id, method: input.method, allocations: [{ orderId: order.id, amount: input.amount }] });
       errorFromAction(result, "收款登记失败");
       return {

@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
 import { auth } from "@/auth";
+import { getTestSessionUserFromEnv } from "@/features/auth/test-session";
 import { prisma } from "@/lib/prisma";
 
 type AuditInput = {
@@ -21,11 +22,13 @@ function toJson(value: unknown): Prisma.InputJsonValue | undefined {
 
 export async function logAction(input: AuditInput) {
   try {
-    const session = await auth();
+    const testUser = getTestSessionUserFromEnv();
+    const session = testUser ? null : await auth();
+    const user = testUser ?? session?.user;
     await prisma.auditLog.create({
       data: {
-        operatorId: session?.user?.type === "STAFF" ? session.user.id : null,
-        operatorName: session?.user?.name ?? "系统",
+        operatorId: user?.type === "STAFF" ? user.id : null,
+        operatorName: user?.name ?? "系统",
         module: input.module,
         action: input.action,
         targetType: input.targetType,
