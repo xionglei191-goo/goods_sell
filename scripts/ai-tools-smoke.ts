@@ -99,6 +99,29 @@ function main() {
   const readinessPlan = planAiToolCall("现在上线还差什么配置", context("ADMIN"), aiTools);
   assert(readinessPlan?.toolName === "system_launch_readiness", "管理员应可自然语言触发上线就绪检查");
 
+  const salespersonTools = aiTools.filter((item) => canRoleUseTool("SALESPERSON", item.name));
+  const salespersonReadinessPlan = planAiToolCall("现在上线还差什么配置", context("SALESPERSON"), salespersonTools);
+  assert(salespersonReadinessPlan?.toolName === "system_launch_readiness", "销售员询问上线配置应进入权限拦截，而不是误规划到经营总览");
+
+  const dealerTools = aiTools.filter((item) => canRoleUseTool("DEALER", item.name));
+  const dealerStockPlan = planAiToolCall("把青岛经典啤酒门店库存上报为9", context("DEALER"), dealerTools);
+  assert(dealerStockPlan?.toolName === "dealer_report_stock", "经销商库存上报应命中库存上报工具");
+  assert(dealerStockPlan.args.productQuery === "青岛经典啤酒", "经销商库存上报应清理商品名");
+  assert(dealerStockPlan.args.stock === 9, "经销商库存上报应提取库存数");
+
+  const dealerSkuStockPlan = planAiToolCall("上报 HQ-BEER-001 门店库存 9 件", context("DEALER"), dealerTools);
+  assert(dealerSkuStockPlan?.toolName === "dealer_report_stock", "经销商 SKU 库存上报应命中库存上报工具");
+  assert(dealerSkuStockPlan.args.productQuery === "HQ-BEER-001", "经销商 SKU 库存上报应保留 SKU");
+  assert(dealerSkuStockPlan.args.stock === 9, "经销商 SKU 库存上报应提取最后的库存数");
+
+  const dealerAcceptPlan = planAiToolCall("接单 HQ20260430000007", context("DEALER"), dealerTools);
+  assert(dealerAcceptPlan?.toolName === "dealer_accept_routing", "经销商接单应命中接单工具");
+  assert(dealerAcceptPlan.args.routingId === "HQ20260430000007", "经销商接单应支持订单号作为确认入口");
+
+  const consumerSearchPlan = planAiToolCall("查一下青岛经典啤酒", context("CONSUMER"), aiTools);
+  assert(consumerSearchPlan?.toolName === "search_products", "消费者商品查询应命中商品查询工具");
+  assert(consumerSearchPlan.args.query === "青岛经典啤酒", "消费者商品查询应清理查询前缀");
+
   const redacted = redactAiAuditValue({ password: "secret", nested: { confirmationToken: "abc", name: "张三" } }) as {
     password?: string;
     nested: { confirmationToken?: string; name: string };

@@ -15,6 +15,8 @@
     "test:phase6": "tsx scripts/phase6-smoke.ts",
     "test:rbac": "tsx scripts/rbac-smoke.ts",
     "test:ai-tools": "tsx scripts/ai-tools-smoke.ts",
+    "test:ai-provider": "tsx scripts/ai-provider-smoke.ts",
+    "test:ai-runtime": "tsx scripts/ai-runtime-regression.ts",
     "check:launch": "tsx scripts/launch-readiness.ts"
   },
   "dependencies": {
