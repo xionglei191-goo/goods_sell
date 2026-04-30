@@ -44,9 +44,11 @@ function cleanProductQuery(message: string) {
   const quantity = parseQuantity(message);
   return message
     .replace(/帮我|我要|我想|请|麻烦|下单|购买|买|来|订|要/g, "")
+    .replace(/^(给|把|将|帮我|请|麻烦)\s*/g, "")
     .replace(quantity.raw, "")
     .replace(/一箱|两箱|一件|两件/g, "")
     .replace(/[，。,.！!？?]/g, "")
+    .replace(/(入库|出库|上报库存|报库存|库存|涨价|降价|调价|改价|价格|零售价|售价)\s*$/g, "")
     .trim();
 }
 
@@ -65,15 +67,26 @@ function parseProductPriceChange(message: string) {
   const newPrice = message.match(/(?:调到|改成|设为|设置为|到)\s*(\d+(?:\.\d+)?)/)?.[1];
   const up = message.match(/(?:涨|上涨|加)\s*(\d+(?:\.\d+)?)/)?.[1];
   const down = message.match(/(?:降|降低|减)\s*(\d+(?:\.\d+)?)/)?.[1];
+  const absolutePrice = message.match(/(?:改成|调到|调整到|设为|设置为)\s*(\d+(?:\.\d+)?)/)?.[1];
+  const relativeUp = message.match(/(?:涨价|上调|加价|增加)\s*(\d+(?:\.\d+)?)/)?.[1];
+  const relativeDown = message.match(/(?:降价|下调|减价|减少|降低)\s*(\d+(?:\.\d+)?)/)?.[1];
   return {
     productQuery,
-    newRetailPrice: newPrice ? Number(newPrice) : undefined,
-    adjustRetailPrice: up ? Number(up) : down ? -Number(down) : undefined,
+    newRetailPrice: newPrice ? Number(newPrice) : absolutePrice ? Number(absolutePrice) : undefined,
+    adjustRetailPrice: up ? Number(up) : relativeUp ? Number(relativeUp) : down ? -Number(down) : relativeDown ? -Number(relativeDown) : undefined,
   };
 }
 
 function parsePhone(message: string) {
   return message.match(/1[3-9]\d{9}/)?.[0] ?? "";
+}
+
+function parsePaymentRegistration(message: string) {
+  const phone = parsePhone(message);
+  const orderNo = message.match(/HQ[A-Z0-9-]{6,}/i)?.[0] ?? "";
+  const amount = Number(message.match(/(?:收款|回款|登记|到账|收到)\s*(\d+(?:\.\d+)?)/)?.[1] ?? message.match(/(\d+(?:\.\d+)?)\s*(?:元|块)/)?.[1] ?? 0);
+  const method = /微信/.test(message) ? "WECHAT" : /现金/.test(message) ? "CASH" : "TRANSFER";
+  return { customerQuery: phone, orderNo, amount, method };
 }
 
 function parseCustomerName(message: string) {
@@ -147,6 +160,12 @@ function toolPlan(tools: readonly AiToolDefinition[], toolName: string, args: Re
 }
 
 function planStaff(message: string, tools: readonly AiToolDefinition[]): AiToolPlan | null {
+  if (/登记|收款|回款|到账|收到/.test(message) && /HQ[A-Z0-9-]{6,}/i.test(message)) {
+    const payment = parsePaymentRegistration(message);
+    if (payment.customerQuery && payment.orderNo && payment.amount > 0) {
+      return toolPlan(tools, "finance_register_payment", payment, "财务登记收款");
+    }
+  }
   if (/业绩|绩效/.test(message)) {
     return toolPlan(tools, "salesperson_performance", { salespersonName: parseSalespersonName(message), period: /今天|今日/.test(message) ? "day" : "month" }, "查询销售员业绩");
   }
