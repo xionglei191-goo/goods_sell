@@ -1,4 +1,6 @@
 import { callAnthropicCompatible, hasAiProvider } from "@/features/ai/provider";
+import { planFixedAiToolCall } from "@/features/ai/intent-templates";
+import { recordAiPromptUsage, type AiPlanSource } from "@/features/ai/prompt-usage";
 import { auditAiAssistant } from "@/features/ai/tools/audit";
 import { getAiToolContext } from "@/features/ai/tools/context";
 import { executeAiTool, getAvailableAiTools, AiToolError } from "@/features/ai/tools/executor";
@@ -31,7 +33,7 @@ async function planWithModel(message: string, tools: readonly AiToolDefinition[]
     const text = await callAnthropicCompatible({
       maxTokens: 512,
       system:
-        `你是业务系统的工具规划器。只返回 JSON，不要解释。JSON 格式：{"toolName":"工具名","args":{},"reason":"原因"}。toolName 必须逐字复制可用工具名之一，不能缩写、翻译或自造别名。可用工具名全集：${toolNames}。如果没有合适工具，toolName 为空字符串。`,
+        `你是业务系统的工具规划器。只返回 JSON，不要解释。JSON 格式：{"toolName":"工具名","args":{},"reason":"原因"}。toolName 必须逐字复制可用工具名之一，不能缩写、翻译或自造别名。可用工具名全集：${toolNames}。如果没有合适工具，toolName 为空字符串。区分意图：用户自己说“我要下单/帮客户开单/要 N 箱”才是下单或开单；“某客户买了什么/买过什么/购买记录”是客户购买历史查询，不能规划成开单草稿或经营总览。`,
       messages: [
         {
           role: "user",
@@ -58,9 +60,20 @@ function answerForExecution(execution: Awaited<ReturnType<typeof executeAiTool>>
 export async function answerAssistantMessage(message: string): Promise<AssistantResponse> {
   const context = await getAiToolContext();
   const tools = getAvailableAiTools(context);
-  const heuristicPlan = planAiToolCall(message, context, tools);
-  const modelPlan = heuristicPlan ? null : await planWithModel(message, tools);
-  const plan = validateAiToolPlan(message, context, tools, heuristicPlan ?? modelPlan);
+  const fixedPlan = planFixedAiToolCall(message, context, tools);
+  const heuristicPlan = fixedPlan ? null : planAiToolCall(message, context, tools);
+  const modelPlan = fixedPlan || heuristicPlan ? null : await planWithModel(message, tools);
+  const selectedPlan = fixedPlan ?? heuristicPlan ?? modelPlan;
+  const plan = validateAiToolPlan(message, context, tools, selectedPlan);
+  const source: AiPlanSource = fixedPlan
+    ? "template"
+    : heuristicPlan
+      ? "heuristic"
+      : modelPlan && plan?.toolName !== modelPlan.toolName
+        ? "correction"
+        : modelPlan
+          ? "model"
+          : "no_plan";
 
   if (!plan) {
     const response: AssistantResponse = {
@@ -80,6 +93,7 @@ export async function answerAssistantMessage(message: string): Promise<Assistant
       status: "no_plan",
       result: response.card,
     });
+    await recordAiPromptUsage({ context, input: message, source: "no_plan", status: "no_plan" });
     return response;
   }
 
@@ -98,6 +112,7 @@ export async function answerAssistantMessage(message: string): Promise<Assistant
       status: execution.status,
       result: execution.status === "needs_confirmation" ? execution.pendingAction : execution.result,
     });
+    await recordAiPromptUsage({ context, input: message, source, toolName: plan.toolName, status: execution.status === "success" ? "success" : execution.status });
     return response;
   } catch (error) {
     if (error instanceof AiToolError) {
@@ -109,6 +124,7 @@ export async function answerAssistantMessage(message: string): Promise<Assistant
         status: "failed",
         error: error.message,
       });
+      await recordAiPromptUsage({ context, input: message, source, toolName: plan.toolName, status: "failed" });
       return {
         answer: error.message,
         card: {
@@ -129,6 +145,7 @@ export async function answerAssistantMessage(message: string): Promise<Assistant
       status: "error",
       error: messageText,
     });
+    await recordAiPromptUsage({ context, input: message, source, toolName: plan.toolName, status: "error" });
     return {
       answer: messageText,
       card: {

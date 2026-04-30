@@ -28,16 +28,28 @@ function salespersonContext(id: string, name: string): AiToolContext {
   };
 }
 
+function warehouseContext(id: string, name: string): AiToolContext {
+  return {
+    role: "WAREHOUSE",
+    isStaff: true,
+    user: { id, name, role: "WAREHOUSE", type: "STAFF" },
+  };
+}
+
 async function main() {
   const dealerCustomer = await prisma.customer.findFirst({ where: { phone: "13900139101" }, select: { id: true, name: true } });
   const salesperson = await prisma.user.findFirst({ where: { phone: "13800138001" }, select: { id: true, name: true } });
+  const warehouse = await prisma.user.findFirst({ where: { role: "WAREHOUSE" }, select: { id: true, name: true } });
   assert(dealerCustomer, "缺少经销商测试账号 13900139101");
   assert(salesperson, "缺少销售员测试账号 13800138001");
+  assert(warehouse, "缺少仓管测试账号");
 
   const dealerContext = customerContext(dealerCustomer.id, dealerCustomer.name);
   const salesContext = salespersonContext(salesperson.id, salesperson.name);
+  const warehouseUserContext = warehouseContext(warehouse.id, warehouse.name);
   const dealerTools = aiTools.filter((tool) => canRoleUseTool("DEALER", tool.name));
   const salesTools = aiTools.filter((tool) => canRoleUseTool("SALESPERSON", tool.name));
+  const warehouseTools = aiTools.filter((tool) => canRoleUseTool("WAREHOUSE", tool.name));
   const pendingRouting = await prisma.orderRouting.findFirst({
     where: { dealer: { customerId: dealerCustomer.id }, status: "PENDING" },
     include: { order: { select: { orderNo: true } } },
@@ -72,6 +84,15 @@ async function main() {
     blocked = error instanceof AiToolError && error.status === 403;
   }
   assert(blocked, "销售员 readiness 请求应被 403 权限拦截");
+
+  const purchaseHistoryPlan = planAiToolCall("张阿姨买了什么东西", salesContext, salesTools);
+  assert(purchaseHistoryPlan?.toolName === "customer_purchase_history", "销售员查询客户买了什么应命中购买历史工具");
+  const purchaseHistoryExecution = await executeAiTool(purchaseHistoryPlan.toolName, purchaseHistoryPlan.args, salesContext);
+  assert(purchaseHistoryExecution.status === "success", "客户购买历史查询应直接返回结果");
+  assert(purchaseHistoryExecution.result.title === "客户购买历史", "客户购买历史结果标题不正确");
+
+  const blockedWarehouseHistoryPlan = planAiToolCall("张阿姨买了什么东西", warehouseUserContext, warehouseTools);
+  assert(!blockedWarehouseHistoryPlan, "仓管查询客户购买历史不应被规划到任何可用工具");
 
   console.log("AI runtime regression passed");
 }

@@ -779,6 +779,67 @@ export const aiTools: AiToolDefinition[] = [
     },
   },
   {
+    name: "customer_purchase_history",
+    title: "客户购买历史",
+    description: "按客户姓名或手机号查询最近购买过的商品、订单金额和订单状态。",
+    riskLevel: "READ",
+    access: { permission: "customers:view" },
+    inputSchema: z.object({ customerQuery: z.string().trim().min(1, "请说明客户姓名或手机号"), limit: z.coerce.number().int().min(1).max(20).default(8) }),
+    handler: async (input, context) => {
+      const customer = await findCustomerByQuery(input.customerQuery, context);
+      const orders = await prisma.order.findMany({
+        where: { customerId: customer.id, parentId: null },
+        include: { items: true },
+        orderBy: { createdAt: "desc" },
+        take: input.limit,
+      });
+      const productStats = new Map<string, { quantity: number; amount: number }>();
+      for (const order of orders) {
+        for (const item of order.items) {
+          const current = productStats.get(item.productName) ?? { quantity: 0, amount: 0 };
+          current.quantity += item.quantity;
+          current.amount += Number(item.totalAmount);
+          productStats.set(item.productName, current);
+        }
+      }
+      const topProducts = Array.from(productStats.entries())
+        .sort(([, left], [, right]) => right.amount - left.amount)
+        .slice(0, 5);
+      const totalAmount = orders.reduce((sum, order) => sum + Number(order.payableAmount), 0);
+      const orderRows = orders.slice(0, 6).map((order) => ({
+        label: order.orderNo,
+        value: `${order.status}｜${money(Number(order.payableAmount))}｜${order.items.map((item) => `${item.productName}×${item.quantity}`).join("、")}`,
+      }));
+      return {
+        title: "客户购买历史",
+        summary: orders.length
+          ? `${customer.name} 最近 ${orders.length} 单，购买金额 ${money(totalAmount)}，主要商品：${topProducts.map(([name]) => name).join("、") || "暂无"}。`
+          : `${customer.name} 暂无订单购买记录。`,
+        href: `/dashboard/customers/${customer.id}`,
+        details: [
+          ...details([
+            ["客户", `${customer.name} · ${customer.phone}`],
+            ["归属销售员", customer.salesPerson?.name ?? "未分配"],
+            ["最近订单", orders.length],
+            ["购买金额", money(totalAmount)],
+          ]),
+          ...topProducts.map(([name, stat]) => ({ label: name, value: `${stat.quantity} 件｜${money(stat.amount)}` })),
+          ...orderRows,
+        ],
+        data: {
+          customerId: customer.id,
+          orders: orders.map((order) => ({
+            id: order.id,
+            orderNo: order.orderNo,
+            status: order.status,
+            payableAmount: Number(order.payableAmount),
+            items: order.items.map((item) => ({ productName: item.productName, sku: item.sku, quantity: item.quantity })),
+          })),
+        },
+      };
+    },
+  },
+  {
     name: "admin_create_customer",
     title: "新增客户",
     description: "管理员或销售员新增客户账号，并可设置归属销售员、信用额度和标签。",

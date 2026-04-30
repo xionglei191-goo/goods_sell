@@ -2,7 +2,7 @@
 
 import { Bot, ChevronDown, Loader2, Maximize2, Mic, Send, Sparkles, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -44,12 +44,18 @@ type BubbleMessage = {
   card?: AiAssistantCard;
 };
 
+type AiQuickPrompt = {
+  id: string;
+  label: string;
+  text: string;
+  toolName: string;
+  riskLevel: "READ" | "DRAFT" | "WRITE" | "HIGH_RISK";
+};
+
 type AiFloatingBubbleProps = {
   className?: string;
   contextLabel?: string;
 };
-
-const quickPrompts = ["查一下今天待处理", "这个月业绩怎么样", "查库存预警", "我要下单 1 箱剑兰春"];
 
 function parseSseChunk(buffer: string) {
   const events = buffer.split("\n\n");
@@ -128,8 +134,24 @@ export function AiFloatingBubble({ className, contextLabel = "AI 助手" }: AiFl
   const [messages, setMessages] = useState<BubbleMessage[]>([]);
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [quickPrompts, setQuickPrompts] = useState<AiQuickPrompt[]>([]);
   const [isPending, startTransition] = useTransition();
   const assistantIdRef = useRef("");
+
+  useEffect(() => {
+    if (!open) return;
+    const controller = new AbortController();
+    fetch("/api/ai/quick-prompts", { signal: controller.signal })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: { prompts?: AiQuickPrompt[] } | null) => {
+        setQuickPrompts(data?.prompts ?? []);
+      })
+      .catch((err) => {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setQuickPrompts([]);
+      });
+    return () => controller.abort();
+  }, [open]);
 
   function appendAssistantText(text: string) {
     setMessages((current) => current.map((item) => (item.id === assistantIdRef.current ? { ...item, content: item.content + text } : item)));
@@ -281,8 +303,8 @@ export function AiFloatingBubble({ className, contextLabel = "AI 助手" }: AiFl
       <div className="border-t border-stone-100 p-3">
         <div className="mb-2 flex flex-wrap gap-2 pb-1">
           {quickPrompts.map((prompt) => (
-            <button className="max-w-full rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-600 hover:bg-red-50 hover:text-[#dc2626]" key={prompt} onClick={() => send(prompt)} type="button">
-              {prompt}
+            <button className="max-w-full rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-600 hover:bg-red-50 hover:text-[#dc2626]" key={prompt.id} onClick={() => send(prompt.text)} title={prompt.text} type="button">
+              {prompt.text}
             </button>
           ))}
         </div>

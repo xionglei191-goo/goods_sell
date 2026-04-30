@@ -40,8 +40,15 @@ function parseQuantity(message: string) {
   };
 }
 
+function isPurchaseHistoryIntent(message: string) {
+  return /买了什么|买过什么|购买记录|消费记录|采购记录|历史购买|最近买|都买了什么|买的哪些|买过哪些|购买过哪些/.test(message);
+}
+
 function isPurchaseIntent(message: string) {
-  return /下单|购买|买|来\d|来一|来两|要\d|要一|要两/.test(message);
+  if (isPurchaseHistoryIntent(message)) return false;
+  if (/下单|开单|补货/.test(message)) return true;
+  if (/(?:我要|我想|我准备|帮客户|给客户|客户要|客人要|帮.*客户).*(?:买|购买|要|来|订)/.test(message)) return true;
+  return /(?:买|购买|要|来|订)\s*(?:\d+|[一二两三四五六七八九十]{1,3})\s*(?:箱|件|瓶|提|包|袋|个)/.test(message);
 }
 
 function parseOrderNo(message: string) {
@@ -137,6 +144,18 @@ function parsePhone(message: string) {
   return message.match(/1[3-9]\d{9}/)?.[0] ?? "";
 }
 
+function parseCustomerPurchaseQuery(message: string) {
+  const phone = parsePhone(message);
+  if (phone) return phone;
+  return message
+    .replace(/查一下|查询|查|看看|帮我|请|麻烦/g, "")
+    .replace(/客户|顾客|用户|会员|这个人|这个客户/g, "")
+    .replace(/最近|历史|订单|商品|东西/g, "")
+    .replace(/买了什么|买过什么|购买记录|消费记录|采购记录|历史购买|都买了什么|买的哪些|买过哪些|购买过哪些|买/g, "")
+    .replace(/[，。,.！!？?]/g, "")
+    .trim();
+}
+
 function parseStaffRole(message: string): "ADMIN" | "SALESPERSON" | "WAREHOUSE" | "FINANCE" {
   if (/管理员|ADMIN/i.test(message)) return "ADMIN";
   if (/销售|SALESPERSON/i.test(message)) return "SALESPERSON";
@@ -229,6 +248,9 @@ function parseOrderAction(message: string) {
 }
 
 function planConsumer(message: string, tools: readonly AiToolDefinition[]): AiToolPlan | null {
+  if (isPurchaseHistoryIntent(message) && hasTool(tools, "customer_orders")) {
+    return { toolName: "customer_orders", args: { limit: 8 }, reason: "客户查询自己的购买记录" };
+  }
   if (/欠款|应收|账款|还要付|待付款/.test(message) && hasTool(tools, "customer_receivables")) {
     return { toolName: "customer_receivables", args: {}, reason: "客户查询自己的账款" };
   }
@@ -287,6 +309,9 @@ function toolPlan(tools: readonly AiToolDefinition[], toolName: string, args: Re
 function planStaff(message: string, tools: readonly AiToolDefinition[]): AiToolPlan | null {
   if (/上线|发布|部署|就绪|还差|待决|配置检查|上线检查/.test(message)) {
     return { toolName: "system_launch_readiness", args: {}, reason: "上线就绪检查" };
+  }
+  if (isPurchaseHistoryIntent(message)) {
+    return toolPlan(tools, "customer_purchase_history", { customerQuery: parseCustomerPurchaseQuery(message), limit: 8 }, "客户购买历史查询");
   }
   if (isPurchaseIntent(message)) {
     return toolPlan(tools, "orders_manual_order_draft", { text: message }, "后台开单草稿")
@@ -393,6 +418,7 @@ function planStaff(message: string, tools: readonly AiToolDefinition[]): AiToolP
 
 type CoreIntent =
   | "purchase"
+  | "purchase_history"
   | "readiness"
   | "payment"
   | "price"
@@ -409,6 +435,7 @@ type CoreIntent =
   | "invoice";
 
 function detectCoreIntent(message: string): CoreIntent | null {
+  if (isPurchaseHistoryIntent(message)) return "purchase_history";
   if (isPurchaseIntent(message)) return "purchase";
   if (/上线|发布|部署|就绪|还差|待决|配置检查|上线检查/.test(message)) return "readiness";
   if (/创建.*(?:员工|账号)|新增.*(?:员工|账号)/.test(message)) return "staff_create";
@@ -431,6 +458,8 @@ function allowedToolsForIntent(intent: CoreIntent) {
   switch (intent) {
     case "purchase":
       return new Set(["customer_submit_order", "orders_manual_order_draft", "search_products"]);
+    case "purchase_history":
+      return new Set(["customer_purchase_history", "customer_orders"]);
     case "readiness":
       return new Set(["system_launch_readiness"]);
     case "payment":

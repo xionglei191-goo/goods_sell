@@ -44,6 +44,7 @@ const toolArgumentHints: Record<string, string> = {
   business_overview: '{"period":"month"}',
   salesperson_performance: '{"salespersonName":"销售员姓名或手机号","period":"month"}',
   search_customers: '{"query":"客户姓名/手机号/标签","limit":8}',
+  customer_purchase_history: '{"customerQuery":"客户姓名/手机号","limit":8}',
   admin_create_customer: '{"name":"客户名","phone":"13900000000","customerType":"CONSUMER","creditLimit":0,"salesPersonQuery":"销售员手机号","tags":["标签"]}',
   admin_update_customer_profile: '{"customerQuery":"客户手机号","name":"新姓名","creditLimit":1000}',
   admin_assign_customer_salesperson: '{"customerQuery":"客户手机号","salesPersonQuery":"销售员手机号"}',
@@ -126,7 +127,7 @@ async function planWithProvider(testCase: FullCase) {
   const text = await callAnthropicCompatible({
     maxTokens: 2048,
     system:
-      `你是业务系统的 AI 工具规划器。必须只从可用工具中选择一个最匹配的工具。只返回 JSON，不要解释，不要 Markdown。JSON 格式：{"toolName":"工具名","args":{},"reason":"简短原因"}。toolName 必须逐字复制可用工具名之一，不能缩写、翻译或自造别名。可用工具名全集：${toolNames}。常见错误：上线检查必须返回 system_launch_readiness，不能返回 system_launch_ready；新品推送写操作必须返回 marketing_create_product_push，不能返回 marketing_product_push。args 必须是合法 JSON，布尔值必须使用 true/false，数字必须使用 number。`,
+      `你是业务系统的 AI 工具规划器。必须只从可用工具中选择一个最匹配的工具。只返回 JSON，不要解释，不要 Markdown。JSON 格式：{"toolName":"工具名","args":{},"reason":"简短原因"}。toolName 必须逐字复制可用工具名之一，不能缩写、翻译或自造别名。可用工具名全集：${toolNames}。常见错误：上线检查必须返回 system_launch_readiness，不能返回 system_launch_ready；新品推送写操作必须返回 marketing_create_product_push，不能返回 marketing_product_push；“某客户买了什么/买过什么/购买记录”必须返回 customer_purchase_history，不能返回 orders_manual_order_draft 或 business_overview。args 必须是合法 JSON，布尔值必须使用 true/false，数字必须使用 number。`,
     messages: [
       {
         role: "user",
@@ -564,6 +565,7 @@ function buildCases(data: SeedData): FullCase[] {
     { id: "AI-FULL-045", role: "SALESPERSON", user: users.salesperson, expectedTool: "orders_manual_order_draft", message: `帮客户 ${customers.consumer.phone} 开单 1 箱 ${products.product.name}` },
     { id: "AI-FULL-046", role: "SALESPERSON", user: users.salesperson, expectedTool: "marketing_coupon_draft", message: "创建优惠券活动草稿，满200减20，发100张" },
     { id: "AI-FULL-047", role: "SALESPERSON", user: users.salesperson, expectedTool: "marketing_product_push_draft", message: `生成新品推送草稿，把 ${products.pushProduct.name} 发给高价值客户` },
+    { id: "AI-FULL-048", role: "ADMIN", user: users.admin, expectedTool: "customer_purchase_history", message: `查客户 ${customers.consumer.phone} 买了什么东西` },
   ];
 }
 

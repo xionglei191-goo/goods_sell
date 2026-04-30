@@ -130,6 +130,14 @@ type AiToolDefinition = {
 type AiAssistantCard =
   | { kind: "result"; title: string; summary: string; details: AiToolDetail[]; href?: string }
   | { kind: "confirmation"; pendingAction: AiPendingAction }
+
+type AiQuickPrompt = {
+  id: string
+  label: string
+  text: string
+  toolName: string
+  riskLevel: AiToolRiskLevel
+}
 ```
 
 已注册 tool 分组：
@@ -137,17 +145,20 @@ type AiAssistantCard =
 | 分组 | 代表 tools |
 |------|------------|
 | 客户服务 | `search_products`、`customer_context`、`customer_submit_order`、`customer_orders`、`customer_receivables` |
-| 经营查询 | `business_overview`、`salesperson_performance`、`search_customers`、`product_operations_summary`、`finance_summary`、`delivery_summary`、`channel_summary` |
+| 经营查询 | `business_overview`、`salesperson_performance`、`search_customers`、`customer_purchase_history`、`product_operations_summary`、`finance_summary`、`delivery_summary`、`channel_summary` |
 | 管理操作 | `admin_update_product_price`、`order_status_action`、`inventory_stock_in`、`finance_register_payment`、`settings_save_business_config` |
 | 经销商 | `dealer_incoming_orders`、`dealer_report_stock`、`dealer_accept_routing`、`dealer_reject_routing` |
 | 营销与系统 | `marketing_create_coupon`、`marketing_issue_coupon`、`marketing_create_product_push`、`system_launch_readiness` |
 
 执行约定：
+- 固定高频词条由 `intent-templates.ts` 维护，并通过 `/api/ai/quick-prompts` 按角色返回。
+- AI Assistant 规划顺序为固定词条、本地高置信规则、真实 AI provider、计划校验、executor 执行。
 - `READ` 查询直接执行。
 - `DRAFT` 只返回草稿卡。
 - `WRITE` 返回确认卡，确认 API 校验 token 后执行。
 - `HIGH_RISK` 除 token 外还要求指定确认文字。
 - Tool handler 必须复用现有业务 action/query，不允许绕过权限直接写库。
+- 非固定问法会记录高频候选，但不会自动变成本地规则。
 
 ### 2.10 线索/询价模块（Phase 7 规划）
 ```typescript
@@ -268,6 +279,7 @@ POST /api/webhooks/wechat-pay  — 微信支付回调
 POST /api/ai/chat              — AI对话流式响应(SSE)
 POST /api/ai/assistant         — AI悬浮气泡对话与tool调用(SSE)
 POST /api/ai/assistant/confirm — AI待确认tool执行
+GET  /api/ai/quick-prompts     — 当前角色AI固定词条
 GET  /api/promoters/[code]     — 推广码解析与来源上下文
 POST /api/wechat/mini/share    — 小程序分享/裂变事件
 ```
@@ -294,6 +306,34 @@ SSE 事件：
 | `card` | 查询结果卡或确认卡 |
 | `done` | `{ "ok": true }` |
 | `error` | `{ "message": "请先登录后再使用 AI 助手" }` |
+
+`GET /api/ai/quick-prompts`
+
+```json
+{
+  "role": "WAREHOUSE",
+  "prompts": [
+    {
+      "id": "warehouse-delivery",
+      "label": "配送摘要",
+      "text": "查看配送摘要",
+      "toolName": "delivery_summary",
+      "riskLevel": "READ"
+    }
+  ]
+}
+```
+
+未登录时返回：
+
+```json
+{
+  "role": null,
+  "prompts": []
+}
+```
+
+固定词条仅表示 UI 快捷入口；服务端仍按当前登录角色过滤可用 tools，并在执行前进行参数、权限和风险校验。
 
 `POST /api/ai/assistant/confirm`
 

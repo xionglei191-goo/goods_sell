@@ -1,4 +1,5 @@
 import { redactAiAuditText, redactAiAuditValue } from "@/features/ai/tools/audit";
+import { getAiQuickPromptsForContext, planFixedAiToolCall } from "@/features/ai/intent-templates";
 import { aiTools, canRoleUseTool } from "@/features/ai/tools/registry";
 import { planAiToolCall, validateAiToolPlan } from "@/features/ai/tools/planner";
 import { getLaunchReadinessReport } from "@/features/system/launch-readiness";
@@ -36,6 +37,11 @@ function main() {
   assert(!canRoleUseTool("CONSUMER", "business_overview"), "客户不能查看经营总览");
   assert(canRoleUseTool("ADMIN", "admin_update_product_price"), "管理员应可调价");
   assert(canRoleUseTool("ADMIN", "admin_create_customer"), "管理员应可新增客户");
+  assert(canRoleUseTool("ADMIN", "customer_purchase_history"), "管理员应可查询客户购买历史");
+  assert(canRoleUseTool("SALESPERSON", "customer_purchase_history"), "销售员应可查询名下客户购买历史");
+  assert(canRoleUseTool("FINANCE", "customer_purchase_history"), "财务应可查询客户购买历史");
+  assert(!canRoleUseTool("WAREHOUSE", "customer_purchase_history"), "仓管不能查询客户购买历史");
+  assert(!canRoleUseTool("DEALER", "customer_purchase_history"), "经销商不能查询客户购买历史");
   assert(canRoleUseTool("SALESPERSON", "admin_update_customer_tags"), "销售员应可维护名下客户标签");
   assert(!canRoleUseTool("FINANCE", "admin_create_customer"), "财务不能新增客户");
   assert(canRoleUseTool("ADMIN", "admin_approve_dealer_application"), "管理员应可审核经销商");
@@ -65,6 +71,17 @@ function main() {
   assert(consumerPlan?.toolName === "customer_submit_order", "客户自然语言下单应命中下单工具");
   assert(consumerPlan.args.productQuery === "剑兰春", "客户自然语言下单应清理商品名");
 
+  const consumerQuickPrompts = getAiQuickPromptsForContext(context("CONSUMER"), aiTools);
+  const dealerQuickPrompts = getAiQuickPromptsForContext(context("DEALER"), aiTools);
+  const adminQuickPrompts = getAiQuickPromptsForContext(context("ADMIN"), aiTools);
+  assert(consumerQuickPrompts.some((prompt) => prompt.toolName === "customer_submit_order"), "消费者固定词条应包含下单");
+  assert(!consumerQuickPrompts.some((prompt) => prompt.toolName === "dealer_incoming_orders"), "消费者不能看到经销商固定词条");
+  assert(dealerQuickPrompts.some((prompt) => prompt.toolName === "dealer_incoming_orders"), "经销商固定词条应包含待接订单");
+  assert(!dealerQuickPrompts.some((prompt) => prompt.toolName === "business_overview"), "经销商不能看到后台经营固定词条");
+  assert(adminQuickPrompts.some((prompt) => prompt.toolName === "system_launch_readiness"), "管理员固定词条应包含上线检查");
+  const fixedOrderPlan = planFixedAiToolCall("我要下单 1 箱剑兰春", context("CONSUMER"), aiTools);
+  assert(fixedOrderPlan?.toolName === "customer_submit_order", "固定下单词条应直接命中本地模板");
+
   const consumerSkuPlan = planAiToolCall("我要下单 1 箱 AIFULL-JLC-MOKZNWYX 剑兰春，微信支付", context("CONSUMER"), aiTools);
   assert(consumerSkuPlan?.toolName === "customer_submit_order", "客户带 SKU 和支付方式的自然语言下单应命中下单工具");
   assert(consumerSkuPlan.args.productQuery === "AIFULL-JLC-MOKZNWYX", "客户带 SKU 下单应优先使用 SKU 作为商品查询条件");
@@ -78,12 +95,26 @@ function main() {
   const staffOrderPlan = planAiToolCall("我要下单 1 箱剑兰春", context("ADMIN"), aiTools);
   assert(staffOrderPlan?.toolName === "orders_manual_order_draft", "员工侧下单意图应进入后台开单草稿，不能误命中经营总览");
 
+  const purchaseHistoryPlan = planAiToolCall("leige买了什么东西?", context("ADMIN"), aiTools);
+  assert(purchaseHistoryPlan?.toolName === "customer_purchase_history", "客户买了什么应命中购买历史，不能误命中后台开单草稿");
+  assert(purchaseHistoryPlan.args.customerQuery === "leige", "购买历史应提取客户名称");
+
+  const vaguePurchasePlan = planAiToolCall("leige买东西", context("ADMIN"), aiTools);
+  assert(vaguePurchasePlan?.toolName !== "orders_manual_order_draft", "含糊第三人称买东西不应直接生成后台开单草稿");
+
   const correctedStaffOrderPlan = validateAiToolPlan("我要下单 1 箱剑兰春", context("ADMIN"), aiTools, {
     toolName: "business_overview",
     args: { period: "month" },
     reason: "模拟错误模型规划",
   });
   assert(correctedStaffOrderPlan?.toolName === "orders_manual_order_draft", "下单意图若被 AI 误规划为经营总览，应被计划校验层纠偏");
+
+  const correctedPurchaseHistoryPlan = validateAiToolPlan("leige买了什么东西?", context("ADMIN"), aiTools, {
+    toolName: "business_overview",
+    args: { period: "month" },
+    reason: "模拟错误模型规划",
+  });
+  assert(correctedPurchaseHistoryPlan?.toolName === "customer_purchase_history", "购买历史意图若被 AI 误规划为经营总览，应被计划校验层纠偏");
 
   const adminPlan = planAiToolCall("这个月张军业绩怎么样", context("ADMIN"), aiTools);
   assert(adminPlan?.toolName === "salesperson_performance", "管理员查询业绩应命中销售员业绩工具");
