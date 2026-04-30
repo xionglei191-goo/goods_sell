@@ -70,14 +70,14 @@ function CardView({ card, onConfirm, isPending }: { card: AiAssistantCard; onCon
     const requiresText = Boolean(action.confirmTextRequired);
     const canConfirm = !requiresText || confirmText.trim() === action.confirmTextRequired;
     return (
-      <div className="mt-3 rounded-lg bg-white p-3 text-stone-900 shadow-sm ring-1 ring-amber-200">
-        <p className="text-sm font-semibold">{action.title}</p>
-        <p className="mt-1 text-xs leading-5 text-stone-600">{action.summary}</p>
+      <div className="mt-3 min-w-0 max-w-full overflow-hidden rounded-lg bg-white p-3 text-stone-900 shadow-sm ring-1 ring-amber-200">
+        <p className="break-words text-sm font-semibold [overflow-wrap:anywhere]">{action.title}</p>
+        <p className="mt-1 break-words text-xs leading-5 text-stone-600 [overflow-wrap:anywhere]">{action.summary}</p>
         <div className="mt-3 grid gap-1.5">
           {action.details.map((detail) => (
-            <div className="flex justify-between gap-3 text-xs" key={`${detail.label}-${detail.value}`}>
+            <div className="flex min-w-0 justify-between gap-3 text-xs" key={`${detail.label}-${detail.value}`}>
               <span className="shrink-0 text-stone-400">{detail.label}</span>
-              <span className="text-right font-medium text-stone-700">{detail.value}</span>
+              <span className="min-w-0 break-words text-right font-medium text-stone-700 [overflow-wrap:anywhere]">{detail.value}</span>
             </div>
           ))}
         </div>
@@ -98,15 +98,15 @@ function CardView({ card, onConfirm, isPending }: { card: AiAssistantCard; onCon
   }
 
   return (
-    <div className="mt-3 rounded-lg bg-white p-3 text-stone-900 shadow-sm ring-1 ring-stone-200">
-      <p className="text-sm font-semibold">{card.title}</p>
-      <p className="mt-1 text-xs leading-5 text-stone-600">{card.summary}</p>
+    <div className="mt-3 min-w-0 max-w-full overflow-hidden rounded-lg bg-white p-3 text-stone-900 shadow-sm ring-1 ring-stone-200">
+      <p className="break-words text-sm font-semibold [overflow-wrap:anywhere]">{card.title}</p>
+      <p className="mt-1 break-words text-xs leading-5 text-stone-600 [overflow-wrap:anywhere]">{card.summary}</p>
       {card.details.length ? (
         <div className="mt-3 grid gap-1.5">
           {card.details.map((detail) => (
-            <div className="flex justify-between gap-3 text-xs" key={`${detail.label}-${detail.value}`}>
+            <div className="flex min-w-0 justify-between gap-3 text-xs" key={`${detail.label}-${detail.value}`}>
               <span className="shrink-0 text-stone-400">{detail.label}</span>
-              <span className="text-right font-medium text-stone-700">{detail.value}</span>
+              <span className="min-w-0 break-words text-right font-medium text-stone-700 [overflow-wrap:anywhere]">{detail.value}</span>
             </div>
           ))}
         </div>
@@ -231,7 +231,7 @@ export function AiFloatingBubble({ className, contextLabel = "AI 助手" }: AiFl
   }
 
   return (
-    <div className={cn("fixed bottom-20 right-3 z-50 w-[calc(100vw-1.5rem)] max-w-[390px] rounded-lg bg-white shadow-2xl ring-1 ring-stone-200 md:bottom-6", expanded ? "md:max-w-[520px]" : "", className)}>
+    <div className={cn("fixed bottom-20 right-3 z-50 w-[calc(100vw-1.5rem)] max-w-[390px] overflow-hidden rounded-lg bg-white shadow-2xl ring-1 ring-stone-200 md:bottom-6", expanded ? "md:max-w-[520px]" : "", className)}>
       <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-50 text-[#dc2626]">
@@ -255,7 +255,7 @@ export function AiFloatingBubble({ className, contextLabel = "AI 助手" }: AiFl
         </div>
       </div>
 
-      <div className="max-h-[55vh] min-h-72 space-y-3 overflow-y-auto bg-stone-50 px-3 py-4">
+      <div className="max-h-[55vh] min-h-72 space-y-3 overflow-x-hidden overflow-y-auto bg-stone-50 px-3 py-4">
         {messages.length === 0 ? (
           <div className="rounded-lg bg-white p-3 text-sm text-stone-600 shadow-sm ring-1 ring-stone-200">
             <p className="font-semibold text-stone-950">直接说你要办什么</p>
@@ -266,7 +266,7 @@ export function AiFloatingBubble({ className, contextLabel = "AI 助手" }: AiFl
           const isUser = message.role === "USER";
           return (
             <div className={cn("flex", isUser ? "justify-end" : "justify-start")} key={message.id}>
-              <div className={cn("max-w-[86%] rounded-lg px-3 py-2 text-sm leading-6", isUser ? "bg-stone-900 text-white" : "bg-white text-stone-800 shadow-sm ring-1 ring-stone-200")}>
+              <div className={cn("min-w-0 max-w-[86%] break-words rounded-lg px-3 py-2 text-sm leading-6 [overflow-wrap:anywhere]", isUser ? "bg-stone-900 text-white" : "bg-white text-stone-800 shadow-sm ring-1 ring-stone-200")}>
                 {message.content || "正在处理..."}
                 {message.card ? <CardView card={message.card} isPending={isPending} onConfirm={confirmAction} /> : null}
               </div>
@@ -276,9 +276,9 @@ export function AiFloatingBubble({ className, contextLabel = "AI 助手" }: AiFl
       </div>
 
       <div className="border-t border-stone-100 p-3">
-        <div className="mb-2 flex gap-2 overflow-x-auto pb-1">
+        <div className="mb-2 flex flex-wrap gap-2 pb-1">
           {quickPrompts.map((prompt) => (
-            <button className="shrink-0 rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-600 hover:bg-red-50 hover:text-[#dc2626]" key={prompt} onClick={() => send(prompt)} type="button">
+            <button className="max-w-full rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-600 hover:bg-red-50 hover:text-[#dc2626]" key={prompt} onClick={() => send(prompt)} type="button">
               {prompt}
             </button>
           ))}

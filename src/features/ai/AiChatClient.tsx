@@ -136,7 +136,7 @@ export function AiChatClient({ initialMessages }: AiChatClientProps) {
   }
 
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-10rem)] max-w-3xl flex-col rounded-lg bg-white shadow-sm ring-1 ring-stone-200">
+    <div className="mx-auto flex min-h-[calc(100vh-10rem)] max-w-3xl flex-col overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-stone-200">
       <div className="border-b border-stone-100 px-4 py-3">
         <h1 className="text-xl font-bold text-stone-950">AI 选品与询价助手</h1>
         <p className="mt-1 text-sm text-stone-500">宴席配酒、企业团购、门店补货、新品试饮先由小启梳理需求</p>
@@ -146,7 +146,7 @@ export function AiChatClient({ initialMessages }: AiChatClientProps) {
         <AlcoholComplianceNotice compact />
       </div>
 
-      <div className="flex-1 space-y-4 overflow-y-auto px-4 py-5">
+      <div className="flex-1 space-y-4 overflow-x-hidden overflow-y-auto px-4 py-5">
         {messages.length === 0 ? (
           <div className="rounded-lg bg-stone-50 p-4">
             <div className="flex items-start gap-3">
@@ -188,7 +188,7 @@ export function AiChatClient({ initialMessages }: AiChatClientProps) {
                   <Bot className="h-4 w-4" />
                 </span>
               ) : null}
-              <div className={cn("max-w-[78%] rounded-lg px-3 py-2 text-sm leading-6", isUser ? "bg-blue-600 text-white" : "bg-stone-100 text-stone-800")}>
+              <div className={cn("min-w-0 max-w-[78%] break-words rounded-lg px-3 py-2 text-sm leading-6 [overflow-wrap:anywhere]", isUser ? "bg-blue-600 text-white" : "bg-stone-100 text-stone-800")}>
                 {message.content || "正在输入..."}
                 {!isUser && suggestions[message.id] ? <SuggestionCard suggestion={suggestions[message.id]} /> : null}
               </div>
@@ -203,11 +203,11 @@ export function AiChatClient({ initialMessages }: AiChatClientProps) {
       </div>
 
       <div className="border-t border-stone-100 p-4">
-        <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+        <div className="mb-3 flex flex-wrap gap-2 pb-1">
           {quickQuestions.map((question) => {
             const Icon = question.icon;
             return (
-            <button className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-red-50 px-3 py-1.5 text-sm font-medium text-[#dc2626]" key={question.label} onClick={() => send(question.value)} type="button">
+            <button className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-red-50 px-3 py-1.5 text-sm font-medium text-[#dc2626]" key={question.label} onClick={() => send(question.value)} type="button">
               <Icon className="h-3.5 w-3.5" />
               {question.label}
             </button>
@@ -237,15 +237,15 @@ export function AiChatClient({ initialMessages }: AiChatClientProps) {
 
 function SuggestionCard({ suggestion }: { suggestion: ChannelAiSuggestion }) {
   return (
-    <div className="mt-3 rounded-md bg-white p-3 text-stone-800 shadow-sm ring-1 ring-stone-200">
-      <p className="font-semibold text-stone-950">{suggestion.title}</p>
-      <p className="mt-1 text-xs leading-5 text-stone-500">{suggestion.summary}</p>
+    <div className="mt-3 min-w-0 max-w-full overflow-hidden rounded-md bg-white p-3 text-stone-800 shadow-sm ring-1 ring-stone-200">
+      <p className="break-words font-semibold text-stone-950 [overflow-wrap:anywhere]">{suggestion.title}</p>
+      <p className="mt-1 break-words text-xs leading-5 text-stone-500 [overflow-wrap:anywhere]">{suggestion.summary}</p>
       {suggestion.details.length > 0 ? (
         <div className="mt-3 grid gap-2">
           {suggestion.details.map((detail) => (
-            <p className="flex justify-between gap-3 text-xs" key={`${detail.label}-${detail.value}`}>
-              <span className="text-stone-400">{detail.label}</span>
-              <span className="text-right font-medium text-stone-700">{detail.value}</span>
+            <p className="flex min-w-0 justify-between gap-3 text-xs" key={`${detail.label}-${detail.value}`}>
+              <span className="shrink-0 text-stone-400">{detail.label}</span>
+              <span className="min-w-0 break-words text-right font-medium text-stone-700 [overflow-wrap:anywhere]">{detail.value}</span>
             </p>
           ))}
         </div>
