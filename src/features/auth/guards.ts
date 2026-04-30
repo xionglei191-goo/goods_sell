@@ -21,8 +21,8 @@ function unauthorized(message = "无权限执行该操作") {
 
 export async function getSessionUser(): Promise<SessionUser | null> {
   const session = await auth();
-  const role = normalizeRole(session?.user.role);
-  if (!session?.user.id || !role) return null;
+  const role = normalizeRole(session?.user?.role);
+  if (!session?.user?.id || !role) return null;
 
   return {
     id: session.user.id,

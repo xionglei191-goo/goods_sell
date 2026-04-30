@@ -5,6 +5,7 @@ import { signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { AiFloatingBubble } from "@/features/ai/AiFloatingBubble";
 import { cn } from "@/lib/utils";
 
 type DealerShellProps = {
@@ -56,6 +57,7 @@ export function DealerShell({ dealer, children }: DealerShellProps) {
           })}
         </div>
       </nav>
+      <AiFloatingBubble contextLabel="经销商 AI 助手" />
     </div>
   );
 }

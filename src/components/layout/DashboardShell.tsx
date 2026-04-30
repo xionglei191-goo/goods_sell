@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { AiFloatingBubble } from "@/features/ai/AiFloatingBubble";
 import type { AppRole } from "@/features/auth/types";
 
 type DashboardUser = {
@@ -39,6 +40,7 @@ export function DashboardShell({ children, user }: DashboardShellProps) {
         <Header onMenuClick={() => setMobileOpen(true)} user={user} />
         <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
       </div>
+      <AiFloatingBubble contextLabel="后台 AI 代办助手" />
     </div>
   );
 }

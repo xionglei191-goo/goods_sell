@@ -7,6 +7,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { AiFloatingBubble } from "@/features/ai/AiFloatingBubble";
 import { getDefaultAuthorizedPath } from "@/features/auth/permissions";
 import type { ShopUser } from "@/features/shop/types";
 import { cn } from "@/lib/utils";
@@ -133,6 +134,7 @@ export function ShopShell({ user, cartCount, children }: ShopShellProps) {
           })}
         </div>
       </nav>
+      {user ? <AiFloatingBubble contextLabel="商城 AI 助手" /> : null}
     </div>
   );
 }

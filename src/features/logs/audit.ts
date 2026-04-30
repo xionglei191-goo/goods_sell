@@ -24,8 +24,8 @@ export async function logAction(input: AuditInput) {
     const session = await auth();
     await prisma.auditLog.create({
       data: {
-        operatorId: session?.user.type === "STAFF" ? session.user.id : null,
-        operatorName: session?.user.name ?? "系统",
+        operatorId: session?.user?.type === "STAFF" ? session.user.id : null,
+        operatorName: session?.user?.name ?? "系统",
         module: input.module,
         action: input.action,
         targetType: input.targetType,
