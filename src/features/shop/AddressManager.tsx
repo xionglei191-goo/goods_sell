@@ -2,7 +2,7 @@
 
 import { Edit2, MapPin, Plus, Star, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { deleteAddress, saveAddress, setDefaultAddress } from "@/features/shop/actions";
@@ -20,18 +20,25 @@ export function AddressManager({ initialAddresses }: AddressManagerProps) {
   const router = useRouter();
   const [addresses, setAddresses] = useState(initialAddresses);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
   const [input, setInput] = useState<AddressInput>(emptyInput);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const isEditing = editingId !== null || input.name || input.phone || input.detail;
+  const isEditing = isCreating || editingId !== null || input.name || input.phone || input.detail;
+
+  useEffect(() => {
+    setAddresses(initialAddresses);
+  }, [initialAddresses]);
 
   function startCreate() {
     setEditingId(null);
+    setIsCreating(true);
     setInput({ ...emptyInput, isDefault: addresses.length === 0 });
   }
 
   function startEdit(address: AddressView) {
     setEditingId(address.id);
+    setIsCreating(false);
     setInput({
       name: address.name,
       phone: address.phone,
@@ -51,6 +58,7 @@ export function AddressManager({ initialAddresses }: AddressManagerProps) {
 
       setMessage(result.message ?? "地址已保存");
       setEditingId(null);
+      setIsCreating(false);
       setInput(emptyInput);
       router.refresh();
     });
@@ -111,7 +119,7 @@ export function AddressManager({ initialAddresses }: AddressManagerProps) {
             <Button className="bg-[#dc2626] text-white hover:bg-[#b91c1c]" disabled={isPending} onClick={submit} type="button">
               保存
             </Button>
-            <Button onClick={() => { setEditingId(null); setInput(emptyInput); }} type="button" variant="outline">
+            <Button onClick={() => { setEditingId(null); setIsCreating(false); setInput(emptyInput); }} type="button" variant="outline">
               取消
             </Button>
           </div>
