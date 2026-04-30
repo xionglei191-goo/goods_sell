@@ -2,7 +2,7 @@ import { callAnthropicCompatible, hasAiProvider } from "@/features/ai/provider";
 import { auditAiAssistant } from "@/features/ai/tools/audit";
 import { getAiToolContext } from "@/features/ai/tools/context";
 import { executeAiTool, getAvailableAiTools, AiToolError } from "@/features/ai/tools/executor";
-import { planAiToolCall } from "@/features/ai/tools/planner";
+import { planAiToolCall, validateAiToolPlan } from "@/features/ai/tools/planner";
 import { describeAiToolsForPrompt } from "@/features/ai/tools/registry";
 import type { AiAssistantCard, AiToolPlan } from "@/features/ai/tools/types";
 
@@ -57,7 +57,7 @@ export async function answerAssistantMessage(message: string): Promise<Assistant
   const tools = getAvailableAiTools(context);
   const heuristicPlan = planAiToolCall(message, context, tools);
   const modelPlan = heuristicPlan ? null : await planWithModel(message, describeAiToolsForPrompt(tools));
-  const plan = heuristicPlan ?? modelPlan;
+  const plan = validateAiToolPlan(message, context, tools, heuristicPlan ?? modelPlan);
 
   if (!plan) {
     const response: AssistantResponse = {

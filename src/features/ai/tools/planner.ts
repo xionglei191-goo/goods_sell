@@ -279,6 +279,76 @@ function planStaff(message: string, tools: readonly AiToolDefinition[]): AiToolP
   return toolPlan(tools, "business_overview", { period: /今天|今日/.test(message) ? "day" : "month" }, "经营总览") ?? null;
 }
 
+type CoreIntent =
+  | "purchase"
+  | "readiness"
+  | "payment"
+  | "price"
+  | "dealer_reject"
+  | "dealer_accept"
+  | "dealer_stock"
+  | "inventory_flow"
+  | "safe_stock"
+  | "order_status";
+
+function detectCoreIntent(message: string): CoreIntent | null {
+  if (isPurchaseIntent(message)) return "purchase";
+  if (/上线|发布|部署|就绪|还差|待决|配置检查|上线检查/.test(message)) return "readiness";
+  if (/登记|收款|回款|到账|收到/.test(message) && /HQ[A-Z0-9-]{6,}/i.test(message)) return "payment";
+  if (/涨价|降价|调价|改价|价格.*(改|调|设)|售价.*(改|调|设)/.test(message)) return "price";
+  if (/拒单|拒绝/.test(message)) return "dealer_reject";
+  if (/接单|接受/.test(message) && !/待接|新订单/.test(message)) return "dealer_accept";
+  if (/上报.*库存|库存.*上报|报库存|库存有|门店库存/.test(message)) return "dealer_stock";
+  if (/入库|出库/.test(message)) return "inventory_flow";
+  if (/安全库存|预警阈值/.test(message)) return "safe_stock";
+  if (/订单.*(确认|发货|送达|完成|取消|作废)|HQ\d+.*(确认|发货|送达|完成|取消|作废)/.test(message)) return "order_status";
+  return null;
+}
+
+function allowedToolsForIntent(intent: CoreIntent) {
+  switch (intent) {
+    case "purchase":
+      return new Set(["customer_submit_order", "orders_manual_order_draft", "search_products"]);
+    case "readiness":
+      return new Set(["system_launch_readiness"]);
+    case "payment":
+      return new Set(["finance_register_payment"]);
+    case "price":
+      return new Set(["admin_update_product_price"]);
+    case "dealer_reject":
+      return new Set(["dealer_reject_routing"]);
+    case "dealer_accept":
+      return new Set(["dealer_accept_routing"]);
+    case "dealer_stock":
+      return new Set(["dealer_report_stock"]);
+    case "inventory_flow":
+      return new Set(["inventory_stock_in", "inventory_stock_out"]);
+    case "safe_stock":
+      return new Set(["warehouse_update_safe_stock"]);
+    case "order_status":
+      return new Set(["order_status_action"]);
+  }
+}
+
+export function validateAiToolPlan(message: string, context: AiToolContext, tools: readonly AiToolDefinition[], plan: AiToolPlan | null): AiToolPlan | null {
+  if (!plan) return null;
+  const intent = detectCoreIntent(message);
+  if (!intent) return plan;
+
+  const allowedTools = allowedToolsForIntent(intent);
+  if (allowedTools.has(plan.toolName)) return plan;
+
+  const fallback = planAiToolCall(message, context, tools);
+  if (fallback && allowedTools.has(fallback.toolName)) {
+    return {
+      ...fallback,
+      reason: `${fallback.reason}；已拦截不匹配计划 ${plan.toolName}`,
+    };
+  }
+
+  return null;
+}
+
 export function planAiToolCall(message: string, context: AiToolContext, tools: readonly AiToolDefinition[]): AiToolPlan | null {
   if (context.role === "CONSUMER") return planConsumer(message, tools);
   if (context.role === "DEALER") return planDealer(message, tools);

@@ -1,6 +1,6 @@
 import { redactAiAuditValue } from "@/features/ai/tools/audit";
 import { aiTools, canRoleUseTool } from "@/features/ai/tools/registry";
-import { planAiToolCall } from "@/features/ai/tools/planner";
+import { planAiToolCall, validateAiToolPlan } from "@/features/ai/tools/planner";
 import { getLaunchReadinessReport } from "@/features/system/launch-readiness";
 import type { AiToolContext } from "@/features/ai/tools/types";
 
@@ -67,6 +67,13 @@ function main() {
   const staffOrderPlan = planAiToolCall("我要下单 1 箱剑兰春", context("ADMIN"), aiTools);
   assert(staffOrderPlan?.toolName === "orders_manual_order_draft", "员工侧下单意图应进入后台开单草稿，不能误命中经营总览");
 
+  const correctedStaffOrderPlan = validateAiToolPlan("我要下单 1 箱剑兰春", context("ADMIN"), aiTools, {
+    toolName: "business_overview",
+    args: { period: "month" },
+    reason: "模拟错误模型规划",
+  });
+  assert(correctedStaffOrderPlan?.toolName === "orders_manual_order_draft", "下单意图若被 AI 误规划为经营总览，应被计划校验层纠偏");
+
   const adminPlan = planAiToolCall("这个月张军业绩怎么样", context("ADMIN"), aiTools);
   assert(adminPlan?.toolName === "salesperson_performance", "管理员查询业绩应命中销售员业绩工具");
 
@@ -110,6 +117,13 @@ function main() {
   const dealerOrderPlan = planAiToolCall("我要下单 1 箱剑兰春", context("DEALER"), dealerTools);
   assert(dealerOrderPlan?.toolName === "search_products", "经销商侧下单意图应先进入商品查询，不能误命中经营总览");
   assert(dealerOrderPlan.args.query === "剑兰春", "经销商侧下单意图应清理商品名");
+
+  const correctedDealerOrderPlan = validateAiToolPlan("我要下单 1 箱剑兰春", context("DEALER"), dealerTools, {
+    toolName: "dealer_settlement_summary",
+    args: {},
+    reason: "模拟错误模型规划",
+  });
+  assert(correctedDealerOrderPlan?.toolName === "search_products", "经销商下单意图若被 AI 误规划为结算查询，应被计划校验层纠偏");
 
   const dealerStockPlan = planAiToolCall("把青岛经典啤酒门店库存上报为9", context("DEALER"), dealerTools);
   assert(dealerStockPlan?.toolName === "dealer_report_stock", "经销商库存上报应命中库存上报工具");
