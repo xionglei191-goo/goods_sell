@@ -115,6 +115,7 @@ export type AnyToolInput = Record<string, unknown> & {
   startsAt?: string;
   status: "ACTIVE" | "INACTIVE" | "OUT_OF_STOCK";
   stock: number;
+  sort?: "sales_desc" | "stock_desc" | "stock_asc";
   tag?: string;
   tags?: string[];
   targetTag?: string;
@@ -131,6 +132,9 @@ export type AiToolDefinition<TSchema extends z.ZodTypeAny = z.ZodTypeAny> = {
   name: string;
   title: string;
   description: string;
+  capabilities?: readonly string[];
+  examples?: readonly string[];
+  argumentHints?: string;
   inputSchema: TSchema;
   riskLevel: AiToolRiskLevel;
   access?: AiToolAccess;
@@ -157,4 +161,7 @@ export type AiToolPlan = {
   toolName: string;
   args: Record<string, unknown>;
   reason: string;
+  intent?: string;
+  confidence?: number;
+  missingSlots?: string[];
 };

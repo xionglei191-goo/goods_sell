@@ -1113,25 +1113,46 @@ export const aiTools: AiToolDefinition[] = [
     description: "查询商品销量、库存、毛利、滞销、缺货和价格。",
     riskLevel: "READ",
     access: { permission: "products:view" },
-    inputSchema: z.object({ query: z.string().trim().optional().default(""), limit: z.coerce.number().int().min(1).max(20).default(10) }),
+    inputSchema: z.object({
+      query: z.string().trim().optional().default(""),
+      limit: z.coerce.number().int().min(1).max(20).default(10),
+      sort: z.enum(["sales_desc", "stock_desc", "stock_asc"]).optional().default("sales_desc"),
+    }),
     handler: async (input) => {
-      const products = await prisma.product.findMany({
-        where: input.query
-          ? {
-              OR: [
-                { name: { contains: input.query, mode: "insensitive" } },
-                { sku: { contains: input.query, mode: "insensitive" } },
-                { brand: { name: { contains: input.query, mode: "insensitive" } } },
-              ],
-            }
-          : {},
-        include: { brand: { select: { name: true } } },
-        orderBy: [{ salesCount: "desc" }, { stock: "asc" }],
-        take: input.limit,
-      });
+      const where: Prisma.ProductWhereInput = input.query
+        ? {
+            OR: [
+              { name: { contains: input.query, mode: "insensitive" } },
+              { sku: { contains: input.query, mode: "insensitive" } },
+              { brand: { name: { contains: input.query, mode: "insensitive" } } },
+            ],
+          }
+        : {};
+      const orderBy: Prisma.ProductOrderByWithRelationInput[] =
+        input.sort === "stock_desc"
+          ? [{ stock: "desc" as const }, { salesCount: "desc" as const }]
+          : input.sort === "stock_asc"
+            ? [{ stock: "asc" as const }, { salesCount: "desc" as const }]
+            : [{ salesCount: "desc" as const }, { stock: "asc" as const }];
+      const [totalProducts, topStockProduct, products] = await Promise.all([
+        prisma.product.count({ where }),
+        prisma.product.findFirst({
+          where,
+          include: { brand: { select: { name: true } } },
+          orderBy: [{ stock: "desc" }, { salesCount: "desc" }],
+        }),
+        prisma.product.findMany({
+          where,
+          include: { brand: { select: { name: true } } },
+          orderBy,
+          take: input.limit,
+        }),
+      ]);
+      const sortText = input.sort === "stock_desc" ? "按库存从高到低" : input.sort === "stock_asc" ? "按库存从低到高" : "按销量优先";
+      const topStockText = topStockProduct ? `库存最多的是 ${topStockProduct.name}，当前库存 ${topStockProduct.stock}。` : "";
       return {
         title: "商品经营查询",
-        summary: products.length ? `返回 ${products.length} 个商品经营指标。` : "没有匹配商品。",
+        summary: products.length ? `当前匹配 ${totalProducts} 个商品，${topStockText}${sortText}返回 ${products.length} 个商品经营指标。` : "没有匹配商品。",
         details: products.map((product) => ({
           label: product.name,
           value: `${product.brand.name}｜库存 ${product.stock}/${product.safeStock}｜销量 ${product.salesCount}｜零售 ${money(Number(product.retailPrice))}｜毛利 ${money(Number(product.retailPrice) - Number(product.costPrice))}`,
@@ -2321,12 +2342,269 @@ export const aiTools: AiToolDefinition[] = [
   },
 ];
 
+type AiToolSemanticMetadata = Pick<AiToolDefinition, "capabilities" | "examples" | "argumentHints">;
+
+const aiToolSemanticMetadata: Record<string, AiToolSemanticMetadata> = {
+  search_products: {
+    capabilities: ["商品搜索", "查商品", "查价格", "查库存", "SKU 查询", "品牌规格查询"],
+    examples: ["查一下青岛经典啤酒", "HQ-BEER-001 多少钱", "有没有 500ml 啤酒"],
+    argumentHints: '{"query":"商品名/SKU/品牌/规格","limit":5}',
+  },
+  customer_context: {
+    capabilities: ["当前客户信息", "默认地址", "历史购买", "常用支付方式"],
+    examples: ["我的收货信息是什么", "我常买什么"],
+    argumentHints: "{}",
+  },
+  customer_submit_order: {
+    capabilities: ["客户下单", "购买商品", "要货", "补货", "生成订单确认卡"],
+    examples: ["我要下单 1 箱青岛经典啤酒", "来 2 件 HQ-BEER-001，微信支付"],
+    argumentHints: '{"productQuery":"商品名/SKU","quantity":1,"payMethod":"WECHAT"}',
+  },
+  customer_orders: {
+    capabilities: ["我的订单", "订单状态", "配送状态", "购买记录"],
+    examples: ["我的订单到哪了", "最近买了什么"],
+    argumentHints: '{"limit":5}',
+  },
+  customer_receivables: {
+    capabilities: ["我的欠款", "我的应收", "待付款", "账款"],
+    examples: ["我还有多少欠款", "哪些订单没付"],
+    argumentHints: "{}",
+  },
+  business_overview: {
+    capabilities: ["经营总览", "销售额", "订单数", "客户数", "回款", "毛利", "库存预警", "待处理事项"],
+    examples: ["这个月经营怎么样", "今天销售额和订单数", "现在有哪些待处理事项"],
+    argumentHints: '{"period":"month"}',
+  },
+  salesperson_performance: {
+    capabilities: ["销售员业绩", "业务员绩效", "销售转化", "报价转化", "成交", "销售排名", "客户数", "回款"],
+    examples: ["李明最近转化怎么样", "这个月李明业绩怎么样", "销售员排名如何"],
+    argumentHints: '{"salespersonName":"销售员姓名或手机号","period":"month"}',
+  },
+  search_customers: {
+    capabilities: ["客户查询", "查客户", "客户欠款", "归属销售员", "最近订单", "客户标签"],
+    examples: ["查一下张阿姨", "谁是李明名下客户", "欠款客户有哪些"],
+    argumentHints: '{"query":"客户姓名/手机号/标签/归属销售员","limit":8}',
+  },
+  customer_purchase_history: {
+    capabilities: ["客户购买历史", "买过什么", "最近购买", "消费记录", "采购记录"],
+    examples: ["张阿姨买了什么东西", "leige 最近买过哪些商品"],
+    argumentHints: '{"customerQuery":"客户姓名/手机号","limit":8}',
+  },
+  admin_create_customer: {
+    capabilities: ["新增客户", "创建客户", "录入客户", "客户建档"],
+    examples: ["新增客户张三 13900000000", "录入经销商客户"],
+    argumentHints: '{"name":"客户名","phone":"13900000000","customerType":"CONSUMER","creditLimit":0,"salesPersonQuery":"销售员手机号","tags":["标签"]}',
+  },
+  admin_update_customer_profile: {
+    capabilities: ["修改客户资料", "改客户姓名", "改客户手机号", "改信用额度"],
+    examples: ["把客户 13900000000 信用额度改成 1000"],
+    argumentHints: '{"customerQuery":"客户手机号/姓名","name":"新姓名","creditLimit":1000}',
+  },
+  admin_assign_customer_salesperson: {
+    capabilities: ["调整客户归属", "分配销售员", "客户转给业务员"],
+    examples: ["把张阿姨分给李明"],
+    argumentHints: '{"customerQuery":"客户手机号/姓名","salesPersonQuery":"销售员手机号/姓名"}',
+  },
+  admin_update_customer_tags: {
+    capabilities: ["客户标签", "追加标签", "移除标签", "替换标签"],
+    examples: ["给张阿姨加高价值标签"],
+    argumentHints: '{"customerQuery":"客户手机号/姓名","tags":["标签"],"mode":"add"}',
+  },
+  product_operations_summary: {
+    capabilities: ["商品经营", "库存总览", "库存排行", "库存最多", "低库存", "缺货", "销量排行", "滞销", "毛利", "商品价格"],
+    examples: ["现在库存有多少商品，哪个库存最多", "哪些商品快没货了", "销量最高的商品有哪些"],
+    argumentHints: '{"query":"商品名/SKU/品牌，可为空","limit":8,"sort":"stock_desc"}',
+  },
+  finance_summary: {
+    capabilities: ["财务摘要", "应收款", "欠款", "欠款最多", "账龄", "回款趋势", "客户对账", "收款"],
+    examples: ["谁欠款最多", "这个月回款怎么样", "应收账龄情况"],
+    argumentHints: '{"period":"month"}',
+  },
+  delivery_summary: {
+    capabilities: ["配送查询", "待发货", "配送中", "已送达", "异常订单", "物流"],
+    examples: ["现在有哪些待发货订单", "配送异常有哪些"],
+    argumentHints: "{}",
+  },
+  channel_summary: {
+    capabilities: ["渠道摘要", "经销商表现", "线索", "询价", "报价", "渠道冲突", "新品推送效果"],
+    examples: ["经销商线索怎么样", "最近渠道冲突有哪些"],
+    argumentHints: "{}",
+  },
+  admin_update_product_price: {
+    capabilities: ["商品调价", "涨价", "降价", "修改零售价", "改售价"],
+    examples: ["把 HQ-BEER-001 涨价 5 块", "把青岛经典啤酒价格改成 16"],
+    argumentHints: '{"productQuery":"商品名/SKU","newRetailPrice":19,"adjustRetailPrice":5}',
+  },
+  admin_update_product_status: {
+    capabilities: ["商品上下架", "上架", "下架", "售罄", "缺货状态"],
+    examples: ["把 HQ-BEER-001 下架", "青岛经典啤酒设为缺货"],
+    argumentHints: '{"productQuery":"商品名/SKU","status":"INACTIVE"}',
+  },
+  warehouse_update_safe_stock: {
+    capabilities: ["安全库存", "预警阈值", "库存预警"],
+    examples: ["把 HQ-BEER-001 安全库存设为 20"],
+    argumentHints: '{"productQuery":"商品名/SKU","safeStock":17}',
+  },
+  order_status_action: {
+    capabilities: ["订单状态", "确认订单", "发货", "送达", "完成订单", "取消订单"],
+    examples: ["订单 HQ20260430000007 发货", "取消订单 HQ20260430000007"],
+    argumentHints: '{"orderNo":"HQ...","action":"ship"}',
+  },
+  inventory_stock_in: {
+    capabilities: ["商品入库", "库存入库", "补库存", "加库存"],
+    examples: ["给 HQ-BEER-001 入库 2 件"],
+    argumentHints: '{"productQuery":"商品名/SKU","quantity":2,"remark":"备注"}',
+  },
+  inventory_stock_out: {
+    capabilities: ["商品出库", "库存出库", "扣库存"],
+    examples: ["给 HQ-BEER-001 出库 1 件"],
+    argumentHints: '{"productQuery":"商品名/SKU","quantity":1,"remark":"备注"}',
+  },
+  warehouse_create_stock_check: {
+    capabilities: ["盘点", "新建盘点", "库存盘点"],
+    examples: ["创建一张库存盘点"],
+    argumentHints: "{}",
+  },
+  finance_register_payment: {
+    capabilities: ["登记收款", "登记回款", "订单到账", "核销收款"],
+    examples: ["给订单 HQAI-FIN-15348961 登记收款 1 元"],
+    argumentHints: '{"customerQuery":"客户手机号","orderNo":"HQ...","amount":5,"method":"TRANSFER"}',
+  },
+  receipts_issue_invoice: {
+    capabilities: ["开票", "发票", "普票", "专票", "税号"],
+    examples: ["给订单 HQBROWSERINV166053 开普票，购方测试公司"],
+    argumentHints: '{"orderNo":"HQ...","type":"NORMAL","buyerName":"购方名称","buyerTaxNo":"税号"}',
+  },
+  settings_create_staff_user: {
+    capabilities: ["创建员工", "新增账号", "后台账号"],
+    examples: ["创建仓管员工李四 13900000000 密码 AiFull456"],
+    argumentHints: '{"name":"员工姓名","phone":"13900000000","role":"WAREHOUSE","password":"至少6位"}',
+  },
+  settings_set_staff_status: {
+    capabilities: ["启用员工", "禁用员工", "停用账号", "恢复账号"],
+    examples: ["禁用员工 13900139088"],
+    argumentHints: '{"userQuery":"员工手机号/姓名","isActive":false}',
+  },
+  settings_reset_staff_password: {
+    capabilities: ["重置密码", "修改员工密码"],
+    examples: ["重置员工 13900139088 密码为 AiFull456"],
+    argumentHints: '{"userQuery":"员工手机号/姓名","password":"至少6位"}',
+  },
+  settings_save_business_config: {
+    capabilities: ["业务参数", "修改配置", "起送金额", "拒单限制"],
+    examples: ["把 bulkOrderAmount 调整为 999"],
+    argumentHints: '{"key":"bulkOrderAmount","value":999}',
+  },
+  system_launch_readiness: {
+    capabilities: ["上线检查", "发布检查", "部署配置", "还差什么", "就绪状态"],
+    examples: ["现在上线还差什么配置", "发布前还有哪些阻塞项"],
+    argumentHints: "{}",
+  },
+  admin_approve_dealer_application: {
+    capabilities: ["审核经销商", "通过经销商申请", "经销商入驻"],
+    examples: ["通过 13900000000 的经销商申请"],
+    argumentHints: '{"leadQuery":"申请人手机号","shopName":"门店名","zone":"雨湖区","latitude":27.8297,"longitude":112.9441,"serviceRadius":3000,"businessLicense":"TEST-LICENSE","salesPersonQuery":"销售员手机号","notes":"备注"}',
+  },
+  admin_reject_dealer_application: {
+    capabilities: ["驳回经销商申请", "拒绝入驻"],
+    examples: ["驳回 13900000000 的经销商申请，原因资料不全"],
+    argumentHints: '{"leadQuery":"申请人手机号","reason":"驳回原因"}',
+  },
+  admin_update_dealer_policy: {
+    capabilities: ["经销商政策", "起送金额", "价格等级", "跨区", "拒单规则", "优先级"],
+    examples: ["调整某经销商起送金额为 100"],
+    argumentHints: '{"dealerQuery":"经销商门店/手机号","minOrderAmount":100,"priceLevel":"WHOLESALE","allowCrossZone":true,"allowReject":true,"priority":2}',
+  },
+  admin_set_dealer_accepting: {
+    capabilities: ["经销商接单状态", "暂停接单", "启用接单"],
+    examples: ["暂停某经销商接单"],
+    argumentHints: '{"dealerQuery":"经销商门店/手机号","isActive":false}',
+  },
+  admin_dealer_conflicts: {
+    capabilities: ["经销商冲突", "拒单冲突", "渠道冲突"],
+    examples: ["查看某经销商最近冲突"],
+    argumentHints: '{"dealerQuery":"经销商门店/手机号","limit":8}',
+  },
+  marketing_create_coupon: {
+    capabilities: ["创建优惠券", "新增优惠券", "营销券"],
+    examples: ["创建满 100 减 10 优惠券 20 张"],
+    argumentHints: '{"name":"优惠券名","couponType":"AMOUNT","amount":10,"threshold":100,"totalQuantity":20}',
+  },
+  marketing_issue_coupon: {
+    capabilities: ["发券", "批量发优惠券", "按标签发券"],
+    examples: ["给高价值客户发 10 元券"],
+    argumentHints: '{"couponQuery":"优惠券名","tag":"客户标签"}',
+  },
+  marketing_create_product_push: {
+    capabilities: ["新品推送", "产品推送", "商品推送", "按标签推送"],
+    examples: ["把 HQ-BEER-001 推送给高价值人群，话术新品试饮"],
+    argumentHints: '{"productQuery":"商品名/SKU","targetTag":"客户标签","message":"推送话术"}',
+  },
+  dealer_incoming_orders: {
+    capabilities: ["经销商待接订单", "新订单", "待接单"],
+    examples: ["有哪些待接订单"],
+    argumentHints: "{}",
+  },
+  dealer_report_stock: {
+    capabilities: ["经销商上报库存", "门店库存", "报库存", "库存有多少"],
+    examples: ["上报 HQ-BEER-001 门店库存 9 件"],
+    argumentHints: '{"productQuery":"商品名/SKU","stock":9}',
+  },
+  dealer_settlement_summary: {
+    capabilities: ["经销商结算", "佣金", "经销商账款"],
+    examples: ["我的结算怎么样", "本月佣金多少"],
+    argumentHints: "{}",
+  },
+  dealer_accept_routing: {
+    capabilities: ["经销商接单", "接受订单"],
+    examples: ["接单 HQ20260430000007"],
+    argumentHints: '{"routingId":"订单号或routingId"}',
+  },
+  dealer_reject_routing: {
+    capabilities: ["经销商拒单", "拒绝订单"],
+    examples: ["拒单 HQ20260430000008 原因太远"],
+    argumentHints: '{"routingId":"订单号或routingId","reason":"拒单原因"}',
+  },
+  admin_create_product_draft: {
+    capabilities: ["新增商品草稿", "创建产品草稿"],
+    examples: ["新增一款 500ml 啤酒，零售价 12"],
+    argumentHints: '{"text":"商品口述内容"}',
+  },
+  orders_manual_order_draft: {
+    capabilities: ["后台开单草稿", "帮客户开单", "员工下单"],
+    examples: ["帮客户开单 1 箱青岛经典啤酒"],
+    argumentHints: '{"text":"开单口述内容"}',
+  },
+  marketing_coupon_draft: {
+    capabilities: ["优惠券草稿", "优惠券活动"],
+    examples: ["做一个满 100 减 10 的优惠券活动"],
+    argumentHints: '{"text":"优惠券活动口述内容"}',
+  },
+  marketing_product_push_draft: {
+    capabilities: ["新品推送草稿", "产品推送草稿"],
+    examples: ["整理一个新品推送给高价值客户"],
+    argumentHints: '{"text":"新品推送口述内容"}',
+  },
+};
+
+for (const tool of aiTools) {
+  const metadata = aiToolSemanticMetadata[tool.name];
+  if (metadata) Object.assign(tool, metadata);
+}
+
 export function getAiToolByName(name: string) {
   return aiTools.find((tool) => tool.name === name) ?? null;
 }
 
+function describeAiToolForPrompt(tool: AiToolDefinition) {
+  const capabilities = tool.capabilities?.length ? `；能力：${tool.capabilities.join("、")}` : "";
+  const examples = tool.examples?.length ? `；示例：${tool.examples.join(" / ")}` : "";
+  const argumentHints = tool.argumentHints ? `；参数：${tool.argumentHints}` : "";
+  return `${tool.name}: ${tool.title}。${tool.description} [${tool.riskLevel}]${capabilities}${examples}${argumentHints}`;
+}
+
 export function describeAiToolsForPrompt(tools: readonly AiToolDefinition[]) {
-  return tools.map((tool) => `${tool.name}: ${tool.description} [${tool.riskLevel}]`).join("\n");
+  return tools.map(describeAiToolForPrompt).join("\n");
 }
 
 export function canRoleUseTool(role: AiToolContext["role"], toolName: string) {

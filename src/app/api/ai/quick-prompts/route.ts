@@ -1,4 +1,4 @@
-import { getAiQuickPromptsForContext } from "@/features/ai/intent-templates";
+import { getVerifiedQuickPrompts } from "@/features/ai/intent-templates";
 import { AiAuthError, getAiToolContext } from "@/features/ai/tools/context";
 import { getAvailableAiTools } from "@/features/ai/tools/executor";
 
@@ -9,7 +9,7 @@ export async function GET() {
   try {
     const context = await getAiToolContext();
     const tools = getAvailableAiTools(context);
-    return Response.json({ role: context.role, prompts: getAiQuickPromptsForContext(context, tools) });
+    return Response.json({ role: context.role, prompts: await getVerifiedQuickPrompts(context, tools) });
   } catch (error) {
     if (error instanceof AiAuthError) {
       return Response.json({ role: null, prompts: [] });

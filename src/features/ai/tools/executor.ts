@@ -115,6 +115,29 @@ export function getAvailableAiTools(context: AiToolContext) {
   return aiTools.filter((tool) => canUseAiTool(context, tool));
 }
 
+export async function preflightAiTool(tool: AiToolDefinition, args: Record<string, unknown>, context: AiToolContext) {
+  if (!canUseAiTool(context, tool)) {
+    throw new AiToolError("无权限查看或操作该事项", 403);
+  }
+
+  const parsed = tool.inputSchema.safeParse(args);
+  if (!parsed.success) {
+    throw new AiToolError(parsed.error.issues[0]?.message ?? "工具参数不完整", 400);
+  }
+
+  const parsedInput = parsed.data as AnyToolInput;
+  const dynamicPermission = tool.resolvePermission?.(parsedInput, context);
+  if (dynamicPermission && !roleHasPermission(context.role, dynamicPermission)) {
+    throw new AiToolError("无权限查看或操作该事项", 403);
+  }
+
+  if (needsConfirmation(tool)) {
+    await buildPendingAction(tool, args, context);
+  }
+
+  return { ok: true as const, parsedInput };
+}
+
 async function auditToolCall(params: {
   tool: AiToolDefinition;
   action: string;

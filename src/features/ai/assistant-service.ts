@@ -1,54 +1,25 @@
-import { callAnthropicCompatible, hasAiProvider } from "@/features/ai/provider";
-import { planFixedAiToolCall } from "@/features/ai/intent-templates";
+import { planVerifiedQuickPrompt } from "@/features/ai/intent-templates";
 import { recordAiPromptUsage, type AiPlanSource } from "@/features/ai/prompt-usage";
 import { auditAiAssistant } from "@/features/ai/tools/audit";
 import { getAiToolContext } from "@/features/ai/tools/context";
-import { executeAiTool, getAvailableAiTools, AiToolError } from "@/features/ai/tools/executor";
+import { executeAiTool, getAvailableAiTools, AiToolError, preflightAiTool } from "@/features/ai/tools/executor";
+import { buildClarificationResponse, planWithModelV2, rankAiToolsForMessage, repairModelPlan, type RankedAiTool } from "@/features/ai/tools/model-planner";
 import { planAiToolCall, validateAiToolPlan } from "@/features/ai/tools/planner";
-import { describeAiToolsForPrompt } from "@/features/ai/tools/registry";
 import type { AiAssistantCard, AiToolDefinition, AiToolPlan } from "@/features/ai/tools/types";
 
 type AssistantResponse = {
   answer: string;
   card: AiAssistantCard | null;
   plan: AiToolPlan | null;
+  planSource: AiPlanSource;
 };
 
-function extractJsonObject(text: string) {
-  const fenced = text.match(/```json\s*([\s\S]*?)```/i)?.[1];
-  const raw = fenced ?? text.match(/\{[\s\S]*\}/)?.[0] ?? "";
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as { toolName?: string; args?: Record<string, unknown>; reason?: string };
-  } catch {
-    return null;
-  }
-}
-
-async function planWithModel(message: string, tools: readonly AiToolDefinition[]): Promise<AiToolPlan | null> {
-  if (!hasAiProvider()) return null;
-  try {
-    const toolsText = describeAiToolsForPrompt(tools);
-    const toolNames = tools.map((tool) => tool.name).join(", ");
-    const text = await callAnthropicCompatible({
-      maxTokens: 512,
-      system:
-        `你是业务系统的工具规划器。只返回 JSON，不要解释。JSON 格式：{"toolName":"工具名","args":{},"reason":"原因"}。toolName 必须逐字复制可用工具名之一，不能缩写、翻译或自造别名。可用工具名全集：${toolNames}。如果没有合适工具，toolName 为空字符串。区分意图：用户自己说“我要下单/帮客户开单/要 N 箱”才是下单或开单；“某客户买了什么/买过什么/购买记录”是客户购买历史查询，不能规划成开单草稿或经营总览。`,
-      messages: [
-        {
-          role: "user",
-          content: `可用工具：\n${toolsText}\n\n用户请求：${message}`,
-        },
-      ],
-    });
-    const parsed = extractJsonObject(text);
-    if (!parsed?.toolName) return null;
-    if (!tools.some((tool) => tool.name === parsed.toolName)) return null;
-    return { toolName: parsed.toolName, args: parsed.args ?? {}, reason: parsed.reason ?? "模型规划" };
-  } catch {
-    return null;
-  }
-}
+type AssistantRequest = {
+  message: string;
+  quickPromptId?: string;
+  pathname?: string;
+  onStatus?: (text: string) => void | Promise<void>;
+};
 
 function answerForExecution(execution: Awaited<ReturnType<typeof executeAiTool>>) {
   if (execution.status === "needs_confirmation") {
@@ -57,35 +28,115 @@ function answerForExecution(execution: Awaited<ReturnType<typeof executeAiTool>>
   return execution.result.summary;
 }
 
-export async function answerAssistantMessage(message: string): Promise<AssistantResponse> {
+async function validateAssistantPlan(
+  message: string,
+  context: Awaited<ReturnType<typeof getAiToolContext>>,
+  tools: readonly AiToolDefinition[],
+  plan: AiToolPlan | null,
+) {
+  if (!plan) return { plan: null, corrected: false, error: "没有形成工具计划" };
+  const tool = tools.find((item) => item.name === plan.toolName);
+  if (!tool) return { plan: null, corrected: false, error: `当前角色不可使用工具 ${plan.toolName}` };
+
+  const intentValidatedPlan = validateAiToolPlan(message, context, tools, plan);
+  if (!intentValidatedPlan) return { plan: null, corrected: false, error: `计划 ${plan.toolName} 与用户意图不匹配` };
+
+  const validatedTool = tools.find((item) => item.name === intentValidatedPlan.toolName);
+  if (!validatedTool) return { plan: null, corrected: false, error: `当前角色不可使用工具 ${intentValidatedPlan.toolName}` };
+
+  try {
+    const preflight = await preflightAiTool(validatedTool, intentValidatedPlan.args, context);
+    return {
+      plan: { ...intentValidatedPlan, args: preflight.parsedInput as Record<string, unknown> },
+      corrected: intentValidatedPlan.toolName !== plan.toolName,
+      error: null,
+    };
+  } catch (error) {
+    return {
+      plan: null,
+      corrected: intentValidatedPlan.toolName !== plan.toolName,
+      error: error instanceof Error ? error.message : "工具预检失败",
+    };
+  }
+}
+
+function noPlanResponse(message: string, rankedTools: readonly RankedAiTool[], missingSlots: readonly string[], planSource: AiPlanSource, reason?: string): AssistantResponse {
+  const clarification = buildClarificationResponse(message, rankedTools, missingSlots, reason);
+  return {
+    answer: clarification.answer,
+    card: clarification.card,
+    plan: null,
+    planSource,
+  };
+}
+
+export async function answerAssistantMessage(input: string | AssistantRequest): Promise<AssistantResponse> {
+  const message = typeof input === "string" ? input : input.message;
+  const quickPromptId = typeof input === "string" ? undefined : input.quickPromptId;
+  const onStatus = typeof input === "string" ? undefined : input.onStatus;
   const context = await getAiToolContext();
   const tools = getAvailableAiTools(context);
-  const fixedPlan = planFixedAiToolCall(message, context, tools);
-  const heuristicPlan = fixedPlan ? null : planAiToolCall(message, context, tools);
-  const modelPlan = fixedPlan || heuristicPlan ? null : await planWithModel(message, tools);
-  const selectedPlan = fixedPlan ?? heuristicPlan ?? modelPlan;
-  const plan = validateAiToolPlan(message, context, tools, selectedPlan);
-  const source: AiPlanSource = fixedPlan
-    ? "template"
-    : heuristicPlan
-      ? "heuristic"
-      : modelPlan && plan?.toolName !== modelPlan.toolName
-        ? "correction"
-        : modelPlan
-          ? "model"
-          : "no_plan";
+  const rankedTools = rankAiToolsForMessage(message, context, tools);
+  let plan: AiToolPlan | null = null;
+  let source: AiPlanSource = "no_plan";
+  let missingSlots: string[] = [];
+  let lastPlanError: string | undefined;
+
+  const emitStatus = async (text: string) => {
+    await onStatus?.(text);
+  };
+
+  if (quickPromptId) {
+    await emitStatus("正在验证固定词条...");
+    plan = await planVerifiedQuickPrompt(quickPromptId, context, tools);
+    source = plan ? "template" : "no_plan";
+  } else {
+    await emitStatus("正在筛选工具...");
+    await emitStatus("正在规划参数...");
+    const modelResult = await planWithModelV2(message, context, tools);
+    missingSlots = modelResult.missingSlots;
+    if (modelResult.plan) {
+      await emitStatus("正在校验计划...");
+      const validation = await validateAssistantPlan(message, context, tools, modelResult.plan);
+      if (validation.plan) {
+        plan = validation.plan;
+        source = validation.corrected ? "correction" : "model";
+      } else {
+        lastPlanError = validation.error ?? modelResult.error;
+        await emitStatus("正在修复计划...");
+        const repairedResult = await repairModelPlan(message, context, tools, modelResult.plan, lastPlanError ?? "计划校验失败");
+        missingSlots = repairedResult.missingSlots.length ? repairedResult.missingSlots : missingSlots;
+        if (repairedResult.plan) {
+          const repairedValidation = await validateAssistantPlan(message, context, tools, repairedResult.plan);
+          if (repairedValidation.plan) {
+            plan = repairedValidation.plan;
+            source = "correction";
+          } else {
+            lastPlanError = repairedValidation.error ?? repairedResult.error ?? lastPlanError;
+          }
+        } else {
+          lastPlanError = repairedResult.error ?? lastPlanError;
+        }
+      }
+    } else {
+      lastPlanError = modelResult.error;
+    }
+
+    if (!plan) {
+      await emitStatus("正在尝试本地规则...");
+      const heuristicPlan = planAiToolCall(message, context, tools);
+      const heuristicValidation = await validateAssistantPlan(message, context, tools, heuristicPlan);
+      if (heuristicValidation.plan) {
+        plan = heuristicValidation.plan;
+        source = "heuristic";
+      } else {
+        lastPlanError = heuristicValidation.error ?? lastPlanError;
+      }
+    }
+  }
 
   if (!plan) {
-    const response: AssistantResponse = {
-      answer: `我可以帮你处理这些事：${tools.slice(0, 6).map((tool) => tool.title).join("、")}。你可以直接说“查库存”“这个月张军业绩怎么样”或“我要下单 1 箱某商品”。`,
-      card: {
-        kind: "result",
-        title: "可用 AI 工具",
-        summary: `当前角色可用 ${tools.length} 个工具。`,
-        details: tools.slice(0, 10).map((tool) => ({ label: tool.title, value: tool.description })),
-      },
-      plan: null,
-    };
+    const response = noPlanResponse(message, rankedTools, missingSlots, source, lastPlanError);
     await auditAiAssistant({
       action: "AI 未命中工具",
       summary: `用户请求未命中可执行工具：${message.slice(0, 80)}`,
@@ -98,11 +149,14 @@ export async function answerAssistantMessage(message: string): Promise<Assistant
   }
 
   try {
+    await emitStatus("正在调用工具...");
     const execution = await executeAiTool(plan.toolName, plan.args, context);
+    await emitStatus(execution.status === "needs_confirmation" ? "正在生成确认卡..." : "正在整理结果...");
     const response: AssistantResponse = {
       answer: answerForExecution(execution),
       card: execution.card,
       plan,
+      planSource: source,
     };
     await auditAiAssistant({
       action: execution.status === "needs_confirmation" ? "AI 生成确认卡片" : "AI 执行工具完成",
@@ -134,6 +188,7 @@ export async function answerAssistantMessage(message: string): Promise<Assistant
           details: [{ label: "原因", value: error.status === 403 ? "权限不足" : "参数或业务条件不满足" }],
         },
         plan,
+        planSource: source,
       };
     }
     const messageText = error instanceof Error ? error.message : "AI 助手暂时无法完成这个操作";
@@ -155,6 +210,7 @@ export async function answerAssistantMessage(message: string): Promise<Assistant
         details: [],
       },
       plan,
+      planSource: source,
     };
   }
 }

@@ -116,9 +116,9 @@ function parseDealerStockReport(message: string) {
 }
 
 function parseSalespersonName(message: string) {
-  const explicit = message.match(/(?:这个月|本月|今天|最近|查一下|看看)?\s*([\u4e00-\u9fa5]{2,6})\s*的?业绩/);
+  const explicit = message.match(/(?:这个月|本月|今天|最近|查一下|看看|销售员|业务员)?\s*([\u4e00-\u9fa5]{2,4}?)\s*(?:最近|这个月|本月|今天)?的?(?:业绩|绩效|转化|成交|销售结果)/);
   if (explicit?.[1]) return explicit[1];
-  const after = message.match(/业绩.*?([\u4e00-\u9fa5]{2,6})/);
+  const after = message.match(/(?:业绩|绩效|转化|成交).*?([\u4e00-\u9fa5]{2,6})/);
   return after?.[1] ?? "";
 }
 
@@ -195,6 +195,28 @@ function parseProductPush(message: string) {
     productQuery,
     targetTag,
     ...(pushMessage ? { message: pushMessage } : {}),
+  };
+}
+
+function isProductOperationsIntent(message: string) {
+  return /库存|销量|滞销|缺货|商品|毛利/.test(message);
+}
+
+function isGlobalInventoryQuestion(message: string) {
+  return /库存/.test(message) && /多少|几|哪个|哪款|最多|最少|排行|排名|总数|所有|全部|现在|目前/.test(message);
+}
+
+function productOperationsArgs(message: string) {
+  const sort =
+    /库存.*(最多|最高|排行|排名)|(?:哪个|哪款|谁).*库存.*(?:最多|最高)/.test(message)
+      ? "stock_desc"
+      : /库存.*(最少|最低|缺货|预警|低库存|快没货|快缺货)|(?:哪个|哪款|谁).*库存.*(?:最少|最低)|低库存|快没货|快缺货/.test(message)
+        ? "stock_asc"
+        : undefined;
+  return {
+    query: isGlobalInventoryQuestion(message) ? "" : message,
+    limit: 8,
+    ...(sort ? { sort } : {}),
   };
 }
 
@@ -347,7 +369,7 @@ function planStaff(message: string, tools: readonly AiToolDefinition[]): AiToolP
   if (/开.*票|发票/.test(message) && /HQ[A-Z0-9-]{6,}/i.test(message)) {
     return toolPlan(tools, "receipts_issue_invoice", parseInvoiceIssue(message), "财务开票");
   }
-  if (/业绩|绩效/.test(message)) {
+  if (/业绩|绩效|转化|成交|销售结果/.test(message)) {
     return toolPlan(tools, "salesperson_performance", { salespersonName: parseSalespersonName(message), period: /今天|今日/.test(message) ? "day" : "month" }, "查询销售员业绩");
   }
   if (/涨价|降价|调价|改价|价格.*(改|调|设)|售价.*(改|调|设)/.test(message)) {
@@ -407,13 +429,16 @@ function planStaff(message: string, tools: readonly AiToolDefinition[]): AiToolP
   if (/客户|欠款客户|归属/.test(message)) {
     return toolPlan(tools, "search_customers", { query: message, limit: 8 }, "客户查询");
   }
-  if (/库存|销量|滞销|缺货|商品/.test(message)) {
-    return toolPlan(tools, "product_operations_summary", { query: message, limit: 8 }, "商品经营查询");
+  if (isProductOperationsIntent(message)) {
+    return toolPlan(tools, "product_operations_summary", productOperationsArgs(message), "商品经营查询");
   }
   if (/经销商|线索|询价|报价|渠道|冲突|新品推送/.test(message)) {
     return toolPlan(tools, "channel_summary", {}, "渠道查询");
   }
-  return toolPlan(tools, "business_overview", { period: /今天|今日/.test(message) ? "day" : "month" }, "经营总览") ?? null;
+  if (/经营|总览|概览|看板|数据|销售额|订单数|客户数|毛利|待处理|这个月|本月|今天|今日|最近.*怎么样/.test(message)) {
+    return toolPlan(tools, "business_overview", { period: /今天|今日/.test(message) ? "day" : "month" }, "经营总览");
+  }
+  return null;
 }
 
 type CoreIntent =
@@ -431,6 +456,9 @@ type CoreIntent =
   | "staff_create"
   | "staff_status"
   | "staff_password"
+  | "finance_summary"
+  | "salesperson_performance"
+  | "product_operations"
   | "product_push"
   | "invoice";
 
@@ -443,10 +471,13 @@ function detectCoreIntent(message: string): CoreIntent | null {
   if (/重置.*密码|密码.*重置|改.*密码/.test(message) && /员工|账号|1[3-9]\d{9}/.test(message)) return "staff_password";
   if (/登记|收款|回款|到账|收到/.test(message) && /HQ[A-Z0-9-]{6,}/i.test(message)) return "payment";
   if (/开.*票|发票/.test(message) && /HQ[A-Z0-9-]{6,}/i.test(message)) return "invoice";
+  if (/业绩|绩效|转化|成交|销售结果/.test(message)) return "salesperson_performance";
   if (/涨价|降价|调价|改价|价格.*(改|调|设)|售价.*(改|调|设)/.test(message)) return "price";
+  if (/应收|回款|欠款|财务|收款|账龄|对账/.test(message)) return "finance_summary";
   if (/拒单|拒绝/.test(message)) return "dealer_reject";
   if (/接单|接受/.test(message) && !/待接|新订单/.test(message)) return "dealer_accept";
-  if (/上报.*库存|库存.*上报|报库存|库存有|门店库存/.test(message)) return "dealer_stock";
+  if (/上报.*库存|库存.*上报|报库存|门店库存.*(?:上报|报为|设为|设置为|\d+)/.test(message)) return "dealer_stock";
+  if (isProductOperationsIntent(message)) return "product_operations";
   if (/入库|出库/.test(message)) return "inventory_flow";
   if (/安全库存|预警阈值/.test(message)) return "safe_stock";
   if (/订单.*(确认|发货|送达|完成|取消|作废)|HQ\d+.*(确认|发货|送达|完成|取消|作废)/.test(message)) return "order_status";
@@ -486,6 +517,12 @@ function allowedToolsForIntent(intent: CoreIntent) {
       return new Set(["settings_set_staff_status"]);
     case "staff_password":
       return new Set(["settings_reset_staff_password"]);
+    case "finance_summary":
+      return new Set(["finance_summary"]);
+    case "salesperson_performance":
+      return new Set(["salesperson_performance"]);
+    case "product_operations":
+      return new Set(["product_operations_summary"]);
     case "product_push":
       return new Set(["marketing_create_product_push", "marketing_product_push_draft"]);
   }
@@ -497,7 +534,12 @@ export function validateAiToolPlan(message: string, context: AiToolContext, tool
   if (!intent) return plan;
 
   const allowedTools = allowedToolsForIntent(intent);
-  if (allowedTools.has(plan.toolName)) return plan;
+  if (allowedTools.has(plan.toolName)) {
+    if (intent === "product_operations" && plan.toolName === "product_operations_summary") {
+      return planAiToolCall(message, context, tools) ?? plan;
+    }
+    return plan;
+  }
 
   const fallback = planAiToolCall(message, context, tools);
   if (fallback && allowedTools.has(fallback.toolName)) {

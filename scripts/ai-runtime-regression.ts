@@ -1,6 +1,7 @@
 import { loadEnvConfig } from "@next/env";
 
 import { executeAiTool, AiToolError } from "@/features/ai/tools/executor";
+import { buildClarificationResponse, rankAiToolsForMessage } from "@/features/ai/tools/model-planner";
 import { planAiToolCall } from "@/features/ai/tools/planner";
 import { aiTools, canRoleUseTool } from "@/features/ai/tools/registry";
 import { prisma } from "@/lib/prisma";
@@ -93,6 +94,12 @@ async function main() {
 
   const blockedWarehouseHistoryPlan = planAiToolCall("张阿姨买了什么东西", warehouseUserContext, warehouseTools);
   assert(!blockedWarehouseHistoryPlan, "仓管查询客户购买历史不应被规划到任何可用工具");
+
+  const vaguePlan = planAiToolCall("帮我处理一下", salesContext, salesTools);
+  const vagueClarification = buildClarificationResponse("帮我处理一下", rankAiToolsForMessage("帮我处理一下", salesContext, salesTools));
+  assert(!vaguePlan, "低置信问题不应被启发式兜底成可执行工具");
+  assert(vagueClarification.card.kind === "result" && vagueClarification.card.title === "需要补充信息", "低置信问题应返回澄清卡片");
+  assert(!vagueClarification.answer.includes("可用 AI 工具"), "低置信澄清不应回退为工具清单");
 
   console.log("AI runtime regression passed");
 }

@@ -523,3 +523,34 @@
 - [x] 更新 `.env.example`：补充税控接口和酒类经营资质环境变量。
 - [x] 扩展 AI tools smoke：覆盖上线就绪 tool、权限过滤和完整配置 READY 场景。
 - [x] 复核 `todo.md`：当前无 `- [ ]` 未完成任务，剩余外部资质/密钥全部纳入上线检查。
+
+---
+
+## Phase 13：AI 助手固定词条与真实 AI 介入优化（2026-05-01）
+
+> 目标：固定词条必须经过当前数据与 tool 预检后才展示；普通自然语言优先让真实 AI provider 规划，再由本地规则校验和兜底。
+
+- [x] 固定词条改为动态候选：使用当前上架商品、当前销售员、经销商待接订单等真实数据生成。
+- [x] 新增 `preflightAiTool`：只做权限、schema、动态权限与确认卡预检，不执行写入 handler。
+- [x] `/api/ai/quick-prompts` 只返回 `verified: true` 的 READY 词条，隐藏预检失败词条。
+- [x] `/api/ai/assistant` 支持 `quickPromptId` 和 `pathname`，固定词条点击后服务端重新验证再执行。
+- [x] 普通自然语言调整为 provider 优先规划，provider 不可用或规划无效时再回退本地启发式。
+- [x] SSE 增加 `status` 事件，`done` 返回 `planSource`，前端显示阶段状态并用短标签展示固定词条。
+- [x] 新增 `npm run test:ai-quick-prompts`：验证不存在商品不展示、真实商品词条可用、写操作未确认不落库。
+- [x] 更新 `docs/13-AI工具与代办助手.md`：补充固定词条上线规则与 provider 优先策略。
+
+---
+
+## Phase 14：AI Planner v2 通用意图理解与工具编排（2026-05-01）
+
+> 目标：减少为单个问题补正则的情况，让普通自然语言先通过工具语义排序、真实 AI 规划、预检和修复形成可执行 plan，低置信时返回澄清卡。
+
+- [x] `AiToolDefinition` 增加 `capabilities`、`examples`、`argumentHints`，并在 tool registry 中补齐核心工具语义元数据。
+- [x] 新增 Planner v2 工具排序与 prompt 描述：按当前角色可用 tools 进行 top-k 候选筛选，再交给 provider 规划。
+- [x] 模型规划输出升级为 `intent/toolName/args/confidence/missingSlots/reason`，支持低置信和缺槽位澄清。
+- [x] provider plan 增加 schema、权限、动态权限、核心意图和确认卡预检；失败后带原因进行一次模型修复。
+- [x] 本地 planner 继续作为兜底，并补齐库存总览/低库存、欠款排行、销售员转化、上下架等高置信回归。
+- [x] AI 气泡 SSE 状态细化为工具筛选、参数规划、计划校验、计划修复、工具调用、确认卡/结果整理。
+- [x] 低置信问题返回“需要补充信息”卡片，不再展示大段可用工具清单。
+- [x] 扩展 `npm run test:ai-tools`、`npm run test:ai-runtime`、`npm run test:ai-provider` 覆盖 Planner v2 场景。
+- [x] 更新 `docs/13-AI工具与代办助手.md`：记录 Planner v2 链路、扩展新 tool 规范和验收标准。

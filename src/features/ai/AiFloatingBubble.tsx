@@ -50,6 +50,7 @@ type AiQuickPrompt = {
   text: string;
   toolName: string;
   riskLevel: "READ" | "DRAFT" | "WRITE" | "HIGH_RISK";
+  verified?: true;
 };
 
 type AiFloatingBubbleProps = {
@@ -66,7 +67,7 @@ function parseEvent(event: string) {
   const eventName = event.split("\n").find((line) => line.startsWith("event: "))?.slice(7) ?? "message";
   const dataLine = event.split("\n").find((line) => line.startsWith("data: "));
   if (!dataLine) return null;
-  return { eventName, data: JSON.parse(dataLine.slice(6)) as { text?: string; message?: string; card?: AiAssistantCard } };
+  return { eventName, data: JSON.parse(dataLine.slice(6)) as { text?: string; message?: string; card?: AiAssistantCard; planSource?: string } };
 }
 
 function CardView({ card, onConfirm, isPending }: { card: AiAssistantCard; onConfirm: (action: AiPendingAction, confirmText: string) => void; isPending: boolean }) {
@@ -161,25 +162,30 @@ export function AiFloatingBubble({ className, contextLabel = "AI 助手" }: AiFl
     setMessages((current) => current.map((item) => (item.id === assistantIdRef.current ? { ...item, content: item.content || text } : item)));
   }
 
+  function replaceAssistantText(text: string) {
+    setMessages((current) => current.map((item) => (item.id === assistantIdRef.current ? { ...item, content: text } : item)));
+  }
+
   function attachCard(card: AiAssistantCard) {
     setMessages((current) => current.map((item) => (item.id === assistantIdRef.current ? { ...item, card } : item)));
   }
 
-  function send(question = input) {
+  function send(question = input, quickPrompt?: AiQuickPrompt) {
     const content = question.trim();
     if (!content || isPending) return;
     setError(null);
     setInput("");
     const assistantId = `a-${Date.now()}`;
     assistantIdRef.current = assistantId;
-    setMessages((current) => [...current, { id: `u-${Date.now()}`, role: "USER", content }, { id: assistantId, role: "ASSISTANT", content: "" }]);
+    setMessages((current) => [...current, { id: `u-${Date.now()}`, role: "USER", content }, { id: assistantId, role: "ASSISTANT", content: quickPrompt ? "正在验证固定词条..." : "正在筛选工具..." }]);
 
     startTransition(async () => {
       try {
+        let hasAnswerStarted = false;
         const response = await fetch("/api/ai/assistant", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: content }),
+          body: JSON.stringify({ message: content, quickPromptId: quickPrompt?.id, pathname: window.location.pathname }),
         });
         if (!response.ok || !response.body) throw new Error("AI 助手暂时不可用");
         const reader = response.body.getReader();
@@ -194,6 +200,10 @@ export function AiFloatingBubble({ className, contextLabel = "AI 助手" }: AiFl
           for (const event of parsed.complete) {
             const parsedEvent = parseEvent(event);
             if (!parsedEvent) continue;
+            if (parsedEvent.eventName === "status" && parsedEvent.data.text && !hasAnswerStarted) {
+              replaceAssistantText(parsedEvent.data.text);
+              continue;
+            }
             if (parsedEvent.eventName === "card" && parsedEvent.data.card) {
               attachCard(parsedEvent.data.card);
               continue;
@@ -203,11 +213,21 @@ export function AiFloatingBubble({ className, contextLabel = "AI 助手" }: AiFl
               setError(parsedEvent.data.message);
               continue;
             }
-            if (parsedEvent.data.text) appendAssistantText(parsedEvent.data.text);
+            if (parsedEvent.data.text) {
+              if (!hasAnswerStarted) {
+                replaceAssistantText("");
+                hasAnswerStarted = true;
+              }
+              appendAssistantText(parsedEvent.data.text);
+            }
             if (parsedEvent.data.message) setError(parsedEvent.data.message);
           }
         }
-        setAssistantText("已处理完成。");
+        if (!hasAnswerStarted) {
+          replaceAssistantText("已处理完成。");
+        } else {
+          setAssistantText("已处理完成。");
+        }
       } catch (err) {
         const messageText = err instanceof Error ? err.message : "AI 助手暂时不可用";
         setAssistantText(messageText);
@@ -303,8 +323,8 @@ export function AiFloatingBubble({ className, contextLabel = "AI 助手" }: AiFl
       <div className="border-t border-stone-100 p-3">
         <div className="mb-2 flex flex-wrap gap-2 pb-1">
           {quickPrompts.map((prompt) => (
-            <button className="max-w-full rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-600 hover:bg-red-50 hover:text-[#dc2626]" key={prompt.id} onClick={() => send(prompt.text)} title={prompt.text} type="button">
-              {prompt.text}
+            <button className="max-w-full rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-600 hover:bg-red-50 hover:text-[#dc2626]" key={prompt.id} onClick={() => send(prompt.text, prompt)} title={prompt.text} type="button">
+              {prompt.label}
             </button>
           ))}
         </div>
@@ -319,7 +339,7 @@ export function AiFloatingBubble({ className, contextLabel = "AI 助手" }: AiFl
             onKeyDown={(event) => {
               if (event.key === "Enter") send();
             }}
-            placeholder="例如：这个月张军业绩怎么样"
+            placeholder="例如：这个月李明业绩怎么样"
             value={input}
           />
           <Button className="h-10 rounded-full bg-[#dc2626] px-4 text-white hover:bg-[#b91c1c]" disabled={isPending} onClick={() => send()}>

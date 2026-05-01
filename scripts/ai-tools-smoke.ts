@@ -1,5 +1,5 @@
 import { redactAiAuditText, redactAiAuditValue } from "@/features/ai/tools/audit";
-import { getAiQuickPromptsForContext, planFixedAiToolCall } from "@/features/ai/intent-templates";
+import { rankAiToolsForMessage } from "@/features/ai/tools/model-planner";
 import { aiTools, canRoleUseTool } from "@/features/ai/tools/registry";
 import { planAiToolCall, validateAiToolPlan } from "@/features/ai/tools/planner";
 import { getLaunchReadinessReport } from "@/features/system/launch-readiness";
@@ -71,17 +71,6 @@ function main() {
   assert(consumerPlan?.toolName === "customer_submit_order", "客户自然语言下单应命中下单工具");
   assert(consumerPlan.args.productQuery === "剑兰春", "客户自然语言下单应清理商品名");
 
-  const consumerQuickPrompts = getAiQuickPromptsForContext(context("CONSUMER"), aiTools);
-  const dealerQuickPrompts = getAiQuickPromptsForContext(context("DEALER"), aiTools);
-  const adminQuickPrompts = getAiQuickPromptsForContext(context("ADMIN"), aiTools);
-  assert(consumerQuickPrompts.some((prompt) => prompt.toolName === "customer_submit_order"), "消费者固定词条应包含下单");
-  assert(!consumerQuickPrompts.some((prompt) => prompt.toolName === "dealer_incoming_orders"), "消费者不能看到经销商固定词条");
-  assert(dealerQuickPrompts.some((prompt) => prompt.toolName === "dealer_incoming_orders"), "经销商固定词条应包含待接订单");
-  assert(!dealerQuickPrompts.some((prompt) => prompt.toolName === "business_overview"), "经销商不能看到后台经营固定词条");
-  assert(adminQuickPrompts.some((prompt) => prompt.toolName === "system_launch_readiness"), "管理员固定词条应包含上线检查");
-  const fixedOrderPlan = planFixedAiToolCall("我要下单 1 箱剑兰春", context("CONSUMER"), aiTools);
-  assert(fixedOrderPlan?.toolName === "customer_submit_order", "固定下单词条应直接命中本地模板");
-
   const consumerSkuPlan = planAiToolCall("我要下单 1 箱 AIFULL-JLC-MOKZNWYX 剑兰春，微信支付", context("CONSUMER"), aiTools);
   assert(consumerSkuPlan?.toolName === "customer_submit_order", "客户带 SKU 和支付方式的自然语言下单应命中下单工具");
   assert(consumerSkuPlan.args.productQuery === "AIFULL-JLC-MOKZNWYX", "客户带 SKU 下单应优先使用 SKU 作为商品查询条件");
@@ -119,6 +108,11 @@ function main() {
   const adminPlan = planAiToolCall("这个月张军业绩怎么样", context("ADMIN"), aiTools);
   assert(adminPlan?.toolName === "salesperson_performance", "管理员查询业绩应命中销售员业绩工具");
 
+  const conversionPlan = planAiToolCall("李明最近转化怎么样", context("ADMIN"), aiTools);
+  assert(conversionPlan?.toolName === "salesperson_performance", "销售转化类问题应命中销售员业绩工具");
+  assert(conversionPlan.args.salespersonName === "李明", "销售转化类问题应提取销售员姓名");
+  assert(rankAiToolsForMessage("李明最近转化怎么样", context("ADMIN"), aiTools)[0]?.tool.name === "salesperson_performance", "Planner v2 工具排序应把销售员业绩排在转化问题首位");
+
   const pricePlan = planAiToolCall("把剑兰春涨价 5 块", context("ADMIN"), aiTools);
   assert(pricePlan?.toolName === "admin_update_product_price", "管理员调价应命中调价工具");
   assert(pricePlan.args.adjustRetailPrice === 5, "相对涨价应提取调价金额");
@@ -126,6 +120,10 @@ function main() {
   const absolutePricePlan = planAiToolCall("把剑兰春价格改成 16", context("ADMIN"), aiTools);
   assert(absolutePricePlan?.toolName === "admin_update_product_price", "管理员绝对改价应命中调价工具");
   assert(absolutePricePlan.args.newRetailPrice === 16, "绝对改价应提取新零售价");
+
+  const productStatusPlan = planAiToolCall("把青岛经典啤酒下架", context("ADMIN"), aiTools);
+  assert(productStatusPlan?.toolName === "admin_update_product_status", "商品下架应命中商品上下架工具");
+  assert(productStatusPlan.args.status === "INACTIVE", "商品下架应提取 INACTIVE 状态");
 
   const orderTool = tool("order_status_action");
   type DynamicInput = Parameters<NonNullable<typeof orderTool.resolvePermission>>[0];
@@ -135,6 +133,24 @@ function main() {
   const warehouseTools = aiTools.filter((item) => canRoleUseTool("WAREHOUSE", item.name));
   const blockedWarehousePlan = planAiToolCall("这个月张军业绩怎么样", context("WAREHOUSE"), warehouseTools);
   assert(blockedWarehousePlan?.toolName !== "salesperson_performance", "仓管不应被启发式规划到销售员业绩工具");
+
+  const inventoryRankingPlan = planAiToolCall("现在库存有多少商品，哪个库存最多?", context("ADMIN"), aiTools);
+  assert(inventoryRankingPlan?.toolName === "product_operations_summary", "库存数量和库存最多应命中商品经营查询");
+  assert(inventoryRankingPlan.args.query === "", "库存总览问题不应把整句当作商品名过滤");
+  assert(inventoryRankingPlan.args.sort === "stock_desc", "库存最多问题应按库存倒序查询");
+  assert(rankAiToolsForMessage("现在库存有多少商品，哪个库存最多?", context("ADMIN"), aiTools)[0]?.tool.name === "product_operations_summary", "Planner v2 工具排序应把库存总览排在商品经营首位");
+
+  const lowStockPlan = planAiToolCall("哪些商品快没货了", context("ADMIN"), aiTools);
+  assert(lowStockPlan?.toolName === "product_operations_summary", "低库存问题应命中商品经营查询");
+  assert(lowStockPlan.args.sort === "stock_asc", "低库存问题应按库存升序查询");
+
+  const correctedInventoryRankingPlan = validateAiToolPlan("现在库存有多少商品，哪个库存最多?", context("ADMIN"), aiTools, {
+    toolName: "dealer_report_stock",
+    args: { productQuery: "青岛经典啤酒", stock: 9 },
+    reason: "模拟错误模型规划",
+  });
+  assert(correctedInventoryRankingPlan?.toolName === "product_operations_summary", "库存总览若被误规划为库存上报，应被纠偏为商品经营查询");
+  assert(correctedInventoryRankingPlan.args.sort === "stock_desc", "纠偏后的库存总览应保留库存倒序");
 
   const stockInPlan = planAiToolCall("给香脆薯片组合装入库 2 件", context("WAREHOUSE"), warehouseTools);
   assert(stockInPlan?.toolName === "inventory_stock_in", "仓管自然语言入库应命中入库工具");
@@ -148,6 +164,16 @@ function main() {
   assert(skuStockInPlan.args.remark === "浏览器回归", "SKU 入库应提取备注");
 
   const financeTools = aiTools.filter((item) => canRoleUseTool("FINANCE", item.name));
+  const debtRankingPlan = planAiToolCall("谁欠款最多?", context("FINANCE"), financeTools);
+  assert(debtRankingPlan?.toolName === "finance_summary", "欠款排行问题应命中财务摘要工具");
+  assert(rankAiToolsForMessage("谁欠款最多?", context("FINANCE"), financeTools)[0]?.tool.name === "finance_summary", "Planner v2 工具排序应把欠款问题排在财务摘要首位");
+  const correctedDebtPlan = validateAiToolPlan("谁欠款最多?", context("FINANCE"), financeTools, {
+    toolName: "search_customers",
+    args: { query: "欠款", limit: 8 },
+    reason: "模拟错误模型规划",
+  });
+  assert(correctedDebtPlan?.toolName === "finance_summary", "欠款排行若被误规划为客户查询，应被纠偏为财务摘要");
+
   const paymentPlan = planAiToolCall("给13900139001的订单HQAI-FIN-15348961登记收款1元", context("FINANCE"), financeTools);
   assert(paymentPlan?.toolName === "finance_register_payment", "财务自然语言收款应命中登记收款工具");
   assert(paymentPlan.args.customerQuery === "13900139001", "财务收款应提取客户手机号");

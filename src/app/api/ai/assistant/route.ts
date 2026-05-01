@@ -10,7 +10,7 @@ function encoderPayload(event: string, data: unknown) {
 }
 
 export async function POST(request: NextRequest) {
-  const body = (await request.json().catch(() => null)) as { message?: string } | null;
+  const body = (await request.json().catch(() => null)) as { message?: string; quickPromptId?: string; pathname?: string } | null;
   const message = body?.message?.trim();
   if (!message) {
     return Response.json({ error: "请输入要让 AI 处理的事项" }, { status: 400 });
@@ -20,7 +20,12 @@ export async function POST(request: NextRequest) {
     async start(controller) {
       const encoder = new TextEncoder();
       try {
-        const result = await answerAssistantMessage(message);
+        const result = await answerAssistantMessage({
+          message,
+          quickPromptId: body?.quickPromptId,
+          pathname: body?.pathname,
+          onStatus: (text) => controller.enqueue(encoder.encode(encoderPayload("status", { text }))),
+        });
         for (const char of Array.from(result.answer)) {
           controller.enqueue(encoder.encode(encoderPayload("delta", { text: char })));
           await new Promise((resolve) => setTimeout(resolve, 8));
@@ -28,7 +33,7 @@ export async function POST(request: NextRequest) {
         if (result.card) {
           controller.enqueue(encoder.encode(encoderPayload("card", { card: result.card })));
         }
-        controller.enqueue(encoder.encode(encoderPayload("done", { ok: true, plan: result.plan })));
+        controller.enqueue(encoder.encode(encoderPayload("done", { ok: true, plan: result.plan, planSource: result.planSource })));
       } catch (error) {
         const status = typeof error === "object" && error && "status" in error && typeof error.status === "number" ? error.status : 500;
         const messageText = error instanceof Error ? error.message : "AI 助手暂时不可用";
