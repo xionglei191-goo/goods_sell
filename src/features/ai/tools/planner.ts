@@ -260,6 +260,15 @@ function parseTags(message: string) {
     .filter(Boolean) ?? [];
 }
 
+function isCustomerAnalyticsIntent(message: string) {
+  return /(?:一共|总共|共有|总计|现在|目前).{0,6}(?:多少|几个).{0,4}客户|客户.{0,4}(?:总数|数量|总量|统计|分布|排行)|(?:哪个|哪位|谁).{0,6}(?:消费|购买金额|成交金额).{0,4}(?:最高|最多)|(?:消费|购买金额|成交金额).{0,4}(?:最高|最多).{0,6}客户/.test(message);
+}
+
+function customerAnalyticsArgs(message: string) {
+  const period = /今天|今日/.test(message) ? "day" : /本周|这周|近7天|近 7 天/.test(message) ? "week" : /本月|这个月|当月/.test(message) ? "month" : "all";
+  return { period, limit: /排行|排名|前/.test(message) ? 8 : 5 };
+}
+
 function parseOrderAction(message: string) {
   const orderNo = message.match(/(HQ\d{10,})/)?.[1] ?? message.match(/订单\s*([A-Za-z0-9-]{6,})/)?.[1] ?? "";
   if (/取消|作废/.test(message)) return { orderNo, action: "cancel" };
@@ -426,6 +435,9 @@ function planStaff(message: string, tools: readonly AiToolDefinition[]): AiToolP
   if (/配送|发货|送达|物流/.test(message)) {
     return toolPlan(tools, "delivery_summary", {}, "配送查询");
   }
+  if (isCustomerAnalyticsIntent(message)) {
+    return toolPlan(tools, "customer_analytics_summary", customerAnalyticsArgs(message), "客户统计分析");
+  }
   if (/客户|欠款客户|归属/.test(message)) {
     return toolPlan(tools, "search_customers", { query: message, limit: 8 }, "客户查询");
   }
@@ -458,6 +470,7 @@ type CoreIntent =
   | "staff_password"
   | "finance_summary"
   | "salesperson_performance"
+  | "customer_analytics"
   | "product_operations"
   | "product_push"
   | "invoice";
@@ -474,6 +487,7 @@ function detectCoreIntent(message: string): CoreIntent | null {
   if (/业绩|绩效|转化|成交|销售结果/.test(message)) return "salesperson_performance";
   if (/涨价|降价|调价|改价|价格.*(改|调|设)|售价.*(改|调|设)/.test(message)) return "price";
   if (/应收|回款|欠款|财务|收款|账龄|对账/.test(message)) return "finance_summary";
+  if (isCustomerAnalyticsIntent(message)) return "customer_analytics";
   if (/拒单|拒绝/.test(message)) return "dealer_reject";
   if (/接单|接受/.test(message) && !/待接|新订单/.test(message)) return "dealer_accept";
   if (/上报.*库存|库存.*上报|报库存|门店库存.*(?:上报|报为|设为|设置为|\d+)/.test(message)) return "dealer_stock";
@@ -521,6 +535,8 @@ function allowedToolsForIntent(intent: CoreIntent) {
       return new Set(["finance_summary"]);
     case "salesperson_performance":
       return new Set(["salesperson_performance"]);
+    case "customer_analytics":
+      return new Set(["customer_analytics_summary"]);
     case "product_operations":
       return new Set(["product_operations_summary"]);
     case "product_push":

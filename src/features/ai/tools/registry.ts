@@ -779,6 +779,103 @@ export const aiTools: AiToolDefinition[] = [
     },
   },
   {
+    name: "customer_analytics_summary",
+    title: "客户统计分析",
+    description: "查询当前权限范围内客户总数、客户类型分布、归属情况和消费最高客户。",
+    riskLevel: "READ",
+    access: { permission: "customers:view" },
+    inputSchema: z.object({
+      period: z.enum(["all", "day", "week", "month"]).optional().default("all"),
+      limit: z.coerce.number().int().min(1).max(20).default(5),
+    }),
+    handler: async (input, context) => {
+      const scope: Prisma.CustomerWhereInput = context.role === "SALESPERSON" ? { salesPersonId: context.user.id } : {};
+      const start = input.period && input.period !== "all" ? startForPeriod(input.period) : null;
+      const orderScope: Prisma.OrderWhereInput = {
+        parentId: null,
+        status: { in: revenueStatuses },
+        ...(start ? { createdAt: { gte: start } } : {}),
+        ...(context.role === "SALESPERSON" ? { customer: { salesPersonId: context.user.id } } : {}),
+      };
+
+      const [totalCustomers, consumerCustomers, dealerCustomers, verifiedCustomers, assignedCustomers, orders] = await Promise.all([
+        prisma.customer.count({ where: scope }),
+        prisma.customer.count({ where: { ...scope, type: "CONSUMER" } }),
+        prisma.customer.count({ where: { ...scope, type: "DEALER" } }),
+        prisma.customer.count({ where: { ...scope, isVerified: true } }),
+        prisma.customer.count({ where: { ...scope, salesPersonId: { not: null } } }),
+        prisma.order.findMany({
+          where: orderScope,
+          select: {
+            customerId: true,
+            payableAmount: true,
+            customer: { select: { name: true, phone: true, type: true, salesPerson: { select: { name: true } } } },
+          },
+        }),
+      ]);
+
+      const spendingRows = Array.from(
+        orders
+          .reduce((map, order) => {
+            const existing = map.get(order.customerId) ?? {
+              customerId: order.customerId,
+              name: order.customer.name,
+              phone: order.customer.phone,
+              type: order.customer.type,
+              salesPersonName: order.customer.salesPerson?.name ?? "未分配",
+              amount: 0,
+              orders: 0,
+            };
+            existing.amount += Number(order.payableAmount);
+            existing.orders += 1;
+            map.set(order.customerId, existing);
+            return map;
+          }, new Map<string, { customerId: string; name: string; phone: string; type: string; salesPersonName: string; amount: number; orders: number }>())
+          .values(),
+      ).sort((left, right) => right.amount - left.amount);
+
+      const topCustomer = spendingRows[0];
+      const periodLabel = input.period === "day" ? "今日" : input.period === "week" ? "近 7 天" : input.period === "month" ? "本月" : "累计";
+      return {
+        title: "客户统计分析",
+        summary: topCustomer
+          ? `当前共有 ${totalCustomers} 个客户，${periodLabel}消费最高的是 ${topCustomer.name}，消费 ${money(topCustomer.amount)}。`
+          : `当前共有 ${totalCustomers} 个客户，${periodLabel}暂无成交消费记录。`,
+        details: [
+          ...details([
+            ["客户总数", totalCustomers],
+            ["消费者客户", consumerCustomers],
+            ["经销商客户", dealerCustomers],
+            ["已认证客户", verifiedCustomers],
+            ["已分配销售员", assignedCustomers],
+            ["未分配销售员", Math.max(0, totalCustomers - assignedCustomers)],
+            ["统计口径", periodLabel],
+          ]),
+          ...spendingRows.slice(0, input.limit).map((row) => ({
+            label: `${row.name} · ${row.phone}`,
+            value: `${row.type}｜消费 ${money(row.amount)}｜订单 ${row.orders}｜业务员 ${row.salesPersonName}`,
+          })),
+        ],
+        data: {
+          totalCustomers,
+          consumerCustomers,
+          dealerCustomers,
+          verifiedCustomers,
+          assignedCustomers,
+          topCustomers: spendingRows.slice(0, input.limit).map((row) => ({
+            customerId: row.customerId,
+            name: row.name,
+            phone: row.phone,
+            type: row.type,
+            amount: row.amount,
+            orders: row.orders,
+            salesPersonName: row.salesPersonName,
+          })),
+        },
+      };
+    },
+  },
+  {
     name: "customer_purchase_history",
     title: "客户购买历史",
     description: "按客户姓名或手机号查询最近购买过的商品、订单金额和订单状态。",
@@ -2384,6 +2481,11 @@ const aiToolSemanticMetadata: Record<string, AiToolSemanticMetadata> = {
     capabilities: ["客户查询", "查客户", "客户欠款", "归属销售员", "最近订单", "客户标签"],
     examples: ["查一下张阿姨", "谁是李明名下客户", "欠款客户有哪些"],
     argumentHints: '{"query":"客户姓名/手机号/标签/归属销售员","limit":8}',
+  },
+  customer_analytics_summary: {
+    capabilities: ["客户统计", "客户总数", "一共有多少客户", "多少客户", "消费最高客户", "消费最多客户", "客户消费排行", "客户类型分布"],
+    examples: ["现在一共有多少客户，哪个消费最高", "现在一共有多少客户", "哪个客户消费最多"],
+    argumentHints: '{"period":"all","limit":5}',
   },
   customer_purchase_history: {
     capabilities: ["客户购买历史", "买过什么", "最近购买", "消费记录", "采购记录"],

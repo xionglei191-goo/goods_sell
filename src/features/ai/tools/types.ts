@@ -95,7 +95,7 @@ export type AnyToolInput = Record<string, unknown> & {
   password: string;
   payMethod?: "WECHAT" | "CASH" | "TRANSFER" | "CREDIT";
   percent?: number;
-  period: "day" | "week" | "month";
+  period: "all" | "day" | "week" | "month";
   phone: string;
   priceLevel?: "RETAIL" | "WHOLESALE" | "VIP";
   priority?: number;

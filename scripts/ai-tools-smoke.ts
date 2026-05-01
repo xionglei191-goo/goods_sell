@@ -38,9 +38,13 @@ function main() {
   assert(canRoleUseTool("ADMIN", "admin_update_product_price"), "管理员应可调价");
   assert(canRoleUseTool("ADMIN", "admin_create_customer"), "管理员应可新增客户");
   assert(canRoleUseTool("ADMIN", "customer_purchase_history"), "管理员应可查询客户购买历史");
+  assert(canRoleUseTool("ADMIN", "customer_analytics_summary"), "管理员应可查询客户统计分析");
   assert(canRoleUseTool("SALESPERSON", "customer_purchase_history"), "销售员应可查询名下客户购买历史");
+  assert(canRoleUseTool("SALESPERSON", "customer_analytics_summary"), "销售员应可查询名下客户统计分析");
   assert(canRoleUseTool("FINANCE", "customer_purchase_history"), "财务应可查询客户购买历史");
+  assert(canRoleUseTool("FINANCE", "customer_analytics_summary"), "财务应可查询客户统计分析");
   assert(!canRoleUseTool("WAREHOUSE", "customer_purchase_history"), "仓管不能查询客户购买历史");
+  assert(!canRoleUseTool("WAREHOUSE", "customer_analytics_summary"), "仓管不能查询客户统计分析");
   assert(!canRoleUseTool("DEALER", "customer_purchase_history"), "经销商不能查询客户购买历史");
   assert(canRoleUseTool("SALESPERSON", "admin_update_customer_tags"), "销售员应可维护名下客户标签");
   assert(!canRoleUseTool("FINANCE", "admin_create_customer"), "财务不能新增客户");
@@ -104,6 +108,18 @@ function main() {
     reason: "模拟错误模型规划",
   });
   assert(correctedPurchaseHistoryPlan?.toolName === "customer_purchase_history", "购买历史意图若被 AI 误规划为经营总览，应被计划校验层纠偏");
+
+  const customerAnalyticsPlan = planAiToolCall("现在一共有多少客户，哪个消费最高", context("ADMIN"), aiTools);
+  assert(customerAnalyticsPlan?.toolName === "customer_analytics_summary", "客户总数和消费最高问题应命中客户统计分析工具");
+  assert(customerAnalyticsPlan.args.period === "all", "客户总数问题默认应使用累计口径");
+  assert(rankAiToolsForMessage("现在一共有多少客户，哪个消费最高", context("ADMIN"), aiTools)[0]?.tool.name === "customer_analytics_summary", "Planner v2 工具排序应把客户统计分析排在客户总数问题首位");
+
+  const correctedCustomerAnalyticsPlan = validateAiToolPlan("现在一共有多少客户，哪个消费最高", context("ADMIN"), aiTools, {
+    toolName: "business_overview",
+    args: { period: "month" },
+    reason: "模拟错误模型规划",
+  });
+  assert(correctedCustomerAnalyticsPlan?.toolName === "customer_analytics_summary", "客户统计意图若被 AI 误规划为经营总览，应被计划校验层纠偏");
 
   const adminPlan = planAiToolCall("这个月张军业绩怎么样", context("ADMIN"), aiTools);
   assert(adminPlan?.toolName === "salesperson_performance", "管理员查询业绩应命中销售员业绩工具");

@@ -16,6 +16,7 @@ type ProviderCase = {
 const cases: ProviderCase[] = [
   { role: "ADMIN", message: "现在上线还差什么配置", expectedTool: "system_launch_readiness" },
   { role: "ADMIN", message: "现在库存有多少商品，哪个库存最多？", expectedTool: "product_operations_summary" },
+  { role: "ADMIN", message: "现在一共有多少客户，哪个消费最高？", expectedTool: "customer_analytics_summary" },
   { role: "FINANCE", message: "谁欠款最多？", expectedTool: "finance_summary" },
   { role: "ADMIN", message: "李明最近转化怎么样？", expectedTool: "salesperson_performance" },
 ];

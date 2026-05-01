@@ -550,6 +550,7 @@
 - [x] 模型规划输出升级为 `intent/toolName/args/confidence/missingSlots/reason`，支持低置信和缺槽位澄清。
 - [x] provider plan 增加 schema、权限、动态权限、核心意图和确认卡预检；失败后带原因进行一次模型修复。
 - [x] 本地 planner 继续作为兜底，并补齐库存总览/低库存、欠款排行、销售员转化、上下架等高置信回归。
+- [x] 新增客户统计分析 tool：支持“现在一共有多少客户/哪个客户消费最高”，避免误落到经营总览的“新增客户”口径。
 - [x] AI 气泡 SSE 状态细化为工具筛选、参数规划、计划校验、计划修复、工具调用、确认卡/结果整理。
 - [x] 低置信问题返回“需要补充信息”卡片，不再展示大段可用工具清单。
 - [x] 扩展 `npm run test:ai-tools`、`npm run test:ai-runtime`、`npm run test:ai-provider` 覆盖 Planner v2 场景。
