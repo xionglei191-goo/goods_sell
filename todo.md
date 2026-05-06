@@ -618,4 +618,4 @@
 - [x] 保留全站能力目录边界：`AgentCapabilityRegistry` 继续负责找入口/解释页面，不抢业务统计、排行、明细和配送订单查询。
 - [x] 扩展工具语义与测试：覆盖配送订单、供应商数量、库存流水数据、微信生态数据、供应商入口、库存流水入口、微信菜单入口等成对场景。
 - [x] 真实 DeepSeek provider smoke 扩展到 10 个 Planner v3 场景，包含 `delivery_summary` 和 `navigate_to_feature`。
-- [/] 全量本地验证、提交推送、VPS 部署和线上 provider smoke。
+- [x] 全量本地验证、提交推送、VPS 部署和线上 provider smoke。
