@@ -602,5 +602,5 @@
 - [x] `done` 返回 `plannerVersion/intentKind/toolNames/confidence/planSource`，ADMIN 额外显示调试摘要。
 - [x] 更新 `docs/13-AI工具与代办助手.md`：记录 Planner v3 链路、执行规则、总结边界和调试字段。
 - [x] 全量验证：`npx tsc --noEmit`、`npm run lint`、`npm run test:ai-tools`、`npm run test:ai-runtime`、`npm run test:ai-quick-prompts`、`npm run test:agent-capabilities`、`npm run test:ai-provider`、`npm run test:rbac`、`npm audit --audit-level=moderate`、`npm run build`。
-- [ ] 提交并推送 `main`。
+- [x] 提交并推送 `main`。
 - [ ] 部署到 VPS `/data/goods_sell`，完成线上 `/shop` 健康检查和远端 `npm run test:ai-provider`。
