@@ -300,6 +300,7 @@ function argsForSemanticReadFallback(toolName: string, message: string): Record<
   }
   if (toolName === "shop_cart_summary" || toolName === "shop_coupon_summary") return { limit };
   if (toolName === "shop_account_summary") return {};
+  if (toolName === "salesperson_performance") return { salespersonName: "", period: period === "all" ? "month" : period };
   return null;
 }
 

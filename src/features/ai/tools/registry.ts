@@ -1240,7 +1240,7 @@ export const aiTools: AiToolDefinition[] = [
   {
     name: "salesperson_performance",
     title: "销售员业绩",
-    description: "按销售员姓名和周期查询销售额、订单数、客户数、回款和排名。",
+    description: "查询销售员数量、业绩排行、最好销售员，或按销售员姓名查询销售额、订单数、客户数、回款和排名。",
     riskLevel: "READ",
     access: { permission: "sales:view" },
     inputSchema: z.object({
@@ -1249,11 +1249,69 @@ export const aiTools: AiToolDefinition[] = [
     }),
     handler: async (input, context) => {
       const start = startForPeriod(input.period);
+      const requestedName = input.salespersonName.replace(/谁|哪个人|哪位|哪个|哪一个|个人|几个|多少|最好|最高|排名|排行|销售员|业务员/g, "").trim();
+      if (context.role !== "SALESPERSON" && !requestedName) {
+        const [allSalespeople, totalSalespeople] = await Promise.all([
+          prisma.user.findMany({ where: { role: "SALESPERSON", isActive: true }, select: { id: true, name: true }, orderBy: { createdAt: "asc" } }),
+          prisma.user.count({ where: { role: "SALESPERSON" } }),
+        ]);
+
+        const rows = await Promise.all(
+          allSalespeople.map(async (person) => {
+            const [orders, payments, customerCount] = await Promise.all([
+              prisma.order.findMany({
+                where: {
+                  parentId: null,
+                  status: { in: revenueStatuses },
+                  createdAt: { gte: start },
+                  OR: [{ salesPersonId: person.id }, { salesPersonId: null, customer: { salesPersonId: person.id } }],
+                },
+                select: { customerId: true, payableAmount: true, paidAmount: true },
+              }),
+              prisma.payment.findMany({
+                where: { status: "COMPLETED", type: "RECEIVE", paidAt: { gte: start }, customer: { salesPersonId: person.id } },
+                select: { amount: true },
+              }),
+              prisma.customer.count({ where: { salesPersonId: person.id } }),
+            ]);
+            return {
+              id: person.id,
+              name: person.name ?? "未命名销售员",
+              sales: orders.reduce((sum, order) => sum + Number(order.payableAmount), 0),
+              income: payments.reduce((sum, payment) => sum + Number(payment.amount), 0),
+              receivable: orders.reduce((sum, order) => sum + Math.max(0, Number(order.payableAmount) - Number(order.paidAmount)), 0),
+              orders: orders.length,
+              customers: customerCount,
+              dealCustomers: new Set(orders.map((order) => order.customerId)).size,
+            };
+          }),
+        );
+        const ranking = rows.sort((left, right) => right.sales - left.sales || right.orders - left.orders);
+        const best = ranking[0];
+        return {
+          title: "销售员业绩排行",
+          summary: best
+            ? `当前启用销售员 ${allSalespeople.length} 个，本期业绩最好的是 ${best.name}，销售 ${money(best.sales)}，${best.orders} 单。`
+            : "当前没有启用销售员。",
+          details: [
+            ...details([
+              ["启用销售员", allSalespeople.length],
+              ["全部销售员", totalSalespeople],
+              ["本期最高业绩", best ? `${best.name} ${money(best.sales)}` : "暂无"],
+            ]),
+            ...ranking.slice(0, 8).map((row, index) => ({
+              label: `第 ${index + 1} 名 · ${row.name}`,
+              value: `销售 ${money(row.sales)}｜订单 ${row.orders}｜成交客户 ${row.dealCustomers}｜名下客户 ${row.customers}｜回款 ${money(row.income)}｜未回款 ${money(row.receivable)}`,
+            })),
+          ],
+          data: { totalSalespeople, activeSalespeople: allSalespeople.length, ranking },
+        };
+      }
       const salesperson =
         context.role === "SALESPERSON"
           ? await prisma.user.findUnique({ where: { id: context.user.id }, select: { id: true, name: true } })
           : await prisma.user.findFirst({
-              where: { role: "SALESPERSON", ...(input.salespersonName ? { name: { contains: input.salespersonName, mode: "insensitive" } } : {}) },
+              where: { role: "SALESPERSON", ...(requestedName ? { name: { contains: requestedName, mode: "insensitive" } } : {}) },
               select: { id: true, name: true },
               orderBy: { createdAt: "asc" },
             });
@@ -3113,9 +3171,9 @@ const aiToolSemanticMetadata: Record<string, AiToolSemanticMetadata> = {
     argumentHints: '{"period":"month"}',
   },
   salesperson_performance: {
-    capabilities: ["销售员业绩", "业务员绩效", "销售转化", "报价转化", "成交", "销售排名", "客户数", "回款"],
-    examples: ["李明最近转化怎么样", "这个月李明业绩怎么样", "销售员排名如何"],
-    argumentHints: '{"salespersonName":"销售员姓名或手机号","period":"month"}',
+    capabilities: ["销售员业绩", "业务员绩效", "销售员数量", "有几个销售员", "哪个销售员最好", "销售转化", "报价转化", "成交", "销售排名", "客户数", "回款"],
+    examples: ["这个月哪个人的业绩最好", "有几个销售员", "李明最近转化怎么样", "这个月李明业绩怎么样", "销售员排名如何"],
+    argumentHints: '{"salespersonName":"销售员姓名或手机号；查询数量/排行/最好时留空","period":"month"}',
   },
   search_customers: {
     capabilities: ["客户查询", "查客户", "客户欠款", "归属销售员", "最近订单", "客户标签"],

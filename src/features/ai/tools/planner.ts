@@ -116,10 +116,20 @@ function parseDealerStockReport(message: string) {
 }
 
 function parseSalespersonName(message: string) {
+  if (/谁|哪个人|哪位|哪个|哪一个|几个人|几个销售员|多少销售员|销售员.*(几个|多少)|业务员.*(几个|多少)|排名|排行|最好|最高|第一/.test(message)) {
+    return "";
+  }
   const explicit = message.match(/(?:这个月|本月|今天|最近|查一下|看看|销售员|业务员)?\s*([\u4e00-\u9fa5]{2,4}?)\s*(?:最近|这个月|本月|今天)?的?(?:业绩|绩效|转化|成交|销售结果)/);
   if (explicit?.[1]) return explicit[1];
   const after = message.match(/(?:业绩|绩效|转化|成交).*?([\u4e00-\u9fa5]{2,6})/);
   return after?.[1] ?? "";
+}
+
+function isSalespersonStatsIntent(message: string) {
+  return (
+    /业绩|绩效|转化|成交|销售结果/.test(message)
+    || (/(销售员|业务员|销售人员|个人|谁|哪位|哪个人)/.test(message) && /几个|多少|数量|排名|排行|最好|最高|第一|业绩|销售额|订单|客户|回款/.test(message))
+  );
 }
 
 function parseProductPriceChange(message: string) {
@@ -378,7 +388,7 @@ function planStaff(message: string, tools: readonly AiToolDefinition[]): AiToolP
   if (/开.*票|发票/.test(message) && /HQ[A-Z0-9-]{6,}/i.test(message)) {
     return toolPlan(tools, "receipts_issue_invoice", parseInvoiceIssue(message), "财务开票");
   }
-  if (/业绩|绩效|转化|成交|销售结果/.test(message)) {
+  if (isSalespersonStatsIntent(message)) {
     return toolPlan(tools, "salesperson_performance", { salespersonName: parseSalespersonName(message), period: /今天|今日/.test(message) ? "day" : "month" }, "查询销售员业绩");
   }
   if (/涨价|降价|调价|改价|价格.*(改|调|设)|售价.*(改|调|设)/.test(message)) {
@@ -484,7 +494,7 @@ function detectCoreIntent(message: string): CoreIntent | null {
   if (/重置.*密码|密码.*重置|改.*密码/.test(message) && /员工|账号|1[3-9]\d{9}/.test(message)) return "staff_password";
   if (/登记|收款|回款|到账|收到/.test(message) && /HQ[A-Z0-9-]{6,}/i.test(message)) return "payment";
   if (/开.*票|发票/.test(message) && /HQ[A-Z0-9-]{6,}/i.test(message)) return "invoice";
-  if (/业绩|绩效|转化|成交|销售结果/.test(message)) return "salesperson_performance";
+  if (isSalespersonStatsIntent(message)) return "salesperson_performance";
   if (/涨价|降价|调价|改价|价格.*(改|调|设)|售价.*(改|调|设)/.test(message)) return "price";
   if (/应收|回款|欠款|财务|收款|账龄|对账/.test(message)) return "finance_summary";
   if (isCustomerAnalyticsIntent(message)) return "customer_analytics";
@@ -546,8 +556,8 @@ function allowedToolsForIntent(intent: CoreIntent) {
 
 export function validateAiToolPlan(message: string, context: AiToolContext, tools: readonly AiToolDefinition[], plan: AiToolPlan | null): AiToolPlan | null {
   if (!plan) return null;
-  if (plan.toolName === "navigate_to_feature" || plan.toolName === "feature_help") return plan;
   const intent = detectCoreIntent(message);
+  if ((plan.toolName === "navigate_to_feature" || plan.toolName === "feature_help") && !intent) return plan;
   if (!intent) return plan;
 
   const allowedTools = allowedToolsForIntent(intent);

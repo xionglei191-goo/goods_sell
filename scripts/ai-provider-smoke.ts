@@ -19,6 +19,8 @@ const cases: ProviderCase[] = [
   { role: "ADMIN", message: "现在一共有多少客户，哪个消费最高？", expectedTool: "customer_analytics_summary" },
   { role: "FINANCE", message: "谁欠款最多？", expectedTool: "finance_summary" },
   { role: "ADMIN", message: "李明最近转化怎么样？", expectedTool: "salesperson_performance" },
+  { role: "ADMIN", message: "这个月哪个人的业绩最好?", expectedTool: "salesperson_performance" },
+  { role: "ADMIN", message: "有几个销售员", expectedTool: "salesperson_performance" },
 ];
 
 function assert(condition: unknown, message: string): asserts condition {

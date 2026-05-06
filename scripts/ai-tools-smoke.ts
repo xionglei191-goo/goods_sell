@@ -150,6 +150,23 @@ function main() {
   assert(conversionPlan.args.salespersonName === "李明", "销售转化类问题应提取销售员姓名");
   assert(rankAiToolsForMessage("李明最近转化怎么样", context("ADMIN"), aiTools)[0]?.tool.name === "salesperson_performance", "Planner v2 工具排序应把销售员业绩排在转化问题首位");
 
+  const bestSalespersonPlan = planAiToolCall("这个月哪个人的业绩最好?", context("ADMIN"), aiTools);
+  assert(bestSalespersonPlan?.toolName === "salesperson_performance", "销售员排行问题应命中销售员业绩工具");
+  assert(bestSalespersonPlan.args.salespersonName === "", "销售员排行问题不应把“哪个人”当成销售员姓名");
+  assert(rankAiToolsForMessage("这个月哪个人的业绩最好?", context("ADMIN"), aiTools)[0]?.tool.name === "salesperson_performance", "Planner v2 工具排序应把销售员排行排在销售员业绩工具首位");
+
+  const salespersonCountPlan = planAiToolCall("有几个销售员", context("ADMIN"), aiTools);
+  assert(salespersonCountPlan?.toolName === "salesperson_performance", "销售员数量问题应命中销售员业绩统计工具，而不是导航页面");
+  assert(salespersonCountPlan.args.salespersonName === "", "销售员数量问题不需要销售员姓名");
+  assert(rankAiToolsForMessage("有几个销售员", context("ADMIN"), aiTools)[0]?.tool.name === "salesperson_performance", "Planner v2 工具排序应把销售员数量排在销售员业绩工具首位");
+  assert(planRankedReadToolFallback("有几个销售员", context("ADMIN"), aiTools)?.toolName === "salesperson_performance", "provider 不可用时销售员数量问题应有本地语义 READ 兜底");
+  const correctedSalespersonCountPlan = validateAiToolPlan("有几个销售员", context("ADMIN"), aiTools, {
+    toolName: "navigate_to_feature",
+    args: { capabilityId: "sales.salespeople", query: "有几个销售员" },
+    reason: "模拟模型误规划为页面导航",
+  });
+  assert(correctedSalespersonCountPlan?.toolName === "salesperson_performance", "销售员数量问题若被模型误规划为导航，应被校验层纠偏为统计工具");
+
   const pricePlan = planAiToolCall("把剑兰春涨价 5 块", context("ADMIN"), aiTools);
   assert(pricePlan?.toolName === "admin_update_product_price", "管理员调价应命中调价工具");
   assert(pricePlan.args.adjustRetailPrice === 5, "相对涨价应提取调价金额");
