@@ -183,7 +183,8 @@ else
   pm2 start npm --name "$PM2_APP" -- start
 fi
 pm2 save
-pm2 list
+pm2 describe "$PM2_APP" >/dev/null
+log "PM2 app is online: $PM2_APP"
 REMOTE_SCRIPT
 }
 
