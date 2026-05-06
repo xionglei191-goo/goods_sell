@@ -1,7 +1,7 @@
 import { loadEnvConfig } from "@next/env";
 
 import { hasAiProvider } from "@/features/ai/provider";
-import { planWithModelV2 } from "@/features/ai/tools/model-planner";
+import { planWithModelV3 } from "@/features/ai/tools/model-planner-v3";
 import { aiTools, canRoleUseTool } from "@/features/ai/tools/registry";
 import type { AiToolContext } from "@/features/ai/tools/types";
 
@@ -48,16 +48,17 @@ async function main() {
   for (const testCase of cases) {
     const aiContext = context(testCase.role);
     const tools = aiTools.filter((tool) => canRoleUseTool(testCase.role, tool.name));
-    const result = await planWithModelV2(testCase.message, aiContext, tools);
+    const result = await planWithModelV3(testCase.message, aiContext, tools);
+    const actualTool = result.steps[0]?.toolName ?? result.plan?.toolName;
     const topTools = result.rankedTools.slice(0, 4).map((item) => item.tool.name).join(", ");
     assert(
-      result.plan?.toolName === testCase.expectedTool,
-      `真实 AI provider 未命中预期工具：message=${testCase.message} expected=${testCase.expectedTool} actual=${result.plan?.toolName ?? "null"} top=${topTools} error=${result.error ?? ""} raw=${result.rawText?.slice(0, 300) ?? ""}`,
+      actualTool === testCase.expectedTool,
+      `真实 AI provider 未命中预期工具：message=${testCase.message} expected=${testCase.expectedTool} actual=${actualTool ?? "null"} top=${topTools} intent=${result.intentFrame?.intentKind ?? ""} error=${result.error ?? ""} raw=${result.rawText?.slice(0, 300) ?? ""}`,
     );
   }
 
   console.log(
-    `AI provider smoke passed: ${cases.length} planner-v2 cases, thinking=${process.env.AI_THINKING_ENABLED === "true" || process.env.AI_THINKING_ENABLED === "1" ? "enabled" : "disabled"}`,
+    `AI provider smoke passed: ${cases.length} planner-v3 cases, thinking=${process.env.AI_THINKING_ENABLED === "true" || process.env.AI_THINKING_ENABLED === "1" ? "enabled" : "disabled"}`,
   );
 }
 

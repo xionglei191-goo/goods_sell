@@ -37,11 +37,20 @@ type AiAssistantCard =
       pendingAction: AiPendingAction;
     };
 
+type AiPlannerDebug = {
+  plannerVersion?: string;
+  intentKind?: string;
+  toolNames?: string[];
+  confidence?: number;
+  planSource?: string;
+};
+
 type BubbleMessage = {
   id: string;
   role: "USER" | "ASSISTANT";
   content: string;
   card?: AiAssistantCard;
+  debug?: AiPlannerDebug;
 };
 
 type AiQuickPrompt = {
@@ -67,7 +76,32 @@ function parseEvent(event: string) {
   const eventName = event.split("\n").find((line) => line.startsWith("event: "))?.slice(7) ?? "message";
   const dataLine = event.split("\n").find((line) => line.startsWith("data: "));
   if (!dataLine) return null;
-  return { eventName, data: JSON.parse(dataLine.slice(6)) as { text?: string; message?: string; card?: AiAssistantCard; planSource?: string } };
+  return {
+    eventName,
+    data: JSON.parse(dataLine.slice(6)) as {
+      text?: string;
+      message?: string;
+      card?: AiAssistantCard;
+      planSource?: string;
+      plannerVersion?: string;
+      intentKind?: string;
+      toolNames?: string[];
+      confidence?: number;
+      debug?: AiPlannerDebug;
+    },
+  };
+}
+
+function DebugLine({ debug }: { debug: AiPlannerDebug }) {
+  const parts = [
+    debug.plannerVersion?.toUpperCase(),
+    debug.planSource,
+    debug.intentKind,
+    debug.toolNames?.length ? debug.toolNames.join(" + ") : undefined,
+    typeof debug.confidence === "number" ? debug.confidence.toFixed(2) : undefined,
+  ].filter(Boolean);
+  if (!parts.length) return null;
+  return <div className="mt-2 border-t border-stone-100 pt-1 text-[10px] leading-4 text-stone-400">{parts.join(" · ")}</div>;
 }
 
 function CardView({ card, onConfirm, isPending }: { card: AiAssistantCard; onConfirm: (action: AiPendingAction, confirmText: string) => void; isPending: boolean }) {
@@ -170,6 +204,10 @@ export function AiFloatingBubble({ className, contextLabel = "AI 助手" }: AiFl
     setMessages((current) => current.map((item) => (item.id === assistantIdRef.current ? { ...item, card } : item)));
   }
 
+  function attachDebug(debug: AiPlannerDebug) {
+    setMessages((current) => current.map((item) => (item.id === assistantIdRef.current ? { ...item, debug } : item)));
+  }
+
   function send(question = input, quickPrompt?: AiQuickPrompt) {
     const content = question.trim();
     if (!content || isPending) return;
@@ -206,6 +244,13 @@ export function AiFloatingBubble({ className, contextLabel = "AI 助手" }: AiFl
             }
             if (parsedEvent.eventName === "card" && parsedEvent.data.card) {
               attachCard(parsedEvent.data.card);
+              continue;
+            }
+            if (parsedEvent.eventName === "done") {
+              const debug = parsedEvent.data.debug;
+              if (debug) {
+                attachDebug({ ...debug, planSource: parsedEvent.data.planSource ?? debug.planSource });
+              }
               continue;
             }
             if (parsedEvent.eventName === "error" && parsedEvent.data.message) {
@@ -314,6 +359,7 @@ export function AiFloatingBubble({ className, contextLabel = "AI 助手" }: AiFl
               <div className={cn("min-w-0 max-w-[86%] break-words rounded-lg px-3 py-2 text-sm leading-6 [overflow-wrap:anywhere]", isUser ? "bg-stone-900 text-white" : "bg-white text-stone-800 shadow-sm ring-1 ring-stone-200")}>
                 {message.content || "正在处理..."}
                 {message.card ? <CardView card={message.card} isPending={isPending} onConfirm={confirmAction} /> : null}
+                {message.debug ? <DebugLine debug={message.debug} /> : null}
               </div>
             </div>
           );

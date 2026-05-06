@@ -33,7 +33,20 @@ export async function POST(request: NextRequest) {
         if (result.card) {
           controller.enqueue(encoder.encode(encoderPayload("card", { card: result.card })));
         }
-        controller.enqueue(encoder.encode(encoderPayload("done", { ok: true, plan: result.plan, planSource: result.planSource })));
+        controller.enqueue(
+          encoder.encode(
+            encoderPayload("done", {
+              ok: true,
+              plan: result.plan,
+              planSource: result.planSource,
+              plannerVersion: result.plannerVersion,
+              intentKind: result.intentKind,
+              toolNames: result.toolNames,
+              confidence: result.confidence,
+              debug: result.debug,
+            }),
+          ),
+        );
       } catch (error) {
         const status = typeof error === "object" && error && "status" in error && typeof error.status === "number" ? error.status : 500;
         const messageText = error instanceof Error ? error.message : "AI 助手暂时不可用";

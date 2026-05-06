@@ -1,6 +1,6 @@
 # 华启酒饮数字渠道平台 — 开发任务总控 (TODO)
 
-> 最后更新：2026-04-29
+> 最后更新：2026-05-06
 > 角色说明：架构师负责审核验收，代码组负责编码实现
 > 状态：`[ ]` 待做 | `[/]` 进行中 | `[x]` 已完成 | `[!]` 验收不通过
 
@@ -585,3 +585,22 @@
 - [x] Planner 本地规则把销售员数量、排行、最好、绩效、转化等问法统一归到销售员业绩统计工具。
 - [x] 校验层不再无条件放行 `navigate_to_feature`；当核心业务意图明确时，模型误选页面导航会被纠偏为可执行 READ tool。
 - [x] 扩展 `npm run test:ai-tools` 和 `npm run test:ai-provider`，覆盖“这个月哪个人的业绩最好”“有几个销售员”。
+
+---
+
+## Phase 17：AI Planner v3 通用意图框架、总结与部署（2026-05-06）
+
+> 目标：把 AI 助手从“单工具规划 + 本地补丁”升级为“意图框架 + 多步骤 READ 编排 + 结果总结 + 管理员可观察性”，完成后全量测试并部署。
+
+- [x] 新增 `model-planner-v3.ts`：定义 `AiIntentFrame`、`AiToolStep`、`AiPlannerV3Result`、`AiPlannerTrace`。
+- [x] 普通输入链路调整为：V3 model plan → V3 repair → V2 model plan → V2 repair → 本地规则 → READ 语义兜底 → 全站导航兜底。
+- [x] V3 输出固定包含 `intentKind/domain/operation/entities/metrics/timeRange/sort/missingSlots/confidence/steps`。
+- [x] READ 支持多步骤顺序执行；WRITE/HIGH_RISK 仍只允许单步骤确认卡，未确认不写库。
+- [x] READ 执行成功后调用 DeepSeek 生成业务结论；总结失败时回退工具摘要和结果卡。
+- [x] 服务端校验层明确业务查询与导航边界：统计、排行、库存、欠款、业绩不得命中页面导航。
+- [x] SSE 状态增加“正在理解意图、正在抽取对象、正在编排工具、正在校验计划、正在执行查询、正在总结结果”。
+- [x] `done` 返回 `plannerVersion/intentKind/toolNames/confidence/planSource`，ADMIN 额外显示调试摘要。
+- [x] 更新 `docs/13-AI工具与代办助手.md`：记录 Planner v3 链路、执行规则、总结边界和调试字段。
+- [x] 全量验证：`npx tsc --noEmit`、`npm run lint`、`npm run test:ai-tools`、`npm run test:ai-runtime`、`npm run test:ai-quick-prompts`、`npm run test:agent-capabilities`、`npm run test:ai-provider`、`npm run test:rbac`、`npm audit --audit-level=moderate`、`npm run build`。
+- [ ] 提交并推送 `main`。
+- [ ] 部署到 VPS `/data/goods_sell`，完成线上 `/shop` 健康检查和远端 `npm run test:ai-provider`。
