@@ -108,13 +108,21 @@ createScenarioInquiry(scene: ScenarioType, data: ScenarioInquiryInput): Promise<
 ### 2.9.1 AI Tools 与代办助手（Phase 11）
 ```typescript
 type AiToolRiskLevel = "READ" | "DRAFT" | "WRITE" | "HIGH_RISK"
+type AiToolCategory = "NAVIGATE" | AiToolRiskLevel
 
 type AiToolDefinition = {
   name: string
   title: string
   description: string
+  category?: AiToolCategory
+  href?: string
+  capabilityIds?: string[]
   inputSchema: z.ZodTypeAny
   riskLevel: AiToolRiskLevel
+  capabilities?: string[]
+  examples?: string[]
+  argumentHints?: string
+  requiredSlots?: string[]
   access?: {
     roles?: AppRole[]
     permission?: DashboardPermission
@@ -138,6 +146,22 @@ type AiQuickPrompt = {
   toolName: string
   riskLevel: AiToolRiskLevel
 }
+
+type AgentCapability = {
+  id: string
+  title: string
+  module: string
+  kind: "NAVIGATE" | "READ" | "DRAFT" | "WRITE" | "HIGH_RISK"
+  href: string
+  paths: string[]
+  description: string
+  roles?: AppRole[]
+  permission?: DashboardPermission
+  toolName?: string
+  capabilities: string[]
+  examples: string[]
+  riskLevel: AiToolRiskLevel
+}
 ```
 
 已注册 tool 分组：
@@ -145,10 +169,13 @@ type AiQuickPrompt = {
 | 分组 | 代表 tools |
 |------|------------|
 | 客户服务 | `search_products`、`customer_context`、`customer_submit_order`、`customer_orders`、`customer_receivables` |
+| 商城账户 | `shop_account_summary`、`shop_cart_summary`、`shop_coupon_summary` |
 | 经营查询 | `business_overview`、`salesperson_performance`、`search_customers`、`customer_purchase_history`、`product_operations_summary`、`finance_summary`、`delivery_summary`、`channel_summary` |
+| 缺口模块查询 | `purchase_supplier_summary`、`product_catalog_summary`、`inventory_records_summary`、`wechat_ecosystem_summary`、`audit_log_summary`、`finance_statement_summary`、`channel_pipeline_summary`、`dealer_promotion_summary` |
 | 管理操作 | `admin_update_product_price`、`order_status_action`、`inventory_stock_in`、`finance_register_payment`、`settings_save_business_config` |
 | 经销商 | `dealer_incoming_orders`、`dealer_report_stock`、`dealer_accept_routing`、`dealer_reject_routing` |
 | 营销与系统 | `marketing_create_coupon`、`marketing_issue_coupon`、`marketing_create_product_push`、`system_launch_readiness` |
+| 全站入口 | `navigate_to_feature`、`feature_help` |
 
 执行约定：
 - 固定高频词条由 `intent-templates.ts` 维护，并通过 `/api/ai/quick-prompts` 按角色返回。
@@ -159,6 +186,45 @@ type AiQuickPrompt = {
 - `HIGH_RISK` 除 token 外还要求指定确认文字。
 - Tool handler 必须复用现有业务 action/query，不允许绕过权限直接写库。
 - 非固定问法会记录高频候选，但不会自动变成本地规则。
+
+### 2.9.2 全站 Agent Capability 与导航工具
+
+全站页面能力目录位于 `src/features/ai/tools/capabilities.ts`，由 Planner v2 在普通自然语言规划前参与排序。目录按 `href`、`paths`、角色、权限、关键词和示例问法登记页面或业务入口。
+
+```typescript
+rankAgentCapabilitiesForMessage(message, context): RankedAgentCapability[]
+planAgentCapabilityNavigation(message, context, tools): AiToolPlan | null
+canUseAgentCapability(context, capability): boolean
+```
+
+新增通用 tool：
+
+```typescript
+navigate_to_feature({
+  query?: string
+  capabilityId?: string
+}): Promise<{
+  title: string
+  summary: string
+  href: string
+  details: AiToolDetail[]
+}>
+
+feature_help({
+  query?: string
+  capabilityId?: string
+}): Promise<{
+  title: string
+  summary: string
+  href?: string
+  details: AiToolDetail[]
+}>
+```
+
+约束：
+- `navigate_to_feature` 只返回当前角色可进入的页面入口。
+- `feature_help` 可解释当前角色是否可进入，但不暴露越权业务数据。
+- 导航类 tool 不得替代已有 READ/WRITE 业务 tool；欠款排行、客户统计、库存总览等仍由对应业务 tool 执行。
 
 ### 2.10 线索/询价模块（Phase 7 规划）
 ```typescript
@@ -303,8 +369,9 @@ SSE 事件：
 | 事件 | data |
 |------|------|
 | `delta` | `{ "text": "..." }` |
+| `status` | `{ "text": "正在筛选工具..." }` |
 | `card` | 查询结果卡或确认卡 |
-| `done` | `{ "ok": true }` |
+| `done` | `{ "ok": true, "planSource": "model", "plan": { "toolName": "..." } }` |
 | `error` | `{ "message": "请先登录后再使用 AI 助手" }` |
 
 `GET /api/ai/quick-prompts`

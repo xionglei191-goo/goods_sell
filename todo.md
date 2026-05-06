@@ -555,3 +555,21 @@
 - [x] 低置信问题返回“需要补充信息”卡片，不再展示大段可用工具清单。
 - [x] 扩展 `npm run test:ai-tools`、`npm run test:ai-runtime`、`npm run test:ai-provider` 覆盖 Planner v2 场景。
 - [x] 更新 `docs/13-AI工具与代办助手.md`：记录 Planner v2 链路、扩展新 tool 规范和验收标准。
+
+---
+
+## Phase 15：全站功能 Agent Tools 化（2026-05-06）
+
+> 目标：把 AI 对话升级为全站功能入口。AI 先理解用户想找的页面或业务能力，再匹配当前角色可用的 tool、页面入口或功能帮助，减少“找菜单”和“问功能在哪”的操作成本。
+
+- [x] 新增 `AgentCapabilityRegistry`：按 `id/title/module/kind/href/paths/roles/permission/toolName/capabilities/examples/riskLevel` 登记全站能力。
+- [x] 覆盖 `src/app/**/page.tsx` 中的后台、商城、经销商端和公共入口页面，当前 69 个 capabilities 覆盖 77 个页面路由。
+- [x] `AiToolDefinition` 扩展 `category`、`href`、`capabilityIds`、`requiredSlots`，为导航、查询、草稿和写操作统一建模预留字段。
+- [x] 新增 `navigate_to_feature`：用户问“供应商管理在哪”“怎么查看库存流水”等时返回当前角色可进入的页面入口。
+- [x] 新增 `feature_help`：解释某页面能做什么，并说明当前角色是否可进入，不暴露越权业务数据。
+- [x] Planner v2 同时排序 tools 与 Agent capabilities，provider prompt 中增加全站能力候选；provider 不可用时由 `planAgentCapabilityNavigation()` 兜底。
+- [x] 导航工具不抢占业务查询：客户统计、欠款排行、库存总览等仍命中原 READ tools。
+- [x] 补齐缺口模块 READ tools：采购供应商、产品分类品牌素材、库存流水、商城账户/购物车/优惠券、微信生态、操作日志、财务对账、渠道漏斗、经销商推广线索。
+- [x] 新增本地语义 READ 兜底：真实 AI provider 不可用时，仍可按 tool 元数据命中高置信查询工具。
+- [x] 新增 `npm run test:agent-capabilities`：扫描页面覆盖、校验 `canAccessPath()` 权限一致性，并覆盖供应商、库存流水、经销商政策、购物车、微信菜单等典型问法。
+- [x] 更新 `docs/13-AI工具与代办助手.md`、`docs/05-功能模块设计.md`、`docs/07-API设计.md`：记录全站能力目录、通用导航工具、扩展规范和验收命令。

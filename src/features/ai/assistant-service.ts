@@ -3,7 +3,15 @@ import { recordAiPromptUsage, type AiPlanSource } from "@/features/ai/prompt-usa
 import { auditAiAssistant } from "@/features/ai/tools/audit";
 import { getAiToolContext } from "@/features/ai/tools/context";
 import { executeAiTool, getAvailableAiTools, AiToolError, preflightAiTool } from "@/features/ai/tools/executor";
-import { buildClarificationResponse, planWithModelV2, rankAiToolsForMessage, repairModelPlan, type RankedAiTool } from "@/features/ai/tools/model-planner";
+import {
+  buildClarificationResponse,
+  planAgentCapabilityNavigation,
+  planRankedReadToolFallback,
+  planWithModelV2,
+  rankAiToolsForMessage,
+  repairModelPlan,
+  type RankedAiTool,
+} from "@/features/ai/tools/model-planner";
 import { planAiToolCall, validateAiToolPlan } from "@/features/ai/tools/planner";
 import type { AiAssistantCard, AiToolDefinition, AiToolPlan } from "@/features/ai/tools/types";
 
@@ -131,6 +139,30 @@ export async function answerAssistantMessage(input: string | AssistantRequest): 
         source = "heuristic";
       } else {
         lastPlanError = heuristicValidation.error ?? lastPlanError;
+      }
+    }
+
+    if (!plan) {
+      await emitStatus("正在进行语义查询匹配...");
+      const semanticReadPlan = planRankedReadToolFallback(message, context, tools);
+      const semanticReadValidation = await validateAssistantPlan(message, context, tools, semanticReadPlan);
+      if (semanticReadValidation.plan) {
+        plan = semanticReadValidation.plan;
+        source = "heuristic";
+      } else {
+        lastPlanError = semanticReadValidation.error ?? lastPlanError;
+      }
+    }
+
+    if (!plan) {
+      await emitStatus("正在匹配全站功能...");
+      const capabilityPlan = planAgentCapabilityNavigation(message, context, tools);
+      const capabilityValidation = await validateAssistantPlan(message, context, tools, capabilityPlan);
+      if (capabilityValidation.plan) {
+        plan = capabilityValidation.plan;
+        source = "heuristic";
+      } else {
+        lastPlanError = capabilityValidation.error ?? lastPlanError;
       }
     }
   }

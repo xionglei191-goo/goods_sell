@@ -1,4 +1,10 @@
 import { callAnthropicCompatible, hasAiProvider } from "@/features/ai/provider";
+import {
+  describeRankedAgentCapabilitiesForPrompt,
+  findBestAgentCapabilityForMessage,
+  rankAgentCapabilitiesForMessage,
+  type RankedAgentCapability,
+} from "@/features/ai/tools/capabilities";
 import type { AiAssistantCard, AiToolContext, AiToolDefinition, AiToolPlan } from "@/features/ai/tools/types";
 
 export type RankedAiTool = {
@@ -19,6 +25,7 @@ type ModelPlanJson = {
 type ModelPlannerResult = {
   plan: AiToolPlan | null;
   rankedTools: RankedAiTool[];
+  rankedCapabilities: RankedAgentCapability[];
   missingSlots: string[];
   rawText?: string;
   error?: string;
@@ -106,9 +113,20 @@ function scoreTool(message: string, tool: AiToolDefinition, index: number): Rank
   return { tool, score, reasons: reasons.slice(0, 4) };
 }
 
-export function rankAiToolsForMessage(message: string, _context: AiToolContext, tools: readonly AiToolDefinition[]) {
+export function rankAiToolsForMessage(message: string, context: AiToolContext, tools: readonly AiToolDefinition[]) {
+  const rankedCapabilities = rankAgentCapabilitiesForMessage(message, context);
+  const bestCapability = rankedCapabilities[0];
+  const isNavigationLike = /在哪|哪里|入口|打开|进入|跳转|页面|菜单|在哪管理|怎么查看|如何查看|怎么配置|如何配置/.test(message);
   return tools
-    .map((tool, index) => scoreTool(message, tool, index))
+    .map((tool, index) => {
+      const ranked = scoreTool(message, tool, index);
+      if ((tool.name === "navigate_to_feature" || tool.name === "feature_help") && bestCapability && isNavigationLike) {
+        const boost = Math.min(bestCapability.score * (tool.name === "navigate_to_feature" ? 1.35 : 1.05), 35);
+        ranked.score += boost;
+        ranked.reasons = [`功能:${bestCapability.capability.title}`, ...ranked.reasons].slice(0, 4);
+      }
+      return ranked;
+    })
     .sort((left, right) => right.score - left.score);
 }
 
@@ -174,6 +192,8 @@ async function callModelPlanner(params: {
 }) {
   const toolsText = describeRankedAiToolsForPrompt(params.rankedTools);
   const toolNames = params.rankedTools.slice(0, TOP_TOOL_LIMIT).map((item) => item.tool.name).join(", ");
+  const rankedCapabilities = rankAgentCapabilitiesForMessage(params.message, params.context);
+  const capabilitiesText = describeRankedAgentCapabilitiesForPrompt(rankedCapabilities);
   const repairText = params.repair
     ? `\n上一次计划未通过校验：${JSON.stringify(params.repair.rejectedPlan)}\n失败原因：${params.repair.error}\n请修复 toolName 或 args；如果缺少必要信息，返回 missingSlots。`
     : "";
@@ -186,11 +206,12 @@ async function callModelPlanner(params: {
       `toolName 必须逐字复制候选工具名之一，不能缩写、翻译或自造别名。候选工具名：${toolNames}。` +
       `如果用户意图不明确或缺少必填参数，toolName 返回空字符串，并在 missingSlots 中列出字段名。` +
       `只规划一个最匹配的工具。READ 用于查询；WRITE/HIGH_RISK 只会生成确认卡，不会直接写库。` +
+      `如果用户是在问某功能在哪、怎么打开、某页面能做什么，优先使用 navigate_to_feature 或 feature_help，并把 args.capabilityId 设置为全站能力候选 id。` +
       `关键边界：客户“买了什么/买过什么/购买记录”是购买历史查询；“一共有多少客户/哪个客户消费最高”是客户统计分析；“我要下单/帮客户开单/要 N 箱”才是下单或开单；库存总量、库存最多、低库存属于商品经营查询，不是经销商上报库存。`,
     messages: [
       {
         role: "user",
-        content: `当前角色：${params.context.role}\n候选工具：\n${toolsText}\n\n用户请求：${params.message}${repairText}`,
+        content: `当前角色：${params.context.role}\n候选工具：\n${toolsText}\n\n全站能力候选：\n${capabilitiesText}\n\n用户请求：${params.message}${repairText}`,
       },
     ],
   });
@@ -198,16 +219,17 @@ async function callModelPlanner(params: {
 
 export async function planWithModelV2(message: string, context: AiToolContext, tools: readonly AiToolDefinition[]): Promise<ModelPlannerResult> {
   const rankedTools = rankAiToolsForMessage(message, context, tools);
-  if (!hasAiProvider()) return { plan: null, rankedTools, missingSlots: [], error: "AI provider 未配置" };
+  const rankedCapabilities = rankAgentCapabilitiesForMessage(message, context);
+  if (!hasAiProvider()) return { plan: null, rankedTools, rankedCapabilities, missingSlots: [], error: "AI provider 未配置" };
 
   try {
     const rawText = await callModelPlanner({ message, context, rankedTools });
     const parsed = extractJsonObject(rawText);
-    if (!parsed) return { plan: null, rankedTools, missingSlots: [], rawText, error: "provider 未返回可解析 JSON" };
+    if (!parsed) return { plan: null, rankedTools, rankedCapabilities, missingSlots: [], rawText, error: "provider 未返回可解析 JSON" };
     const { plan, missingSlots } = asPlan(parsed, rankedTools);
-    return { plan, rankedTools, missingSlots, rawText };
+    return { plan, rankedTools, rankedCapabilities, missingSlots, rawText };
   } catch (error) {
-    return { plan: null, rankedTools, missingSlots: [], error: error instanceof Error ? error.message : "provider 调用失败" };
+    return { plan: null, rankedTools, rankedCapabilities, missingSlots: [], error: error instanceof Error ? error.message : "provider 调用失败" };
   }
 }
 
@@ -219,17 +241,81 @@ export async function repairModelPlan(
   error: string,
 ): Promise<ModelPlannerResult> {
   const rankedTools = rankAiToolsForMessage(message, context, tools);
-  if (!hasAiProvider()) return { plan: null, rankedTools, missingSlots: [], error: "AI provider 未配置" };
+  const rankedCapabilities = rankAgentCapabilitiesForMessage(message, context);
+  if (!hasAiProvider()) return { plan: null, rankedTools, rankedCapabilities, missingSlots: [], error: "AI provider 未配置" };
 
   try {
     const rawText = await callModelPlanner({ message, context, rankedTools, repair: { rejectedPlan, error } });
     const parsed = extractJsonObject(rawText);
-    if (!parsed) return { plan: null, rankedTools, missingSlots: [], rawText, error: "provider 修复未返回可解析 JSON" };
+    if (!parsed) return { plan: null, rankedTools, rankedCapabilities, missingSlots: [], rawText, error: "provider 修复未返回可解析 JSON" };
     const { plan, missingSlots } = asPlan(parsed, rankedTools);
-    return { plan, rankedTools, missingSlots, rawText };
+    return { plan, rankedTools, rankedCapabilities, missingSlots, rawText };
   } catch (repairError) {
-    return { plan: null, rankedTools, missingSlots: [], error: repairError instanceof Error ? repairError.message : "provider 修复失败" };
+    return { plan: null, rankedTools, rankedCapabilities, missingSlots: [], error: repairError instanceof Error ? repairError.message : "provider 修复失败" };
   }
+}
+
+export function planAgentCapabilityNavigation(message: string, context: AiToolContext, tools: readonly AiToolDefinition[]): AiToolPlan | null {
+  if (!tools.some((tool) => tool.name === "navigate_to_feature")) return null;
+  const best = findBestAgentCapabilityForMessage(message, context, /在哪|哪里|入口|打开|进入|跳转|页面|菜单|配置|管理|怎么|如何|查看/.test(message) ? 7 : 14);
+  if (!best) return null;
+  return {
+    toolName: "navigate_to_feature",
+    args: { capabilityId: best.capability.id, query: message },
+    reason: `全站能力目录匹配：${best.capability.title}`,
+    intent: "navigate_feature",
+    confidence: Math.min(0.95, best.score / 30),
+  };
+}
+
+function inferPeriod(message: string) {
+  if (/全部|累计|所有|历史/.test(message)) return "all";
+  if (/今天|今日|当天/.test(message)) return "day";
+  if (/本周|这周|最近7天|近7天/.test(message)) return "week";
+  return "month";
+}
+
+function inferLimit(message: string) {
+  const number = Number(message.match(/(?:前|top)?\s*(\d{1,2})\s*(?:个|条|张|家|项)?/i)?.[1] ?? 8);
+  return Number.isFinite(number) ? Math.min(Math.max(number, 1), 20) : 8;
+}
+
+function argsForSemanticReadFallback(toolName: string, message: string): Record<string, unknown> | null {
+  const period = inferPeriod(message);
+  const limit = inferLimit(message);
+  const summaryArgs = { period, limit, query: "" };
+  if (
+    [
+      "purchase_supplier_summary",
+      "product_catalog_summary",
+      "inventory_records_summary",
+      "wechat_ecosystem_summary",
+      "audit_log_summary",
+      "finance_statement_summary",
+      "channel_pipeline_summary",
+      "dealer_promotion_summary",
+    ].includes(toolName)
+  ) {
+    return summaryArgs;
+  }
+  if (toolName === "shop_cart_summary" || toolName === "shop_coupon_summary") return { limit };
+  if (toolName === "shop_account_summary") return {};
+  return null;
+}
+
+export function planRankedReadToolFallback(message: string, context: AiToolContext, tools: readonly AiToolDefinition[]): AiToolPlan | null {
+  const rankedTools = rankAiToolsForMessage(message, context, tools);
+  const candidate = rankedTools.find((item) => item.tool.riskLevel === "READ" && item.tool.name !== "navigate_to_feature" && item.tool.name !== "feature_help");
+  if (!candidate || candidate.score < 12) return null;
+  const args = argsForSemanticReadFallback(candidate.tool.name, message);
+  if (!args) return null;
+  return {
+    toolName: candidate.tool.name,
+    args,
+    reason: `本地语义 READ 匹配：${candidate.tool.title}`,
+    intent: "semantic_read",
+    confidence: Math.min(0.9, candidate.score / 30),
+  };
 }
 
 function labelMissingSlots(missingSlots: readonly string[]) {

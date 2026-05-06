@@ -4,6 +4,7 @@ import type { DashboardPermission, AppRole } from "@/features/auth/permissions";
 import type { SessionUser } from "@/features/auth/guards";
 
 export type AiToolRiskLevel = "READ" | "DRAFT" | "WRITE" | "HIGH_RISK";
+export type AiToolCategory = "NAVIGATE" | AiToolRiskLevel;
 
 export type AiToolContext = {
   user: SessionUser;
@@ -69,6 +70,7 @@ export type AnyToolInput = Record<string, unknown> & {
   buyerPhone?: string;
   buyerTaxNo?: string;
   businessLicense?: string;
+  capabilityId?: string;
   confirmText?: string;
   couponQuery?: string;
   couponType?: "AMOUNT" | "PERCENT";
@@ -132,9 +134,13 @@ export type AiToolDefinition<TSchema extends z.ZodTypeAny = z.ZodTypeAny> = {
   name: string;
   title: string;
   description: string;
+  category?: AiToolCategory;
+  href?: string;
+  capabilityIds?: readonly string[];
   capabilities?: readonly string[];
   examples?: readonly string[];
   argumentHints?: string;
+  requiredSlots?: readonly string[];
   inputSchema: TSchema;
   riskLevel: AiToolRiskLevel;
   access?: AiToolAccess;

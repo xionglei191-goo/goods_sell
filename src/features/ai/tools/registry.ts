@@ -18,6 +18,13 @@ import { SHOP_PRODUCTS_CACHE_TAG } from "@/features/shop/cache";
 import { roleHasPermission } from "@/features/auth/permissions";
 import { logAction } from "@/features/logs/audit";
 import { getLaunchReadinessReport } from "@/features/system/launch-readiness";
+import {
+  buildAgentCapabilityDetails,
+  canUseAgentCapability,
+  describeAgentCapability,
+  findAgentCapabilityById,
+  rankAgentCapabilitiesForMessage,
+} from "@/features/ai/tools/capabilities";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath, revalidateTag } from "@/lib/revalidate";
 import type { AiToolDefinition, AiToolResult, AiToolContext, AiToolDetail } from "@/features/ai/tools/types";
@@ -483,8 +490,576 @@ async function createCustomerOrderFromAi(input: { productQuery: string; quantity
 
 const productSearchSchema = z.object({ query: z.string().trim().min(1), limit: z.coerce.number().int().min(1).max(20).default(6) });
 const periodSchema = z.object({ period: z.enum(["day", "week", "month"]).default("month") });
+const featureNavigationSchema = z.object({
+  capabilityId: z.string().trim().optional(),
+  query: z.string().trim().min(1).optional(),
+}).refine((input) => Boolean(input.capabilityId || input.query), { message: "请提供功能名称或能力 ID" });
+const summaryQuerySchema = z.object({
+  query: z.string().trim().optional().default(""),
+  limit: z.coerce.number().int().min(1).max(20).default(8),
+  period: z.enum(["all", "day", "week", "month"]).default("month"),
+});
+
+function periodCreatedAtWhere(period?: string) {
+  return period === "all" ? {} : { createdAt: { gte: startForPeriod(period) } };
+}
+
+function compactDate(value?: Date | null) {
+  return value ? value.toISOString().slice(0, 10) : "-";
+}
 
 export const aiTools: AiToolDefinition[] = [
+  {
+    name: "navigate_to_feature",
+    title: "打开功能入口",
+    description: "按当前角色匹配全站功能入口，返回可进入页面和推荐下一步。",
+    category: "NAVIGATE",
+    riskLevel: "READ",
+    inputSchema: featureNavigationSchema,
+    handler: async (input, context) => {
+      const explicit = input.capabilityId ? findAgentCapabilityById(input.capabilityId) : null;
+      const ranked = input.query ? rankAgentCapabilitiesForMessage(input.query, context) : [];
+      const capability = explicit && canUseAgentCapability(context, explicit) ? explicit : ranked[0]?.capability;
+
+      if (!capability) {
+        return {
+          title: "未找到可进入功能",
+          summary: "当前角色下没有匹配到可进入的页面，请换一个更具体的功能名称。",
+          details: input.query ? [{ label: "查询", value: input.query }] : [],
+        };
+      }
+
+      return {
+        title: capability.title,
+        summary: `${describeAgentCapability(capability)} 可以从这里进入。`,
+        href: capability.href,
+        details: buildAgentCapabilityDetails(capability),
+        data: { capabilityId: capability.id, href: capability.href, kind: capability.kind },
+      };
+    },
+  },
+  {
+    name: "feature_help",
+    title: "功能帮助",
+    description: "解释某个页面或业务功能能做什么，并说明当前角色是否可进入。",
+    category: "NAVIGATE",
+    riskLevel: "READ",
+    inputSchema: featureNavigationSchema,
+    handler: async (input, context) => {
+      const explicit = input.capabilityId ? findAgentCapabilityById(input.capabilityId) : null;
+      const ranked = input.query ? rankAgentCapabilitiesForMessage(input.query, context, { includeInaccessible: true }) : [];
+      const capability = explicit ?? ranked[0]?.capability;
+
+      if (!capability) {
+        return {
+          title: "未找到功能说明",
+          summary: "我还没有匹配到对应页面，请补充模块名或功能名。",
+          details: input.query ? [{ label: "查询", value: input.query }] : [],
+        };
+      }
+
+      const allowed = canUseAgentCapability(context, capability);
+      return {
+        title: capability.title,
+        summary: allowed ? describeAgentCapability(capability) : `当前角色 ${context.role} 暂不能进入：${describeAgentCapability(capability)}`,
+        href: allowed ? capability.href : undefined,
+        details: [
+          ...buildAgentCapabilityDetails(capability),
+          { label: "当前角色", value: context.role },
+          { label: "可进入", value: allowed ? "是" : "否" },
+          { label: "示例问法", value: capability.examples.join(" / ") },
+        ],
+        data: { capabilityId: capability.id, href: capability.href, allowed },
+      };
+    },
+  },
+  {
+    name: "purchase_supplier_summary",
+    title: "采购与供应商摘要",
+    description: "查询采购单、供应商状态、采购金额和近期采购记录。",
+    riskLevel: "READ",
+    access: { permission: "purchase:manage" },
+    inputSchema: summaryQuerySchema,
+    handler: async (input) => {
+      const query = String(input.query ?? "").trim();
+      const purchaseWhere: Prisma.PurchaseOrderWhereInput = {
+        ...periodCreatedAtWhere(input.period),
+        ...(query
+          ? {
+              supplier: {
+                OR: [
+                  { name: { contains: query, mode: "insensitive" } },
+                  { contactName: { contains: query, mode: "insensitive" } },
+                  { phone: { contains: query, mode: "insensitive" } },
+                ],
+              },
+            }
+          : {}),
+      };
+      const supplierWhere: Prisma.SupplierWhereInput = query
+        ? {
+            OR: [
+              { name: { contains: query, mode: "insensitive" } },
+              { contactName: { contains: query, mode: "insensitive" } },
+              { phone: { contains: query, mode: "insensitive" } },
+            ],
+          }
+        : {};
+      const [supplierCount, activeSupplierCount, purchaseCount, purchaseAmount, statusRows, recent] = await Promise.all([
+        prisma.supplier.count({ where: supplierWhere }),
+        prisma.supplier.count({ where: { ...supplierWhere, isActive: true } }),
+        prisma.purchaseOrder.count({ where: purchaseWhere }),
+        prisma.purchaseOrder.aggregate({ where: purchaseWhere, _sum: { totalAmount: true } }),
+        prisma.purchaseOrder.groupBy({ by: ["status"], where: purchaseWhere, _count: { _all: true }, _sum: { totalAmount: true } }),
+        prisma.purchaseOrder.findMany({
+          where: purchaseWhere,
+          include: { supplier: { select: { name: true } }, _count: { select: { items: true } } },
+          orderBy: { createdAt: "desc" },
+          take: input.limit,
+        }),
+      ]);
+
+      return {
+        title: "采购与供应商摘要",
+        summary: `供应商 ${supplierCount} 家，启用 ${activeSupplierCount} 家；采购单 ${purchaseCount} 张，金额 ${money(Number(purchaseAmount._sum.totalAmount ?? 0))}。`,
+        href: "/dashboard/purchase",
+        details: [
+          ...details([
+            ["周期", input.period],
+            ["供应商", supplierCount],
+            ["启用供应商", activeSupplierCount],
+            ["采购单", purchaseCount],
+            ["采购金额", money(Number(purchaseAmount._sum.totalAmount ?? 0))],
+          ]),
+          ...statusRows.map((row) => ({ label: `状态 ${row.status}`, value: `${row._count._all} 张｜${money(Number(row._sum.totalAmount ?? 0))}` })),
+          ...recent.map((order) => ({
+            label: order.purchaseNo,
+            value: `${order.supplier.name}｜${order.status}｜${order._count.items} 项｜${money(Number(order.totalAmount))}`,
+          })),
+        ],
+      };
+    },
+  },
+  {
+    name: "product_catalog_summary",
+    title: "产品分类品牌素材摘要",
+    description: "查询商品、分类、品牌、图片素材审核和授权状态。",
+    riskLevel: "READ",
+    access: { permission: "products:view" },
+    inputSchema: summaryQuerySchema,
+    handler: async (input) => {
+      const query = String(input.query ?? "").trim();
+      const productWhere: Prisma.ProductWhereInput = query
+        ? {
+            OR: [
+              { name: { contains: query, mode: "insensitive" } },
+              { sku: { contains: query, mode: "insensitive" } },
+              { brand: { name: { contains: query, mode: "insensitive" } } },
+              { category: { name: { contains: query, mode: "insensitive" } } },
+            ],
+          }
+        : {};
+      const materialWhere: Prisma.ProductImageMaterialWhereInput = {
+        ...periodCreatedAtWhere(input.period),
+        ...(query
+          ? {
+              OR: [
+                { sourceName: { contains: query, mode: "insensitive" } },
+                { product: { name: { contains: query, mode: "insensitive" } } },
+                { product: { sku: { contains: query, mode: "insensitive" } } },
+              ],
+            }
+          : {}),
+      };
+      const [products, activeProducts, categories, brands, pendingReview, pendingLicense, duplicateMaterials, recentMaterials] = await Promise.all([
+        prisma.product.count({ where: productWhere }),
+        prisma.product.count({ where: { ...productWhere, status: "ACTIVE" } }),
+        prisma.category.count(),
+        prisma.brand.count(),
+        prisma.productImageMaterial.count({ where: { ...materialWhere, reviewStatus: "PENDING" } }),
+        prisma.productImageMaterial.count({ where: { ...materialWhere, licenseStatus: "PENDING" } }),
+        prisma.productImageMaterial.count({ where: { ...materialWhere, duplicateOfMaterialId: { not: null } } }),
+        prisma.productImageMaterial.findMany({
+          where: materialWhere,
+          include: { product: { select: { name: true, sku: true } } },
+          orderBy: { createdAt: "desc" },
+          take: input.limit,
+        }),
+      ]);
+
+      return {
+        title: "产品分类品牌素材摘要",
+        summary: `商品 ${products} 个，启用 ${activeProducts} 个；分类 ${categories} 个，品牌 ${brands} 个；待审核素材 ${pendingReview} 条。`,
+        href: "/dashboard/products/materials",
+        details: [
+          ...details([
+            ["商品", products],
+            ["启用商品", activeProducts],
+            ["分类", categories],
+            ["品牌", brands],
+            ["待审核素材", pendingReview],
+            ["待授权素材", pendingLicense],
+            ["重复素材", duplicateMaterials],
+          ]),
+          ...recentMaterials.map((material) => ({
+            label: material.product.name,
+            value: `${material.product.sku}｜审核 ${material.reviewStatus}｜授权 ${material.licenseStatus}｜${material.storageProvider}`,
+          })),
+        ],
+      };
+    },
+  },
+  {
+    name: "inventory_records_summary",
+    title: "库存流水摘要",
+    description: "查询库存出入库流水、操作人、商品和库存变动。",
+    riskLevel: "READ",
+    access: { permission: "inventory:manage" },
+    inputSchema: summaryQuerySchema,
+    handler: async (input) => {
+      const query = String(input.query ?? "").trim();
+      const where: Prisma.StockRecordWhereInput = {
+        ...periodCreatedAtWhere(input.period),
+        ...(query
+          ? {
+              OR: [
+                { product: { name: { contains: query, mode: "insensitive" } } },
+                { product: { sku: { contains: query, mode: "insensitive" } } },
+                { operator: { name: { contains: query, mode: "insensitive" } } },
+                { remark: { contains: query, mode: "insensitive" } },
+              ],
+            }
+          : {}),
+      };
+      const [count, quantityByType, recent] = await Promise.all([
+        prisma.stockRecord.count({ where }),
+        prisma.stockRecord.groupBy({ by: ["type"], where, _count: { _all: true }, _sum: { quantity: true } }),
+        prisma.stockRecord.findMany({
+          where,
+          include: { product: { select: { name: true, sku: true } }, operator: { select: { name: true } } },
+          orderBy: { createdAt: "desc" },
+          take: input.limit,
+        }),
+      ]);
+
+      return {
+        title: "库存流水摘要",
+        summary: `当前范围共有 ${count} 条库存流水。`,
+        href: "/dashboard/inventory/records",
+        details: [
+          ...quantityByType.map((row) => ({ label: row.type, value: `${row._count._all} 条｜${row._sum.quantity ?? 0} 件` })),
+          ...recent.map((record) => ({
+            label: record.product.name,
+            value: `${record.type} ${record.quantity}｜${record.beforeStock} -> ${record.afterStock}｜${record.operator.name ?? "系统"}｜${compactDate(record.createdAt)}`,
+          })),
+        ],
+      };
+    },
+  },
+  {
+    name: "shop_account_summary",
+    title: "商城账户摘要",
+    description: "消费者查询自己的账户、地址、订单、购物车、优惠券和欠款概况。",
+    riskLevel: "READ",
+    access: { roles: ["CONSUMER"] },
+    inputSchema: z.object({}),
+    handler: async (_input, context) => {
+      const [customer, cartCount, couponCount, orderCount] = await Promise.all([
+        prisma.customer.findUnique({
+          where: { id: context.user.id },
+          include: { addresses: { select: { name: true, phone: true, city: true, district: true, isDefault: true }, take: 5 } },
+        }),
+        prisma.cartItem.count({ where: { customerId: context.user.id } }),
+        prisma.customerCoupon.count({ where: { customerId: context.user.id, status: "UNUSED" } }),
+        prisma.order.count({ where: { customerId: context.user.id } }),
+      ]);
+      if (!customer) throw new Error("未找到当前客户账户");
+
+      return {
+        title: "商城账户摘要",
+        summary: `${customer.name}，地址 ${customer.addresses.length} 个，购物车 ${cartCount} 项，可用券 ${couponCount} 张，订单 ${orderCount} 笔。`,
+        href: "/shop/account",
+        details: [
+          ...details([
+            ["姓名", customer.name],
+            ["手机号", customer.phone],
+            ["积分", customer.points],
+            ["信用额度", money(Number(customer.creditLimit))],
+            ["欠款余额", money(Number(customer.balance))],
+            ["购物车", cartCount],
+            ["可用券", couponCount],
+            ["订单数", orderCount],
+          ]),
+          ...customer.addresses.map((address) => ({
+            label: address.isDefault ? "默认地址" : "地址",
+            value: `${address.name} ${address.phone}｜${address.city}${address.district}`,
+          })),
+        ],
+      };
+    },
+  },
+  {
+    name: "shop_cart_summary",
+    title: "购物车摘要",
+    description: "消费者查询自己的购物车商品、数量、选中状态和估算金额。",
+    riskLevel: "READ",
+    access: { roles: ["CONSUMER"] },
+    inputSchema: z.object({ limit: z.coerce.number().int().min(1).max(20).default(10) }),
+    handler: async (input, context) => {
+      const items = await prisma.cartItem.findMany({
+        where: { customerId: context.user.id },
+        include: { product: { select: { name: true, sku: true, retailPrice: true, stock: true, status: true } } },
+        orderBy: { updatedAt: "desc" },
+        take: input.limit,
+      });
+      const selectedAmount = items.filter((item) => item.selected).reduce((total, item) => total + Number(item.product.retailPrice) * item.quantity, 0);
+
+      return {
+        title: "购物车摘要",
+        summary: items.length ? `购物车 ${items.length} 项，已选估算 ${money(selectedAmount)}。` : "购物车还是空的。",
+        href: "/shop/cart",
+        details: items.map((item) => ({
+          label: item.product.name,
+          value: `${item.quantity} 件｜${item.selected ? "已选" : "未选"}｜${money(Number(item.product.retailPrice) * item.quantity)}｜库存 ${item.product.stock}`,
+        })),
+      };
+    },
+  },
+  {
+    name: "shop_coupon_summary",
+    title: "我的优惠券摘要",
+    description: "消费者查询自己的优惠券、可用券、已用券和过期券。",
+    riskLevel: "READ",
+    access: { roles: ["CONSUMER"] },
+    inputSchema: z.object({ limit: z.coerce.number().int().min(1).max(20).default(10) }),
+    handler: async (input, context) => {
+      const [statusRows, coupons] = await Promise.all([
+        prisma.customerCoupon.groupBy({ by: ["status"], where: { customerId: context.user.id }, _count: { _all: true } }),
+        prisma.customerCoupon.findMany({
+          where: { customerId: context.user.id },
+          include: { coupon: { select: { name: true, type: true, amount: true, percent: true, threshold: true, endsAt: true, isActive: true } } },
+          orderBy: { receivedAt: "desc" },
+          take: input.limit,
+        }),
+      ]);
+
+      return {
+        title: "我的优惠券摘要",
+        summary: statusRows.length ? statusRows.map((row) => `${row.status} ${row._count._all} 张`).join("，") : "暂时没有优惠券。",
+        href: "/shop/coupons",
+        details: coupons.map((item) => ({
+          label: item.coupon.name,
+          value: `${item.status}｜${item.coupon.type === "AMOUNT" ? money(Number(item.coupon.amount ?? 0)) : `${item.coupon.percent}%`}｜门槛 ${money(Number(item.coupon.threshold))}｜到期 ${compactDate(item.coupon.endsAt)}`,
+        })),
+      };
+    },
+  },
+  {
+    name: "wechat_ecosystem_summary",
+    title: "微信生态摘要",
+    description: "查询公众号模板消息、小程序分享和微信配置就绪概况。",
+    riskLevel: "READ",
+    access: { permission: "wechat:manage" },
+    inputSchema: summaryQuerySchema,
+    handler: async (input) => {
+      const where = periodCreatedAtWhere(input.period);
+      const [messageCount, messageStatuses, shareCount, recentMessages] = await Promise.all([
+        prisma.wechatMessageLog.count({ where }),
+        prisma.wechatMessageLog.groupBy({ by: ["status"], where, _count: { _all: true } }),
+        prisma.wechatShareEvent.count({ where }),
+        prisma.wechatMessageLog.findMany({
+          where,
+          include: { customer: { select: { name: true, phone: true } }, order: { select: { orderNo: true } } },
+          orderBy: { createdAt: "desc" },
+          take: input.limit,
+        }),
+      ]);
+      const configKeys = ["WECHAT_MINI_APP_ID", "WECHAT_OFFICIAL_APP_ID", "WECHAT_OFFICIAL_ORDER_TEMPLATE_ID", "WECHAT_PAY_MCH_ID"];
+
+      return {
+        title: "微信生态摘要",
+        summary: `微信消息 ${messageCount} 条，分享 ${shareCount} 条；关键配置 ${configKeys.filter((key) => Boolean(process.env[key])).length}/${configKeys.length} 项已配置。`,
+        href: "/dashboard/wechat",
+        details: [
+          ...configKeys.map((key) => ({ label: key, value: process.env[key] ? "已配置" : "未配置" })),
+          ...messageStatuses.map((row) => ({ label: `消息 ${row.status}`, value: `${row._count._all} 条` })),
+          ...recentMessages.map((message) => ({
+            label: message.scene,
+            value: `${message.status}｜${message.customer?.name ?? message.openId ?? "未知用户"}｜${message.order?.orderNo ?? "-"}｜${compactDate(message.createdAt)}`,
+          })),
+        ],
+      };
+    },
+  },
+  {
+    name: "audit_log_summary",
+    title: "操作日志摘要",
+    description: "按模块、动作、操作人或关键词查询审计日志和 AI 工具调用记录。",
+    riskLevel: "READ",
+    access: { permission: "logs:manage" },
+    inputSchema: summaryQuerySchema,
+    handler: async (input) => {
+      const query = String(input.query ?? "").trim();
+      const where: Prisma.AuditLogWhereInput = {
+        ...periodCreatedAtWhere(input.period),
+        ...(query
+          ? {
+              OR: [
+                { module: { contains: query, mode: "insensitive" } },
+                { action: { contains: query, mode: "insensitive" } },
+                { operatorName: { contains: query, mode: "insensitive" } },
+                { targetName: { contains: query, mode: "insensitive" } },
+                { summary: { contains: query, mode: "insensitive" } },
+              ],
+            }
+          : {}),
+      };
+      const [count, moduleRows, recent] = await Promise.all([
+        prisma.auditLog.count({ where }),
+        prisma.auditLog.groupBy({ by: ["module"], where, _count: { _all: true }, orderBy: { _count: { module: "desc" } }, take: 8 }),
+        prisma.auditLog.findMany({ where, orderBy: { createdAt: "desc" }, take: input.limit }),
+      ]);
+
+      return {
+        title: "操作日志摘要",
+        summary: `当前范围共有 ${count} 条操作日志。`,
+        href: "/dashboard/logs",
+        details: [
+          ...moduleRows.map((row) => ({ label: row.module, value: `${row._count._all} 条` })),
+          ...recent.map((log) => ({
+            label: `${log.module}｜${log.action}`,
+            value: `${log.operatorName ?? "系统"}｜${log.summary.slice(0, 80)}｜${compactDate(log.createdAt)}`,
+          })),
+        ],
+      };
+    },
+  },
+  {
+    name: "finance_statement_summary",
+    title: "财务对账与票据摘要",
+    description: "查询客户欠款、收款、对账口径、票据和财务报表细项。",
+    riskLevel: "READ",
+    access: { permission: "finance:manage" },
+    inputSchema: summaryQuerySchema,
+    handler: async (input) => {
+      const where = periodCreatedAtWhere(input.period);
+      const [paymentSum, paymentCount, invoiceSum, invoiceCount, debtors] = await Promise.all([
+        prisma.payment.aggregate({ where: { ...where, status: "COMPLETED" }, _sum: { amount: true } }),
+        prisma.payment.count({ where }),
+        prisma.invoice.aggregate({ where, _sum: { amount: true, taxAmount: true } }),
+        prisma.invoice.count({ where }),
+        prisma.customer.findMany({
+          where: { balance: { gt: 0 } },
+          select: { name: true, phone: true, balance: true, salesPerson: { select: { name: true } } },
+          orderBy: { balance: "desc" },
+          take: input.limit,
+        }),
+      ]);
+
+      return {
+        title: "财务对账与票据摘要",
+        summary: `收款 ${paymentCount} 笔，金额 ${money(Number(paymentSum._sum?.amount ?? 0))}；发票 ${invoiceCount} 张，金额 ${money(Number(invoiceSum._sum.amount ?? 0))}。`,
+        href: "/dashboard/finance/statements",
+        details: [
+          ...details([
+            ["周期", input.period],
+            ["收款笔数", paymentCount],
+            ["收款金额", money(Number(paymentSum._sum?.amount ?? 0))],
+            ["发票张数", invoiceCount],
+            ["发票金额", money(Number(invoiceSum._sum.amount ?? 0))],
+            ["税额", money(Number(invoiceSum._sum.taxAmount ?? 0))],
+          ]),
+          ...debtors.map((customer) => ({
+            label: customer.name,
+            value: `${customer.phone}｜欠款 ${money(Number(customer.balance))}｜销售 ${customer.salesPerson?.name ?? "未分配"}`,
+          })),
+        ],
+      };
+    },
+  },
+  {
+    name: "channel_pipeline_summary",
+    title: "渠道线索询价报价摘要",
+    description: "查询线索、询价、报价、推广码、新品推送和渠道冲突漏斗。",
+    riskLevel: "READ",
+    access: { permission: "channel:manage" },
+    inputSchema: summaryQuerySchema,
+    handler: async (input, context) => {
+      const query = String(input.query ?? "").trim();
+      const salespersonFilter = context.role === "SALESPERSON" ? { salespersonId: context.user.id } : {};
+      const leadWhere: Prisma.LeadWhereInput = {
+        ...periodCreatedAtWhere(input.period),
+        ...salespersonFilter,
+        ...(query ? { OR: [{ name: { contains: query, mode: "insensitive" } }, { phone: { contains: query, mode: "insensitive" } }, { notes: { contains: query, mode: "insensitive" } }] } : {}),
+      };
+      const inquiryWhere: Prisma.InquiryWhereInput = { ...periodCreatedAtWhere(input.period), ...salespersonFilter };
+      const quoteWhere: Prisma.QuoteWhereInput = {
+        ...periodCreatedAtWhere(input.period),
+        ...(context.role === "SALESPERSON" ? { inquiry: { salespersonId: context.user.id } } : {}),
+      };
+      const [leadStatuses, inquiryStatuses, quoteStatuses, promoterCount, pushCount, openConflicts, recentLeads] = await Promise.all([
+        prisma.lead.groupBy({ by: ["status"], where: leadWhere, _count: { _all: true } }),
+        prisma.inquiry.groupBy({ by: ["status"], where: inquiryWhere, _count: { _all: true } }),
+        prisma.quote.groupBy({ by: ["status"], where: quoteWhere, _count: { _all: true }, _sum: { totalAmount: true } }),
+        prisma.promoterCode.count({ where: context.role === "SALESPERSON" ? { salespersonId: context.user.id } : {} }),
+        prisma.productPush.count({ where: periodCreatedAtWhere(input.period) }),
+        prisma.channelConflict.count({ where: { status: "OPEN", ...(context.role === "SALESPERSON" ? { ownerId: context.user.id } : {}) } }),
+        prisma.lead.findMany({
+          where: leadWhere,
+          include: { salesperson: { select: { name: true } }, dealer: { select: { shopName: true } } },
+          orderBy: { createdAt: "desc" },
+          take: input.limit,
+        }),
+      ]);
+
+      return {
+        title: "渠道线索询价报价摘要",
+        summary: `推广码 ${promoterCount} 个，新品推送 ${pushCount} 条，未关闭冲突 ${openConflicts} 个。`,
+        href: "/dashboard/leads",
+        details: [
+          ...leadStatuses.map((row) => ({ label: `线索 ${row.status}`, value: `${row._count._all} 条` })),
+          ...inquiryStatuses.map((row) => ({ label: `询价 ${row.status}`, value: `${row._count._all} 张` })),
+          ...quoteStatuses.map((row) => ({ label: `报价 ${row.status}`, value: `${row._count._all} 张｜${money(Number(row._sum.totalAmount ?? 0))}` })),
+          ...recentLeads.map((lead) => ({
+            label: lead.name ?? lead.phone ?? lead.id,
+            value: `${lead.scene}｜${lead.status}｜销售 ${lead.salesperson?.name ?? "未分配"}｜经销商 ${lead.dealer?.shopName ?? "-"}｜${compactDate(lead.createdAt)}`,
+          })),
+        ],
+      };
+    },
+  },
+  {
+    name: "dealer_promotion_summary",
+    title: "经销商推广与线索摘要",
+    description: "经销商查询自己的推广码、扫码线索、询价和订单转化。",
+    riskLevel: "READ",
+    access: { roles: ["DEALER"] },
+    inputSchema: summaryQuerySchema,
+    handler: async (input, context) => {
+      const dealer = await prisma.dealer.findUnique({ where: { customerId: context.user.id }, select: { id: true, shopName: true } });
+      if (!dealer) throw new Error("未找到当前经销商档案");
+      const where = periodCreatedAtWhere(input.period);
+      const [codes, leadStatuses, inquiryStatuses, routingCount, recentLeads] = await Promise.all([
+        prisma.promoterCode.findMany({ where: { dealerId: dealer.id }, orderBy: { createdAt: "desc" }, take: input.limit }),
+        prisma.lead.groupBy({ by: ["status"], where: { ...where, dealerId: dealer.id }, _count: { _all: true } }),
+        prisma.inquiry.groupBy({ by: ["status"], where: { ...where, dealerId: dealer.id }, _count: { _all: true } }),
+        prisma.orderRouting.count({ where: { dealerId: dealer.id } }),
+        prisma.lead.findMany({ where: { ...where, dealerId: dealer.id }, orderBy: { createdAt: "desc" }, take: input.limit }),
+      ]);
+
+      return {
+        title: "经销商推广与线索摘要",
+        summary: `${dealer.shopName} 有 ${codes.length} 个推广码，历史派单 ${routingCount} 个。`,
+        href: "/dealer/promotion",
+        details: [
+          ...codes.map((code) => ({ label: code.label, value: `${code.code}｜扫码 ${code.scanCount}｜线索 ${code.leadCount}｜订单 ${code.orderCount}` })),
+          ...leadStatuses.map((row) => ({ label: `线索 ${row.status}`, value: `${row._count._all} 条` })),
+          ...inquiryStatuses.map((row) => ({ label: `询价 ${row.status}`, value: `${row._count._all} 张` })),
+          ...recentLeads.map((lead) => ({ label: lead.name ?? lead.phone ?? lead.id, value: `${lead.scene}｜${lead.status}｜${compactDate(lead.createdAt)}` })),
+        ],
+      };
+    },
+  },
   {
     name: "search_products",
     title: "查询商品",
@@ -2442,6 +3017,71 @@ export const aiTools: AiToolDefinition[] = [
 type AiToolSemanticMetadata = Pick<AiToolDefinition, "capabilities" | "examples" | "argumentHints">;
 
 const aiToolSemanticMetadata: Record<string, AiToolSemanticMetadata> = {
+  navigate_to_feature: {
+    capabilities: ["功能入口", "打开页面", "进入页面", "在哪管理", "菜单位置", "全站导航", "页面跳转"],
+    examples: ["供应商管理在哪", "怎么查看库存流水", "帮我打开经销商政策", "微信菜单在哪配置"],
+    argumentHints: '{"query":"用户原话或功能名","capabilityId":"可选，能力目录 id"}',
+  },
+  feature_help: {
+    capabilities: ["功能说明", "页面帮助", "能做什么", "权限说明", "怎么使用"],
+    examples: ["供应商管理能做什么", "微信菜单谁能配置", "经销商政策有什么用"],
+    argumentHints: '{"query":"用户原话或功能名","capabilityId":"可选，能力目录 id"}',
+  },
+  purchase_supplier_summary: {
+    capabilities: ["采购摘要", "采购单", "供应商", "供应商管理", "采购金额", "到货", "进货"],
+    examples: ["采购和供应商情况怎么样", "供应商管理现在有多少家", "这个月采购单有哪些"],
+    argumentHints: '{"query":"供应商/联系人/手机号，可为空","period":"month","limit":8}',
+  },
+  product_catalog_summary: {
+    capabilities: ["产品分类", "品牌管理", "商品素材", "图片素材", "素材审核", "授权状态", "分类品牌"],
+    examples: ["商品素材审核还有多少", "产品分类品牌情况", "图片素材有哪些待授权"],
+    argumentHints: '{"query":"商品/SKU/品牌/素材来源，可为空","period":"month","limit":8}',
+  },
+  inventory_records_summary: {
+    capabilities: ["库存流水", "出入库记录", "库存记录", "谁操作了库存", "库存变动"],
+    examples: ["怎么查看库存流水", "这个月有哪些入库出库记录", "青岛啤酒库存流水"],
+    argumentHints: '{"query":"商品/SKU/操作人/备注，可为空","period":"month","limit":8}',
+  },
+  shop_account_summary: {
+    capabilities: ["账户中心", "我的账户", "收货地址", "我的资料", "我的积分", "我的欠款"],
+    examples: ["我的账户情况", "我的收货地址和优惠券", "我还有多少欠款"],
+    argumentHints: "{}",
+  },
+  shop_cart_summary: {
+    capabilities: ["购物车", "我的购物车", "购物车商品", "结算商品"],
+    examples: ["查购物车", "我的购物车里有什么", "购物车多少钱"],
+    argumentHints: '{"limit":10}',
+  },
+  shop_coupon_summary: {
+    capabilities: ["我的优惠券", "可用券", "优惠券状态", "券包"],
+    examples: ["我的优惠券有哪些", "有没有可用券", "优惠券快过期了吗"],
+    argumentHints: '{"limit":10}',
+  },
+  wechat_ecosystem_summary: {
+    capabilities: ["微信生态", "公众号菜单", "模板消息", "小程序分享", "微信配置", "微信消息日志"],
+    examples: ["微信生态现在怎么样", "微信菜单在哪配置", "模板消息发送情况"],
+    argumentHints: '{"period":"month","limit":8}',
+  },
+  audit_log_summary: {
+    capabilities: ["操作日志", "审计日志", "AI 日志", "谁操作了", "日志查询"],
+    examples: ["最近 AI 工具日志", "谁改了库存", "操作日志里有哪些异常"],
+    argumentHints: '{"query":"模块/动作/操作人/关键词，可为空","period":"month","limit":8}',
+  },
+  finance_statement_summary: {
+    capabilities: ["财务对账", "对账单", "票据", "发票", "收款记录", "客户欠款", "财务报表细项"],
+    examples: ["财务对账单情况", "这个月票据和收款怎么样", "客户欠款排行"],
+    argumentHints: '{"period":"month","limit":8}',
+  },
+  channel_pipeline_summary: {
+    capabilities: ["渠道漏斗", "线索", "询价", "报价", "推广码", "新品推送", "渠道冲突"],
+    examples: ["渠道线索询价报价情况", "最近线索转化怎么样", "推广码和渠道冲突怎么样"],
+    argumentHints: '{"query":"线索姓名/手机号/备注，可为空","period":"month","limit":8}',
+  },
+  dealer_promotion_summary: {
+    capabilities: ["经销商推广", "我的推广码", "经销商线索", "门店线索", "扫码客户", "经销商转化"],
+    examples: ["我的推广效果怎么样", "我的推广码有多少线索", "经销商线索情况"],
+    argumentHints: '{"period":"month","limit":8}',
+  },
   search_products: {
     capabilities: ["商品搜索", "查商品", "查价格", "查库存", "SKU 查询", "品牌规格查询"],
     examples: ["查一下青岛经典啤酒", "HQ-BEER-001 多少钱", "有没有 500ml 啤酒"],

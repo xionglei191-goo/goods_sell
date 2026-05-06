@@ -1,5 +1,5 @@
 import { redactAiAuditText, redactAiAuditValue } from "@/features/ai/tools/audit";
-import { rankAiToolsForMessage } from "@/features/ai/tools/model-planner";
+import { planRankedReadToolFallback, rankAiToolsForMessage } from "@/features/ai/tools/model-planner";
 import { aiTools, canRoleUseTool } from "@/features/ai/tools/registry";
 import { planAiToolCall, validateAiToolPlan } from "@/features/ai/tools/planner";
 import { getLaunchReadinessReport } from "@/features/system/launch-readiness";
@@ -39,6 +39,18 @@ function main() {
   assert(canRoleUseTool("ADMIN", "admin_create_customer"), "管理员应可新增客户");
   assert(canRoleUseTool("ADMIN", "customer_purchase_history"), "管理员应可查询客户购买历史");
   assert(canRoleUseTool("ADMIN", "customer_analytics_summary"), "管理员应可查询客户统计分析");
+  assert(canRoleUseTool("ADMIN", "purchase_supplier_summary"), "管理员应可查询采购与供应商摘要");
+  assert(canRoleUseTool("ADMIN", "product_catalog_summary"), "管理员应可查询产品分类品牌素材摘要");
+  assert(canRoleUseTool("WAREHOUSE", "inventory_records_summary"), "仓管应可查询库存流水摘要");
+  assert(canRoleUseTool("CONSUMER", "shop_cart_summary"), "消费者应可查询自己的购物车摘要");
+  assert(canRoleUseTool("CONSUMER", "shop_coupon_summary"), "消费者应可查询自己的优惠券摘要");
+  assert(canRoleUseTool("ADMIN", "wechat_ecosystem_summary"), "管理员应可查询微信生态摘要");
+  assert(canRoleUseTool("ADMIN", "audit_log_summary"), "管理员应可查询操作日志摘要");
+  assert(canRoleUseTool("FINANCE", "finance_statement_summary"), "财务应可查询对账与票据摘要");
+  assert(canRoleUseTool("SALESPERSON", "channel_pipeline_summary"), "销售员应可查询权限内渠道漏斗摘要");
+  assert(canRoleUseTool("DEALER", "dealer_promotion_summary"), "经销商应可查询自己的推广与线索摘要");
+  assert(!canRoleUseTool("CONSUMER", "purchase_supplier_summary"), "消费者不能查询采购与供应商摘要");
+  assert(!canRoleUseTool("SALESPERSON", "audit_log_summary"), "销售员不能查询操作日志摘要");
   assert(canRoleUseTool("SALESPERSON", "customer_purchase_history"), "销售员应可查询名下客户购买历史");
   assert(canRoleUseTool("SALESPERSON", "customer_analytics_summary"), "销售员应可查询名下客户统计分析");
   assert(canRoleUseTool("FINANCE", "customer_purchase_history"), "财务应可查询客户购买历史");
@@ -120,6 +132,15 @@ function main() {
     reason: "模拟错误模型规划",
   });
   assert(correctedCustomerAnalyticsPlan?.toolName === "customer_analytics_summary", "客户统计意图若被 AI 误规划为经营总览，应被计划校验层纠偏");
+
+  assert(rankAiToolsForMessage("供应商管理现在有多少家", context("ADMIN"), aiTools)[0]?.tool.name === "purchase_supplier_summary", "供应商数据问法应优先命中采购供应商摘要");
+  assert(rankAiToolsForMessage("商品素材审核还有多少", context("ADMIN"), aiTools)[0]?.tool.name === "product_catalog_summary", "商品素材问法应优先命中产品分类品牌素材摘要");
+  assert(rankAiToolsForMessage("这个月有哪些库存流水", context("WAREHOUSE"), aiTools.filter((item) => canRoleUseTool("WAREHOUSE", item.name)))[0]?.tool.name === "inventory_records_summary", "库存流水数据问法应优先命中库存流水摘要");
+  assert(rankAiToolsForMessage("我的购物车里有什么", context("CONSUMER"), aiTools.filter((item) => canRoleUseTool("CONSUMER", item.name)))[0]?.tool.name === "shop_cart_summary", "购物车问法应优先命中购物车摘要");
+  assert(rankAiToolsForMessage("微信生态现在怎么样", context("ADMIN"), aiTools)[0]?.tool.name === "wechat_ecosystem_summary", "微信生态问法应优先命中微信摘要");
+  assert(planRankedReadToolFallback("供应商管理现在有多少家", context("ADMIN"), aiTools)?.toolName === "purchase_supplier_summary", "provider 不可用时供应商数据问法应有本地语义 READ 兜底");
+  assert(planRankedReadToolFallback("我的购物车里有什么", context("CONSUMER"), aiTools.filter((item) => canRoleUseTool("CONSUMER", item.name)))?.toolName === "shop_cart_summary", "provider 不可用时购物车问法应有本地语义 READ 兜底");
+  assert(planRankedReadToolFallback("微信生态现在怎么样", context("ADMIN"), aiTools)?.toolName === "wechat_ecosystem_summary", "provider 不可用时微信生态问法应有本地语义 READ 兜底");
 
   const adminPlan = planAiToolCall("这个月张军业绩怎么样", context("ADMIN"), aiTools);
   assert(adminPlan?.toolName === "salesperson_performance", "管理员查询业绩应命中销售员业绩工具");

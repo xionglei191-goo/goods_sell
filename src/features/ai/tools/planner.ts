@@ -532,7 +532,7 @@ function allowedToolsForIntent(intent: CoreIntent) {
     case "staff_password":
       return new Set(["settings_reset_staff_password"]);
     case "finance_summary":
-      return new Set(["finance_summary"]);
+      return new Set(["finance_summary", "finance_statement_summary"]);
     case "salesperson_performance":
       return new Set(["salesperson_performance"]);
     case "customer_analytics":
@@ -546,6 +546,7 @@ function allowedToolsForIntent(intent: CoreIntent) {
 
 export function validateAiToolPlan(message: string, context: AiToolContext, tools: readonly AiToolDefinition[], plan: AiToolPlan | null): AiToolPlan | null {
   if (!plan) return null;
+  if (plan.toolName === "navigate_to_feature" || plan.toolName === "feature_help") return plan;
   const intent = detectCoreIntent(message);
   if (!intent) return plan;
 
