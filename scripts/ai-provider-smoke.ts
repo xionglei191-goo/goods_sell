@@ -21,6 +21,9 @@ const cases: ProviderCase[] = [
   { role: "ADMIN", message: "李明最近转化怎么样？", expectedTool: "salesperson_performance" },
   { role: "ADMIN", message: "这个月哪个人的业绩最好?", expectedTool: "salesperson_performance" },
   { role: "ADMIN", message: "有几个销售员", expectedTool: "salesperson_performance" },
+  { role: "ADMIN", message: "有哪些客户有配送订单", expectedTool: "delivery_summary" },
+  { role: "ADMIN", message: "供应商管理在哪", expectedTool: "navigate_to_feature" },
+  { role: "ADMIN", message: "微信菜单在哪配置", expectedTool: "navigate_to_feature" },
 ];
 
 function assert(condition: unknown, message: string): asserts condition {

@@ -1,3 +1,4 @@
+import { shouldRejectNavigationPlan } from "@/features/ai/tools/intent-policy";
 import type { AiToolContext, AiToolDefinition, AiToolPlan } from "@/features/ai/tools/types";
 
 const chineseDigits: Record<string, number> = {
@@ -479,6 +480,7 @@ type CoreIntent =
   | "staff_status"
   | "staff_password"
   | "finance_summary"
+  | "delivery_summary"
   | "salesperson_performance"
   | "customer_analytics"
   | "product_operations"
@@ -505,6 +507,7 @@ function detectCoreIntent(message: string): CoreIntent | null {
   if (/入库|出库/.test(message)) return "inventory_flow";
   if (/安全库存|预警阈值/.test(message)) return "safe_stock";
   if (/订单.*(确认|发货|送达|完成|取消|作废)|HQ\d+.*(确认|发货|送达|完成|取消|作废)/.test(message)) return "order_status";
+  if (/配送|物流|待发货|送达/.test(message)) return "delivery_summary";
   if (/新品.*推送|推送.*新品|产品推送|商品推送/.test(message)) return "product_push";
   return null;
 }
@@ -543,6 +546,8 @@ function allowedToolsForIntent(intent: CoreIntent) {
       return new Set(["settings_reset_staff_password"]);
     case "finance_summary":
       return new Set(["finance_summary", "finance_statement_summary"]);
+    case "delivery_summary":
+      return new Set(["delivery_summary"]);
     case "salesperson_performance":
       return new Set(["salesperson_performance"]);
     case "customer_analytics":
@@ -557,6 +562,10 @@ function allowedToolsForIntent(intent: CoreIntent) {
 export function validateAiToolPlan(message: string, context: AiToolContext, tools: readonly AiToolDefinition[], plan: AiToolPlan | null): AiToolPlan | null {
   if (!plan) return null;
   const intent = detectCoreIntent(message);
+  if (shouldRejectNavigationPlan(message, plan)) {
+    const fallback = planAiToolCall(message, context, tools);
+    return fallback ?? null;
+  }
   if ((plan.toolName === "navigate_to_feature" || plan.toolName === "feature_help") && !intent) return plan;
   if (!intent) return plan;
 

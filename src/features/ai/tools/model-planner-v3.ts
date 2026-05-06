@@ -1,5 +1,6 @@
 import { callAnthropicCompatible, hasAiProvider } from "@/features/ai/provider";
 import { describeRankedAgentCapabilitiesForPrompt, rankAgentCapabilitiesForMessage, type RankedAgentCapability } from "@/features/ai/tools/capabilities";
+import { describeAssistantIntentPolicyForPrompt, shouldRejectNavigationPlan } from "@/features/ai/tools/intent-policy";
 import { describeRankedAiToolsForPrompt, rankAiToolsForMessage, type RankedAiTool } from "@/features/ai/tools/model-planner";
 import type { AiToolContext, AiToolDefinition, AiToolPlan, AiToolResult, AiToolRiskLevel } from "@/features/ai/tools/types";
 
@@ -55,7 +56,6 @@ type RawPlannerV3Json = {
 };
 
 const intentKinds = new Set<AiIntentKind>(["READ_SUMMARY", "READ_RANKING", "READ_DETAIL", "NAVIGATE", "DRAFT", "WRITE", "HIGH_RISK", "CLARIFY"]);
-const businessQueryPattern = /多少|几个|哪[个款位]|谁|最多|最高|最少|最低|排行|排名|最好|第一|欠款|库存|业绩|绩效|客户数|销售额|订单数|回款|毛利|消费|购买|统计|总数|总量/;
 
 function extractJsonObject(text: string) {
   const fenced = text.match(/```json\s*([\s\S]*?)```/i)?.[1];
@@ -135,10 +135,6 @@ function normalizeSteps(value: unknown, fallback: RawPlannerV3Json, rankedTools:
     .filter((step) => step.toolName && knownToolNames.has(step.toolName));
 }
 
-function shouldRejectNavigation(message: string, steps: readonly AiToolStep[]) {
-  return businessQueryPattern.test(message) && steps.some((step) => step.toolName === "navigate_to_feature" || step.toolName === "feature_help");
-}
-
 function asPlannerResult(params: {
   parsed: RawPlannerV3Json;
   message: string;
@@ -151,7 +147,7 @@ function asPlannerResult(params: {
   const intentFrame = normalizeIntentFrame(params.parsed.intentFrame, firstConfidence);
   const missingSlots = Array.from(new Set([...intentFrame.missingSlots, ...asStringArray(params.parsed.missingSlots)]));
 
-  if (shouldRejectNavigation(params.message, steps)) {
+  if (shouldRejectNavigationPlan(params.message, steps)) {
     return { plan: null, steps: [], intentFrame, rankedTools: params.rankedTools, rankedCapabilities: params.rankedCapabilities, missingSlots, rawText: params.rawText, error: "业务查询被误规划为页面导航" };
   }
 
@@ -192,9 +188,8 @@ async function callPlannerV3(params: {
       `JSON 结构：{"intentFrame":{"intentKind":"READ_SUMMARY|READ_RANKING|READ_DETAIL|NAVIGATE|DRAFT|WRITE|HIGH_RISK|CLARIFY","domain":"","operation":"","risk":"READ|DRAFT|WRITE|HIGH_RISK|NAVIGATE","timeRange":"all|day|week|month|","entities":{},"metrics":[],"sort":"","missingSlots":[],"confidence":0.0},"steps":[{"toolName":"","args":{},"reason":"","confidence":0.0}]}。` +
       `toolName 必须逐字复制候选工具名之一：${toolNames}。` +
       `READ 查询可以规划 1 到 3 个 READ steps；DRAFT/WRITE/HIGH_RISK 只能规划 1 个 step，且只会生成草稿或确认卡。` +
-      `业务查询边界：问多少、几个、哪个最多、排行、最好、欠款、库存、业绩、客户数、销售员数量时，必须使用业务 READ 工具，不得使用 navigate_to_feature。` +
-      `导航边界：只有用户明确问在哪、打开、入口、菜单、怎么进入、页面能做什么时，才使用 navigate_to_feature 或 feature_help。` +
-      `关键工具：销售员数量/排行/最好/转化 -> salesperson_performance；客户总数/消费最高 -> customer_analytics_summary；库存总量/最多/低库存 -> product_operations_summary；欠款排行/应收 -> finance_summary。`,
+      `${describeAssistantIntentPolicyForPrompt()}` +
+      `关键工具：销售员数量/排行/最好/转化 -> salesperson_performance；客户总数/消费最高 -> customer_analytics_summary；库存总量/最多/低库存 -> product_operations_summary；欠款排行/应收 -> finance_summary；配送客户/配送订单/待发货/配送中 -> delivery_summary。`,
     messages: [
       {
         role: "user",

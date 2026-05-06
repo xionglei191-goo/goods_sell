@@ -5,6 +5,12 @@ import {
   rankAgentCapabilitiesForMessage,
   type RankedAgentCapability,
 } from "@/features/ai/tools/capabilities";
+import {
+  describeAssistantIntentPolicyForPrompt,
+  isNavigationToolName,
+  shouldBoostNavigationTools,
+  shouldPreferReadTools,
+} from "@/features/ai/tools/intent-policy";
 import type { AiAssistantCard, AiToolContext, AiToolDefinition, AiToolPlan } from "@/features/ai/tools/types";
 
 export type RankedAiTool = {
@@ -116,14 +122,23 @@ function scoreTool(message: string, tool: AiToolDefinition, index: number): Rank
 export function rankAiToolsForMessage(message: string, context: AiToolContext, tools: readonly AiToolDefinition[]) {
   const rankedCapabilities = rankAgentCapabilitiesForMessage(message, context);
   const bestCapability = rankedCapabilities[0];
-  const isNavigationLike = /在哪|哪里|入口|打开|进入|跳转|页面|菜单|在哪管理|怎么查看|如何查看|怎么配置|如何配置/.test(message);
+  const boostNavigation = shouldBoostNavigationTools(message);
+  const preferRead = shouldPreferReadTools(message);
   return tools
     .map((tool, index) => {
       const ranked = scoreTool(message, tool, index);
-      if ((tool.name === "navigate_to_feature" || tool.name === "feature_help") && bestCapability && isNavigationLike) {
+      if (isNavigationToolName(tool.name) && bestCapability && boostNavigation) {
         const boost = Math.min(bestCapability.score * (tool.name === "navigate_to_feature" ? 1.35 : 1.05), 35);
         ranked.score += boost;
         ranked.reasons = [`功能:${bestCapability.capability.title}`, ...ranked.reasons].slice(0, 4);
+      }
+      if (preferRead) {
+        if (isNavigationToolName(tool.name)) {
+          ranked.score -= 50;
+          ranked.reasons = ["业务查询不走页面导航", ...ranked.reasons].slice(0, 4);
+        } else if (tool.riskLevel === "READ") {
+          ranked.score += 2;
+        }
       }
       return ranked;
     })
@@ -206,6 +221,7 @@ async function callModelPlanner(params: {
       `toolName 必须逐字复制候选工具名之一，不能缩写、翻译或自造别名。候选工具名：${toolNames}。` +
       `如果用户意图不明确或缺少必填参数，toolName 返回空字符串，并在 missingSlots 中列出字段名。` +
       `只规划一个最匹配的工具。READ 用于查询；WRITE/HIGH_RISK 只会生成确认卡，不会直接写库。` +
+      `${describeAssistantIntentPolicyForPrompt()}` +
       `如果用户是在问某功能在哪、怎么打开、某页面能做什么，优先使用 navigate_to_feature 或 feature_help，并把 args.capabilityId 设置为全站能力候选 id。` +
       `关键边界：客户“买了什么/买过什么/购买记录”是购买历史查询；“一共有多少客户/哪个客户消费最高”是客户统计分析；“我要下单/帮客户开单/要 N 箱”才是下单或开单；库存总量、库存最多、低库存属于商品经营查询，不是经销商上报库存。`,
     messages: [
@@ -257,6 +273,7 @@ export async function repairModelPlan(
 
 export function planAgentCapabilityNavigation(message: string, context: AiToolContext, tools: readonly AiToolDefinition[]): AiToolPlan | null {
   if (!tools.some((tool) => tool.name === "navigate_to_feature")) return null;
+  if (!shouldBoostNavigationTools(message)) return null;
   const best = findBestAgentCapabilityForMessage(message, context, /在哪|哪里|入口|打开|进入|跳转|页面|菜单|配置|管理|怎么|如何|查看/.test(message) ? 7 : 14);
   if (!best) return null;
   return {
@@ -292,6 +309,7 @@ function argsForSemanticReadFallback(toolName: string, message: string): Record<
       "wechat_ecosystem_summary",
       "audit_log_summary",
       "finance_statement_summary",
+      "delivery_summary",
       "channel_pipeline_summary",
       "dealer_promotion_summary",
     ].includes(toolName)

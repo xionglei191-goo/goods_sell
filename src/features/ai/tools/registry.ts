@@ -3221,8 +3221,8 @@ const aiToolSemanticMetadata: Record<string, AiToolSemanticMetadata> = {
     argumentHints: '{"period":"month"}',
   },
   delivery_summary: {
-    capabilities: ["配送查询", "待发货", "配送中", "已送达", "异常订单", "物流"],
-    examples: ["现在有哪些待发货订单", "配送异常有哪些"],
+    capabilities: ["配送查询", "配送订单", "客户配送订单", "哪些客户有配送单", "待发货", "配送中", "已送达", "异常订单", "物流", "配送客户", "配送列表"],
+    examples: ["有哪些客户有配送订单", "现在有哪些待发货订单", "配送中有哪些客户", "配送异常有哪些"],
     argumentHints: "{}",
   },
   channel_summary: {

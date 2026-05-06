@@ -1,4 +1,5 @@
 import { redactAiAuditText, redactAiAuditValue } from "@/features/ai/tools/audit";
+import { classifyAssistantRequest } from "@/features/ai/tools/intent-policy";
 import { planRankedReadToolFallback, rankAiToolsForMessage } from "@/features/ai/tools/model-planner";
 import { aiTools, canRoleUseTool } from "@/features/ai/tools/registry";
 import { planAiToolCall, validateAiToolPlan } from "@/features/ai/tools/planner";
@@ -134,10 +135,15 @@ function main() {
   assert(correctedCustomerAnalyticsPlan?.toolName === "customer_analytics_summary", "客户统计意图若被 AI 误规划为经营总览，应被计划校验层纠偏");
 
   assert(rankAiToolsForMessage("供应商管理现在有多少家", context("ADMIN"), aiTools)[0]?.tool.name === "purchase_supplier_summary", "供应商数据问法应优先命中采购供应商摘要");
+  assert(classifyAssistantRequest("供应商管理现在有多少家").mode === "DATA_QUERY", "供应商数量问法应被识别为业务查询");
+  assert(rankAiToolsForMessage("供应商管理在哪", context("ADMIN"), aiTools)[0]?.tool.name === "navigate_to_feature", "供应商入口问法应优先命中导航");
+  assert(classifyAssistantRequest("供应商管理在哪").mode === "NAVIGATE", "供应商入口问法应被识别为导航");
   assert(rankAiToolsForMessage("商品素材审核还有多少", context("ADMIN"), aiTools)[0]?.tool.name === "product_catalog_summary", "商品素材问法应优先命中产品分类品牌素材摘要");
   assert(rankAiToolsForMessage("这个月有哪些库存流水", context("WAREHOUSE"), aiTools.filter((item) => canRoleUseTool("WAREHOUSE", item.name)))[0]?.tool.name === "inventory_records_summary", "库存流水数据问法应优先命中库存流水摘要");
+  assert(rankAiToolsForMessage("怎么查看库存流水", context("ADMIN"), aiTools)[0]?.tool.name === "navigate_to_feature", "库存流水入口问法应优先命中导航");
   assert(rankAiToolsForMessage("我的购物车里有什么", context("CONSUMER"), aiTools.filter((item) => canRoleUseTool("CONSUMER", item.name)))[0]?.tool.name === "shop_cart_summary", "购物车问法应优先命中购物车摘要");
   assert(rankAiToolsForMessage("微信生态现在怎么样", context("ADMIN"), aiTools)[0]?.tool.name === "wechat_ecosystem_summary", "微信生态问法应优先命中微信摘要");
+  assert(rankAiToolsForMessage("微信菜单在哪配置", context("ADMIN"), aiTools)[0]?.tool.name === "navigate_to_feature", "微信菜单配置入口问法应优先命中导航");
   assert(planRankedReadToolFallback("供应商管理现在有多少家", context("ADMIN"), aiTools)?.toolName === "purchase_supplier_summary", "provider 不可用时供应商数据问法应有本地语义 READ 兜底");
   assert(planRankedReadToolFallback("我的购物车里有什么", context("CONSUMER"), aiTools.filter((item) => canRoleUseTool("CONSUMER", item.name)))?.toolName === "shop_cart_summary", "provider 不可用时购物车问法应有本地语义 READ 兜底");
   assert(planRankedReadToolFallback("微信生态现在怎么样", context("ADMIN"), aiTools)?.toolName === "wechat_ecosystem_summary", "provider 不可用时微信生态问法应有本地语义 READ 兜底");
@@ -227,6 +233,17 @@ function main() {
     reason: "模拟错误模型规划",
   });
   assert(correctedDebtPlan?.toolName === "finance_summary", "欠款排行若被误规划为客户查询，应被纠偏为财务摘要");
+
+  const deliveryOrderPlan = planAiToolCall("有哪些客户有配送订单", context("ADMIN"), aiTools);
+  assert(deliveryOrderPlan?.toolName === "delivery_summary", "客户配送订单问题应命中配送摘要工具，而不是页面导航");
+  assert(rankAiToolsForMessage("有哪些客户有配送订单", context("ADMIN"), aiTools)[0]?.tool.name === "delivery_summary", "Planner 工具排序应把客户配送订单问题排在配送摘要首位");
+  assert(planRankedReadToolFallback("有哪些客户有配送订单", context("ADMIN"), aiTools)?.toolName === "delivery_summary", "provider 不可用时客户配送订单问题应有本地 READ 兜底");
+  const correctedDeliveryPlan = validateAiToolPlan("有哪些客户有配送订单", context("ADMIN"), aiTools, {
+    toolName: "navigate_to_feature",
+    args: { capabilityId: "delivery.list", query: "有哪些客户有配送订单" },
+    reason: "模拟模型误规划为页面导航",
+  });
+  assert(correctedDeliveryPlan?.toolName === "delivery_summary", "客户配送订单问题若被模型误规划为导航，应被校验层纠偏为配送摘要");
 
   const paymentPlan = planAiToolCall("给13900139001的订单HQAI-FIN-15348961登记收款1元", context("FINANCE"), financeTools);
   assert(paymentPlan?.toolName === "finance_register_payment", "财务自然语言收款应命中登记收款工具");

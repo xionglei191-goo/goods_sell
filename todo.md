@@ -1,6 +1,6 @@
 # 华启酒饮数字渠道平台 — 开发任务总控 (TODO)
 
-> 最后更新：2026-05-06
+> 最后更新：2026-05-07
 > 角色说明：架构师负责审核验收，代码组负责编码实现
 > 状态：`[ ]` 待做 | `[/]` 进行中 | `[x]` 已完成 | `[!]` 验收不通过
 
@@ -604,3 +604,18 @@
 - [x] 全量验证：`npx tsc --noEmit`、`npm run lint`、`npm run test:ai-tools`、`npm run test:ai-runtime`、`npm run test:ai-quick-prompts`、`npm run test:agent-capabilities`、`npm run test:ai-provider`、`npm run test:rbac`、`npm audit --audit-level=moderate`、`npm run build`。
 - [x] 提交并推送 `main`。
 - [x] 部署到 VPS `/data/goods_sell`，完成线上 `/shop` 健康检查和远端 `npm run test:ai-provider`。
+
+---
+
+## Phase 18：AI 需求识别与工具调用泛化修复（2026-05-07）
+
+> 目标：修复业务查询被全站导航工具抢占的问题，把“AI 理解需求 → 当前角色可用工具 → 服务端意图/权限/schema/业务预检 → 执行或确认卡”固化为统一链路。
+
+- [x] 新增 `intent-policy.ts`：统一识别 `DATA_QUERY`、`NAVIGATE`、`DRAFT`、`WRITE`、`HIGH_RISK`、`CLARIFY`，并输出业务查询/导航边界原因。
+- [x] V2 工具排序接入服务端意图策略：业务查询提升 READ tools、压低 `navigate_to_feature`/`feature_help`；只有明确入口/菜单/打开类问法才提升导航工具。
+- [x] V3 Planner 接入同一策略：模型 plan 解析后若把业务数据问题规划为导航，直接拒绝并进入 repair/兜底。
+- [x] `validateAiToolPlan()` 增加最终裁判：即使 provider 误选导航，服务端仍会纠偏到本地高置信 READ plan 或拒绝执行。
+- [x] 保留全站能力目录边界：`AgentCapabilityRegistry` 继续负责找入口/解释页面，不抢业务统计、排行、明细和配送订单查询。
+- [x] 扩展工具语义与测试：覆盖配送订单、供应商数量、库存流水数据、微信生态数据、供应商入口、库存流水入口、微信菜单入口等成对场景。
+- [x] 真实 DeepSeek provider smoke 扩展到 10 个 Planner v3 场景，包含 `delivery_summary` 和 `navigate_to_feature`。
+- [/] 全量本地验证、提交推送、VPS 部署和线上 provider smoke。
