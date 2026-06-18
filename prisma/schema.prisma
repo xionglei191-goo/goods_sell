@@ -332,6 +332,9 @@ model Delivery {
   deliveredAt DateTime?
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
 }
 
 model StockRecord {

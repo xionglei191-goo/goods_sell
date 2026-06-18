@@ -94,7 +94,14 @@ async function generateOrderNo(tx: Prisma.TransactionClient) {
   const start = new Date(now);
   start.setHours(0, 0, 0, 0);
   const count = await tx.order.count({ where: { createdAt: { gte: start } } });
-  return `HQ${formatOrderDate(now)}${String(count + 1).padStart(6, "0")}`;
+  const seq = String(count + 1).padStart(6, "0");
+  const orderNo = `HQ${formatOrderDate(now)}${seq}`;
+  const existing = await tx.order.findUnique({ where: { orderNo }, select: { id: true } });
+  if (existing) {
+    const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
+    return `HQ${formatOrderDate(now)}${seq}${suffix}`;
+  }
+  return orderNo;
 }
 
 async function generateInquiryNo(tx: Prisma.TransactionClient) {

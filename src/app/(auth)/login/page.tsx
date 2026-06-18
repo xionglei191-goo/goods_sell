@@ -1,6 +1,12 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import { LoginForm } from "@/app/(auth)/login/login-form";
+
+export const metadata: Metadata = {
+  title: "登录 | 华启商城",
+  description: "登录华启商城，湘潭本地批发分销与线上零售平台。",
+};
 
 export default function LoginPage() {
   return (

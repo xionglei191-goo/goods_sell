@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Building2, Cookie, CupSoda, Gift, Handshake, PartyPopper, Store, Wine } from "lucide-react";
 import Link from "next/link";
 
@@ -6,6 +7,11 @@ import { HeroCarousel } from "@/features/shop/HeroCarousel";
 import { ProductCard } from "@/features/shop/ProductCard";
 import { getShopHomeData } from "@/features/shop/queries";
 import type { ShopCategorySlug } from "@/features/shop/types";
+
+export const metadata: Metadata = {
+  title: "华启商城 — 湘潭本地酒水食品配送",
+  description: "华启商城提供湘潭本地酒类、食品、饮料等商品，支持在线下单、同城配送。品质保障，送货上门。",
+};
 
 export const dynamic = "force-dynamic";
 

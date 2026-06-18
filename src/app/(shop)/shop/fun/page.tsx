@@ -1,11 +1,20 @@
 import Link from "next/link";
+import nextDynamic from "next/dynamic";
 
-import { FunClient } from "@/features/ai/FunClient";
 import { getCheckInState, getSolarTermRecommendation } from "@/features/ai/fun";
 import { AlcoholComplianceNotice } from "@/features/shop/AlcoholComplianceNotice";
 import { formatCurrency } from "@/features/shop/utils";
 
 export const dynamic = "force-dynamic";
+
+const FunClient = nextDynamic(() => import("@/features/ai/FunClient").then((mod) => mod.FunClient), {
+  loading: () => (
+    <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
+      <div className="h-96 animate-pulse rounded-lg bg-stone-100" />
+      <div className="h-48 animate-pulse rounded-lg bg-stone-100" />
+    </div>
+  ),
+});
 
 const seasonLabels = {
   spring: "春季",
