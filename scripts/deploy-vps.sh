@@ -19,6 +19,7 @@ RUN_MIGRATIONS="${RUN_MIGRATIONS:-1}"
 RUN_SEED="${RUN_SEED:-0}"
 SSH_STRICT_HOST_KEY="${SSH_STRICT_HOST_KEY:-accept-new}"
 DEPLOY_SSH_KEY="${DEPLOY_SSH_KEY:-}"
+SKIP_GIT_CHECKS="${SKIP_GIT_CHECKS:-0}"
 
 usage() {
   cat <<'USAGE'
@@ -38,6 +39,7 @@ Environment overrides:
   RUN_LOCAL_CHECKS=1     # run lint, tsc, build locally before deploying
   RUN_MIGRATIONS=1       # run prisma migrate deploy on the server
   RUN_SEED=0             # run prisma db seed on the server
+  SKIP_GIT_CHECKS=0      # set 1 to bypass local HEAD/dirty checks before archive deploy
   DEPLOY_SSH_KEY=~/.ssh/goods_sell_deploy_ed25519
   DEPLOY_PASSWORD=...    # optional; requires sshpass. Prefer SSH keys.
 
@@ -78,17 +80,20 @@ if [[ "$RUN_LOCAL_CHECKS" == "1" ]]; then
   npm run build
 fi
 
-log "Checking local git state"
-git fetch origin "$DEPLOY_BRANCH"
 local_head="$(git rev-parse HEAD)"
-remote_head="$(git rev-parse "origin/$DEPLOY_BRANCH")"
 
-if [[ "$local_head" != "$remote_head" ]]; then
-  die "local HEAD ($local_head) is not pushed to origin/$DEPLOY_BRANCH ($remote_head). Push first, then deploy."
-fi
+if [[ "$SKIP_GIT_CHECKS" != "1" ]]; then
+  log "Checking local git state"
+  git fetch origin "$DEPLOY_BRANCH"
+  remote_head="$(git rev-parse "origin/$DEPLOY_BRANCH")"
 
-if [[ -n "$(git status --porcelain)" ]]; then
-  die "working tree has uncommitted changes. Commit or stash them before deploying."
+  if [[ "$local_head" != "$remote_head" ]]; then
+    die "local HEAD ($local_head) is not pushed to origin/$DEPLOY_BRANCH ($remote_head). Push first, then deploy."
+  fi
+
+  if [[ -n "$(git status --porcelain)" ]]; then
+    die "working tree has uncommitted changes. Commit or stash them before deploying."
+  fi
 fi
 
 ssh_options=(-o "ServerAliveInterval=30" -o "ServerAliveCountMax=6")
@@ -116,6 +121,12 @@ remote_env="DEPLOY_PATH=$(quote "$DEPLOY_PATH") DEPLOY_BRANCH=$(quote "$DEPLOY_B
 deploy_remote() {
   "${ssh_cmd[@]}" "$remote" "$remote_env RELEASE_ARCHIVE=${1:+$(quote "$1")} bash -s" <<'REMOTE_SCRIPT'
 set -Eeuo pipefail
+
+# Load NVM if it exists to make sure node/npm/npx/pm2 are in the PATH
+if [ -s "$HOME/.nvm/nvm.sh" ]; then
+  export NVM_DIR="$HOME/.nvm"
+  \. "$NVM_DIR/nvm.sh"
+fi
 
 log() {
   printf '\n\033[1;36m==>\033[0m %s\n' "$*"
