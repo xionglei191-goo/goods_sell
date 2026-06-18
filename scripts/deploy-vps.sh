@@ -188,6 +188,13 @@ if ! command -v pm2 >/dev/null 2>&1; then
 fi
 
 log "Restarting PM2 app: $PM2_APP"
+if [ -f .env ]; then
+  log "Loading environment variables from .env"
+  set -a
+  . <(sed 's/\r$//' .env)
+  set +a
+fi
+
 if pm2 describe "$PM2_APP" >/dev/null 2>&1; then
   pm2 restart "$PM2_APP" --update-env
 else
