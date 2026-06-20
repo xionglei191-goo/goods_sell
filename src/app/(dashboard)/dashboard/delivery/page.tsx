@@ -20,8 +20,8 @@ export default async function DeliveryPage({ searchParams }: DeliveryPageProps) 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">物流配送</h1>
-        <p className="mt-1 text-sm text-slate-500">配送单列表、发货、送达和配送时间线。</p>
+        <h1 className="text-2xl font-semibold text-neutral-950">物流配送</h1>
+        <p className="mt-1 text-sm text-neutral-500">配送单列表、发货、送达和配送时间线。</p>
       </div>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -33,10 +33,10 @@ export default async function DeliveryPage({ searchParams }: DeliveryPageProps) 
 
       <DeliveryFilters initial={data.filters} />
 
-      <section className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
+      <section className="table-shell">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1180px] text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500">
+            <thead className="dashboard-table-head">
               <tr>
                 <th className="px-4 py-3 font-medium">订单号</th>
                 <th className="px-4 py-3 font-medium">客户</th>
@@ -49,22 +49,22 @@ export default async function DeliveryPage({ searchParams }: DeliveryPageProps) 
             </thead>
             <tbody>
               {data.items.map((item) => (
-                <tr className="border-t border-slate-100 hover:bg-slate-50" key={item.id}>
+                <tr className="dashboard-table-row" key={item.id}>
                   <td className="px-4 py-3">
-                    <Link className="font-medium text-slate-900 hover:text-red-700" href={`/dashboard/delivery/${item.id}`}>
+                    <Link className="font-medium text-neutral-950 hover:text-orange-700" href={`/dashboard/delivery/${item.id}`}>
                       {item.orderNo}
                     </Link>
                   </td>
                   <td className="px-4 py-3">
-                    <p className="font-medium text-slate-900">{item.customerName}</p>
-                    <p className="mt-1 text-xs text-slate-500">{item.customerPhone}</p>
+                    <p className="font-medium text-neutral-950">{item.customerName}</p>
+                    <p className="mt-1 text-xs text-neutral-500">{item.customerPhone}</p>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{item.address}</td>
+                  <td className="px-4 py-3 text-neutral-600">{item.address}</td>
                   <td className="px-4 py-3">
                     <span className={cn("rounded-full px-2 py-1 text-xs font-medium", orderStatusClasses[item.status])}>{orderStatusLabels[item.status]}</span>
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-slate-500">{item.trackingNo ?? "-"}</td>
-                  <td className="px-4 py-3 text-slate-500">
+                  <td className="px-4 py-3 font-mono text-xs text-neutral-500">{item.trackingNo ?? "-"}</td>
+                  <td className="px-4 py-3 text-neutral-500">
                     <p>{formatDateTime(item.shippedAt)}</p>
                     <p>{formatDateTime(item.deliveredAt)}</p>
                   </td>
@@ -78,7 +78,7 @@ export default async function DeliveryPage({ searchParams }: DeliveryPageProps) 
             </tbody>
           </table>
         </div>
-        <div className="border-t border-slate-100 px-4 py-3 text-sm text-slate-500">共 {data.items.length} 张配送单</div>
+        <div className="border-t px-4 py-3 text-sm text-neutral-500" style={{ borderColor: "var(--dashboard-line)" }}>共 {data.items.length} 张配送单</div>
       </section>
     </div>
   );
@@ -86,13 +86,13 @@ export default async function DeliveryPage({ searchParams }: DeliveryPageProps) 
 
 function SummaryCard({ icon: Icon, label, value }: { icon: typeof Truck; label: string; value: string }) {
   return (
-    <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
+    <section className="surface-panel p-5">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-sm text-slate-500">{label}</p>
-          <p className="mt-3 text-2xl font-semibold text-slate-900">{value}</p>
+          <p className="text-sm text-neutral-500">{label}</p>
+          <p className="mt-3 text-2xl font-semibold text-neutral-950">{value}</p>
         </div>
-        <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-red-50 text-[#dc2626]">
+        <span className="flex h-11 w-11 items-center justify-center rounded-md bg-orange-50 text-orange-700">
           <Icon className="h-5 w-5" />
         </span>
       </div>

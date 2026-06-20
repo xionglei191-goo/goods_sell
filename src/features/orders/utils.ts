@@ -14,14 +14,14 @@ export const orderStatusLabels: Record<OrderStatus, string> = {
 
 export const orderStatusClasses: Record<OrderStatus, string> = {
   PENDING_PAYMENT: "bg-amber-50 text-amber-700",
-  PAID: "bg-blue-50 text-blue-700",
-  CONFIRMED: "bg-indigo-50 text-indigo-700",
-  SHIPPING: "bg-cyan-50 text-cyan-700",
+  PAID: "bg-orange-50 text-orange-700",
+  CONFIRMED: "bg-orange-50 text-orange-700",
+  SHIPPING: "bg-orange-50 text-orange-700",
   DELIVERED: "bg-emerald-50 text-emerald-700",
-  COMPLETED: "bg-stone-100 text-stone-700",
-  CANCELLED: "bg-slate-100 text-slate-500",
-  REFUNDING: "bg-purple-50 text-purple-700",
-  REFUNDED: "bg-slate-100 text-slate-500",
+  COMPLETED: "bg-emerald-50 text-emerald-700",
+  CANCELLED: "bg-red-50 text-red-700",
+  REFUNDING: "bg-red-50 text-red-700",
+  REFUNDED: "bg-red-50 text-red-700",
 };
 
 export const orderTypeLabels: Record<OrderType, string> = {

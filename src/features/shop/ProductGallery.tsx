@@ -20,14 +20,14 @@ export function ProductGallery({ product }: ProductGalleryProps) {
 
   return (
     <div className="space-y-3">
-      <div className="relative overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-stone-200">
-        <ProductArt categoryName={product.rootCategoryName} className="min-h-[320px]" imageUrl={images[index]?.url || product.imageUrl} name={product.name} priority />
+      <div className="relative">
+        <ProductArt categoryName={product.rootCategoryName} className="min-h-[260px] sm:min-h-[320px]" imageUrl={images[index]?.url || product.imageUrl} name={product.name} priority />
         {images.length > 1 ? (
           <>
-            <button aria-label="上一张图片" className="absolute left-3 top-1/2 rounded-full bg-white/85 p-2 text-stone-700 shadow-sm" onClick={() => go(index - 1)} type="button">
+            <button aria-label="上一张图片" className="absolute left-3 top-1/2 rounded-full border border-orange-100 bg-[var(--shop-control)] p-2 text-neutral-700 shadow-sm transition-colors hover:bg-orange-50" onClick={() => go(index - 1)} type="button">
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <button aria-label="下一张图片" className="absolute right-3 top-1/2 rounded-full bg-white/85 p-2 text-stone-700 shadow-sm" onClick={() => go(index + 1)} type="button">
+            <button aria-label="下一张图片" className="absolute right-3 top-1/2 rounded-full border border-orange-100 bg-[var(--shop-control)] p-2 text-neutral-700 shadow-sm transition-colors hover:bg-orange-50" onClick={() => go(index + 1)} type="button">
               <ChevronRight className="h-4 w-4" />
             </button>
           </>
@@ -37,7 +37,7 @@ export function ProductGallery({ product }: ProductGalleryProps) {
         {images.map((image, imageIndex) => (
           <button
             aria-label={`切换到第 ${imageIndex + 1} 张图片`}
-            className={imageIndex === index ? "h-2.5 w-7 rounded-full bg-[#dc2626]" : "h-2.5 w-2.5 rounded-full bg-stone-300"}
+            className={imageIndex === index ? "h-2.5 w-7 rounded-full bg-[#dc2626]" : "h-2.5 w-2.5 rounded-full bg-orange-200"}
             key={image.id}
             onClick={() => setIndex(imageIndex)}
             type="button"

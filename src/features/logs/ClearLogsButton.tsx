@@ -24,13 +24,13 @@ export function ClearLogsButton() {
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200 sm:flex-row sm:items-center">
-      <input className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-red-300" onChange={(event) => setBeforeDate(event.target.value)} type="date" value={beforeDate} />
+    <div className="flex flex-col gap-2 surface-panel p-4 sm:flex-row sm:items-center">
+      <input className="form-input" onChange={(event) => setBeforeDate(event.target.value)} type="date" value={beforeDate} />
       <Button disabled={isPending} onClick={submit} type="button" variant="outline">
         <Trash2 className="h-4 w-4" />
         手动清除
       </Button>
-      {message ? <span className="text-sm text-slate-500">{message}</span> : <span className="text-sm text-slate-500">永久保留策略，仅支持管理员手动清除。</span>}
+      {message ? <span className="text-sm text-neutral-500">{message}</span> : <span className="text-sm text-neutral-500">永久保留策略，仅支持管理员手动清除。</span>}
     </div>
   );
 }

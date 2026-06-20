@@ -53,7 +53,7 @@ export function OrderActionButtons({ orderId, status }: OrderActionButtonsProps)
           </Button>
         ) : null}
       </div>
-      {message ? <p className="text-xs text-stone-500">{message}</p> : null}
+      {message ? <p className="text-xs text-neutral-500">{message}</p> : null}
     </div>
   );
 }

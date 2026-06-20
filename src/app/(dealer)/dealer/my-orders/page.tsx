@@ -9,8 +9,8 @@ export default async function DealerMyOrdersPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">订单处理</h1>
-        <p className="mt-1 text-sm text-slate-500">已接订单可确认发货或完成配送</p>
+        <h1 className="text-2xl font-bold text-neutral-950">订单处理</h1>
+        <p className="mt-1 text-sm text-neutral-500">已接订单可确认发货或完成配送</p>
       </div>
       {orders.length > 0 ? (
         <div className="space-y-3">
@@ -19,7 +19,7 @@ export default async function DealerMyOrdersPage() {
           ))}
         </div>
       ) : (
-        <div className="rounded-lg bg-white px-4 py-12 text-center text-sm text-slate-500 shadow-sm ring-1 ring-slate-200">暂无已接订单</div>
+        <div className="dealer-empty-state">暂无已接订单</div>
       )}
     </div>
   );

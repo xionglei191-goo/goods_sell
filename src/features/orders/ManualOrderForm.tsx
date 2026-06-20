@@ -77,17 +77,17 @@ export function ManualOrderForm({ options }: ManualOrderFormProps) {
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
       <div className="space-y-5">
-        <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
-          <h2 className="text-lg font-semibold text-slate-900">客户与地址</h2>
+        <section className="surface-panel p-5">
+          <h2 className="text-lg font-semibold text-neutral-950">客户与地址</h2>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
-            <select className="h-11 rounded-md border border-slate-200 bg-white px-3 outline-none focus:border-blue-400" onChange={(event) => changeCustomer(event.target.value)} value={customerId}>
+            <select className="form-input h-11" onChange={(event) => changeCustomer(event.target.value)} value={customerId}>
               {options.customers.map((customer) => (
                 <option key={customer.id} value={customer.id}>
                   {customer.name} · {customer.phone}
                 </option>
               ))}
             </select>
-            <select className="h-11 rounded-md border border-slate-200 bg-white px-3 outline-none focus:border-blue-400" onChange={(event) => setAddressId(event.target.value)} value={addressId}>
+            <select className="form-input h-11" onChange={(event) => setAddressId(event.target.value)} value={addressId}>
               {(selectedCustomer?.addresses ?? []).map((address) => (
                 <option key={address.id} value={address.id}>
                   {address.label}
@@ -97,9 +97,9 @@ export function ManualOrderForm({ options }: ManualOrderFormProps) {
           </div>
         </section>
 
-        <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <section className="surface-panel p-5">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold text-slate-900">商品明细</h2>
+            <h2 className="text-lg font-semibold text-neutral-950">商品明细</h2>
             <Button onClick={addItem} size="sm" variant="outline">
               <Plus className="h-4 w-4" />
               添加商品
@@ -109,25 +109,25 @@ export function ManualOrderForm({ options }: ManualOrderFormProps) {
             {items.map((item, index) => {
               const product = productMap.get(item.productId);
               return (
-                <div className="grid gap-3 rounded-lg border border-slate-200 p-3 md:grid-cols-[minmax(0,1.5fr)_120px_120px_44px]" key={`${item.productId}-${index}`}>
-                  <select className="h-10 min-w-0 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400" onChange={(event) => updateItem(index, { productId: event.target.value })} value={item.productId}>
+                <div className="grid gap-3 rounded-md border p-3 md:grid-cols-[minmax(0,1.5fr)_120px_120px_44px]" key={`${item.productId}-${index}`} style={{ borderColor: "var(--dashboard-line)" }}>
+                  <select className="form-input min-w-0" onChange={(event) => updateItem(index, { productId: event.target.value })} value={item.productId}>
                     {options.products.map((productOption) => (
                       <option key={productOption.id} value={productOption.id}>
                         {productOption.name} · 库存 {productOption.stock}
                       </option>
                     ))}
                   </select>
-                  <div className="flex h-10 overflow-hidden rounded-md border border-slate-200">
-                    <button className="flex w-9 items-center justify-center text-slate-500 disabled:text-slate-300" disabled={item.quantity <= 1} onClick={() => updateItem(index, { quantity: item.quantity - 1 })} type="button">
+                  <div className="flex h-10 overflow-hidden rounded-md border" style={{ borderColor: "var(--dashboard-line)", backgroundColor: "var(--dashboard-control)" }}>
+                    <button className="flex w-9 items-center justify-center text-neutral-500 disabled:text-neutral-300" disabled={item.quantity <= 1} onClick={() => updateItem(index, { quantity: item.quantity - 1 })} type="button">
                       <Minus className="h-4 w-4" />
                     </button>
-                    <input className="w-full border-x border-slate-200 text-center text-sm outline-none" max={product?.stock ?? 1} min={1} onChange={(event) => updateItem(index, { quantity: Number(event.target.value) })} type="number" value={item.quantity} />
-                    <button className="flex w-9 items-center justify-center text-slate-500 disabled:text-slate-300" disabled={Boolean(product && item.quantity >= product.stock)} onClick={() => updateItem(index, { quantity: item.quantity + 1 })} type="button">
+                    <input className="w-full border-x text-center text-sm outline-none" max={product?.stock ?? 1} min={1} onChange={(event) => updateItem(index, { quantity: Number(event.target.value) })} style={{ borderColor: "var(--dashboard-line)" }} type="number" value={item.quantity} />
+                    <button className="flex w-9 items-center justify-center text-neutral-500 disabled:text-neutral-300" disabled={Boolean(product && item.quantity >= product.stock)} onClick={() => updateItem(index, { quantity: item.quantity + 1 })} type="button">
                       <Plus className="h-4 w-4" />
                     </button>
                   </div>
-                  <input className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-blue-400" min={0.01} onChange={(event) => updateItem(index, { unitPrice: Number(event.target.value) })} type="number" value={item.unitPrice} />
-                  <button aria-label="删除商品" className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50" onClick={() => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index))} type="button">
+                  <input className="form-input" min={0.01} onChange={(event) => updateItem(index, { unitPrice: Number(event.target.value) })} type="number" value={item.unitPrice} />
+                  <button aria-label="删除商品" className="flex h-10 w-10 items-center justify-center rounded-md border text-neutral-500 hover:bg-orange-50" onClick={() => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index))} style={{ borderColor: "var(--dashboard-line)" }} type="button">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
@@ -138,26 +138,26 @@ export function ManualOrderForm({ options }: ManualOrderFormProps) {
       </div>
 
       <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
-        <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
-          <h2 className="text-lg font-semibold text-slate-900">订单设置</h2>
+        <section className="surface-panel p-5">
+          <h2 className="text-lg font-semibold text-neutral-950">订单设置</h2>
           <div className="mt-4 space-y-3">
-            <select className="h-11 w-full rounded-md border border-slate-200 bg-white px-3 outline-none focus:border-blue-400" onChange={(event) => setType(event.target.value as typeof type)} value={type}>
+            <select className="form-input h-11" onChange={(event) => setType(event.target.value as typeof type)} value={type}>
               <option value="RETAIL">零售</option>
               <option value="WHOLESALE">批发</option>
               <option value="GROUP_BUY">团购</option>
             </select>
-            <select className="h-11 w-full rounded-md border border-slate-200 bg-white px-3 outline-none focus:border-blue-400" onChange={(event) => setPayMethod(event.target.value as typeof payMethod)} value={payMethod}>
+            <select className="form-input h-11" onChange={(event) => setPayMethod(event.target.value as typeof payMethod)} value={payMethod}>
               <option value="WECHAT">微信</option>
               <option value="CASH">现金</option>
               <option value="TRANSFER">转账</option>
               <option value="CREDIT">赊账</option>
             </select>
-            <textarea className="min-h-24 w-full rounded-md border border-slate-200 px-3 py-2 outline-none focus:border-blue-400" onChange={(event) => setRemark(event.target.value)} placeholder="订单备注" value={remark} />
+            <textarea className="form-input min-h-24 py-2" onChange={(event) => setRemark(event.target.value)} placeholder="订单备注" value={remark} />
           </div>
-          {message ? <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{message}</p> : null}
-          <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
-            <span className="text-sm text-slate-500">应收合计</span>
-            <span className="text-2xl font-bold text-slate-900">{formatCurrency(total)}</span>
+          {message ? <p className="mt-3 rounded-md bg-orange-50 px-3 py-2 text-sm text-orange-700">{message}</p> : null}
+          <div className="mt-4 flex items-center justify-between border-t border-neutral-100 pt-4">
+            <span className="text-sm text-neutral-500">应收合计</span>
+            <span className="text-2xl font-bold text-neutral-950">{formatCurrency(total)}</span>
           </div>
           <Button className="mt-4 h-11 w-full" disabled={isPending || items.length === 0 || !customerId || !addressId} onClick={submit}>
             {isPending ? "创建中" : "创建订单"}

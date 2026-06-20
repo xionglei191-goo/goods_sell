@@ -30,13 +30,13 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-stone-950">我的订单</h1>
-        <p className="mt-1 text-sm text-stone-500">按状态查看订单进度</p>
+        <h1 className="text-2xl font-bold text-neutral-950">我的订单</h1>
+        <p className="mt-1 text-sm text-neutral-500">按状态查看订单进度</p>
       </div>
 
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
         {tabs.map((tab) => (
-          <Link className={cn("shrink-0 rounded-full px-4 py-2 text-sm font-medium", active === tab.key ? "bg-[#dc2626] text-white" : "bg-white text-stone-600 ring-1 ring-stone-200")} href={tab.key === "all" ? "/shop/my-orders" : `/shop/my-orders?status=${tab.key}`} key={tab.key}>
+          <Link className={cn("shrink-0 rounded-full px-4 py-2 text-sm font-medium", active === tab.key ? "bg-[#dc2626] text-white" : "bg-[var(--shop-control)] text-neutral-600 ring-1 ring-orange-100")} href={tab.key === "all" ? "/shop/my-orders" : `/shop/my-orders?status=${tab.key}`} key={tab.key}>
             {tab.label}
           </Link>
         ))}
@@ -45,11 +45,11 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
       {orders.length > 0 ? (
         <div className="space-y-3">
           {orders.map((order) => (
-            <article className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-stone-200" key={order.id}>
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 pb-3">
+            <article className="shop-block-card p-4" key={order.id}>
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-100 pb-3">
                 <div>
-                  <p className="font-semibold text-stone-950">{order.orderNo}</p>
-                  <p className="mt-1 text-xs text-stone-500">{formatDateTime(order.createdAt)}</p>
+                  <p className="font-semibold text-neutral-950">{order.orderNo}</p>
+                  <p className="mt-1 text-xs text-neutral-500">{formatDateTime(order.createdAt)}</p>
                 </div>
                 <span className={cn("rounded-full px-2 py-1 text-xs font-medium", orderStatusClasses[order.status])}>{order.statusLabel}</span>
               </div>
@@ -60,15 +60,15 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
                       <ProductArt categoryName="default" className="h-full w-full" name={item.name} />
                     </div>
                     <div className="min-w-0">
-                      <p className="line-clamp-1 text-sm font-medium text-stone-800">{item.name}</p>
-                      <p className="text-xs text-stone-400">x{item.quantity}</p>
+                      <p className="line-clamp-1 text-sm font-medium text-neutral-800">{item.name}</p>
+                      <p className="text-xs text-neutral-400">x{item.quantity}</p>
                     </div>
                   </div>
                 ))}
               </div>
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm text-stone-500">
-                  实付 <span className="text-lg font-bold text-[#dc2626]">{formatCurrency(order.payableAmount)}</span>
+                <p className="text-sm text-neutral-500">
+                  实付 <span className="text-lg font-bold commerce-accent">{formatCurrency(order.payableAmount)}</span>
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
                   <Button asChild size="sm" variant="outline">
@@ -81,8 +81,8 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
           ))}
         </div>
       ) : (
-        <div className="rounded-lg bg-white px-4 py-14 text-center shadow-sm ring-1 ring-stone-200">
-          <p className="font-semibold text-stone-950">暂无订单</p>
+        <div className="shop-empty-state py-14">
+          <p className="font-semibold text-neutral-950">暂无订单</p>
           <Button asChild className="mt-5 bg-[#dc2626] text-white hover:bg-[#b91c1c]">
             <Link href="/shop">去逛逛</Link>
           </Button>

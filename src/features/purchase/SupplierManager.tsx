@@ -76,26 +76,26 @@ export function SupplierManager({ suppliers }: SupplierManagerProps) {
 
   return (
     <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
-      <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
-        <h2 className="text-lg font-semibold text-slate-900">新增供应商</h2>
+      <section className="surface-panel p-5">
+        <h2 className="text-lg font-semibold text-neutral-950">新增供应商</h2>
         <div className="mt-5 space-y-4">
           <input className="form-input" onChange={(event) => setName(event.target.value)} placeholder="供应商名称" value={name} />
           <input className="form-input" onChange={(event) => setContactName(event.target.value)} placeholder="联系人" value={contactName} />
           <input className="form-input" onChange={(event) => setPhone(event.target.value)} placeholder="联系电话" value={phone} />
           <input className="form-input" onChange={(event) => setAddress(event.target.value)} placeholder="地址" value={address} />
-          {message ? <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{message}</p> : null}
+          {message ? <p className="rounded-md bg-orange-50 px-3 py-2 text-sm text-orange-700">{message}</p> : null}
           <Button disabled={isPending || !name} onClick={addSupplier} type="button">
             保存供应商
           </Button>
         </div>
       </section>
 
-      <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
-        <h2 className="text-lg font-semibold text-slate-900">供应商列表</h2>
+      <section className="surface-panel p-5">
+        <h2 className="text-lg font-semibold text-neutral-950">供应商列表</h2>
         <div className="mt-5 overflow-x-auto">
           <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="text-slate-500">
-              <tr className="border-b border-slate-100">
+            <thead className="text-neutral-500">
+              <tr className="border-b border-neutral-100">
                 <th className="py-3 font-medium">供应商</th>
                 <th className="py-3 font-medium">联系人</th>
                 <th className="py-3 font-medium">电话</th>
@@ -105,11 +105,11 @@ export function SupplierManager({ suppliers }: SupplierManagerProps) {
             </thead>
             <tbody>
               {suppliers.map((supplier) => (
-                <tr className="border-b border-slate-100 last:border-0" key={supplier.id}>
-                  <td className="py-3 font-medium text-slate-900">{supplier.name}</td>
-                  <td className="py-3 text-slate-600">{supplier.contactName ?? "-"}</td>
-                  <td className="py-3 text-slate-600">{supplier.phone ?? "-"}</td>
-                  <td className="py-3 text-slate-600">{supplier.address ?? "-"}</td>
+                <tr className="border-b border-neutral-100 last:border-0" key={supplier.id}>
+                  <td className="py-3 font-medium text-neutral-950">{supplier.name}</td>
+                  <td className="py-3 text-neutral-600">{supplier.contactName ?? "-"}</td>
+                  <td className="py-3 text-neutral-600">{supplier.phone ?? "-"}</td>
+                  <td className="py-3 text-neutral-600">{supplier.address ?? "-"}</td>
                   <td className="py-3">
                     <div className="flex justify-end gap-1">
                       <Button className="h-8 w-8" onClick={() => editSupplier(supplier)} size="icon" variant="ghost">

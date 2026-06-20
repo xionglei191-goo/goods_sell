@@ -37,30 +37,30 @@ export function ProfileForm({ initial }: ProfileFormProps) {
   return (
     <div className="mx-auto max-w-xl space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-stone-950">个人信息</h1>
-        <p className="mt-1 text-sm text-stone-500">账号 {initial.phone}</p>
+        <h1 className="text-2xl font-bold text-neutral-950">个人信息</h1>
+        <p className="mt-1 text-sm text-neutral-500">账号 {initial.phone}</p>
       </div>
 
-      {message ? <p className="rounded-md bg-stone-100 px-3 py-2 text-sm text-stone-600">{message}</p> : null}
+      {message ? <p className="rounded-md bg-orange-50 px-3 py-2 text-sm text-orange-700">{message}</p> : null}
 
-      <section className="space-y-4 rounded-lg bg-white p-4 shadow-sm ring-1 ring-stone-200">
+      <section className="space-y-4 shop-block-card p-4">
         <div className="space-y-2">
-          <label className="text-sm font-medium text-stone-700" htmlFor="profile-name">
+          <label className="text-sm font-medium text-neutral-700" htmlFor="profile-name">
             昵称
           </label>
-          <input className="h-11 w-full rounded-md border border-stone-200 px-3 outline-none focus:border-red-300" id="profile-name" onChange={(event) => setInput((current) => ({ ...current, name: event.target.value }))} value={input.name} />
+          <input className="shop-form-input h-11" id="profile-name" onChange={(event) => setInput((current) => ({ ...current, name: event.target.value }))} value={input.name} />
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium text-stone-700" htmlFor="old-password">
+          <label className="text-sm font-medium text-neutral-700" htmlFor="old-password">
             旧密码
           </label>
-          <input className="h-11 w-full rounded-md border border-stone-200 px-3 outline-none focus:border-red-300" id="old-password" onChange={(event) => setInput((current) => ({ ...current, oldPassword: event.target.value }))} type="password" value={input.oldPassword ?? ""} />
+          <input className="shop-form-input h-11" id="old-password" onChange={(event) => setInput((current) => ({ ...current, oldPassword: event.target.value }))} type="password" value={input.oldPassword ?? ""} />
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium text-stone-700" htmlFor="new-password">
+          <label className="text-sm font-medium text-neutral-700" htmlFor="new-password">
             新密码
           </label>
-          <input className="h-11 w-full rounded-md border border-stone-200 px-3 outline-none focus:border-red-300" id="new-password" onChange={(event) => setInput((current) => ({ ...current, newPassword: event.target.value }))} type="password" value={input.newPassword ?? ""} />
+          <input className="shop-form-input h-11" id="new-password" onChange={(event) => setInput((current) => ({ ...current, newPassword: event.target.value }))} type="password" value={input.newPassword ?? ""} />
         </div>
         <Button className="h-11 w-full bg-[#dc2626] text-white hover:bg-[#b91c1c]" disabled={isPending} onClick={submit}>
           {isPending ? "保存中" : "保存修改"}

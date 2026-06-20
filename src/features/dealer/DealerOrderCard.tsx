@@ -1,7 +1,7 @@
 import { Clock, MapPin } from "lucide-react";
 
 import { DealerOrderActions } from "@/features/dealer/DealerOrderActions";
-import { formatDateTime, orderStatusClasses } from "@/features/orders/utils";
+import { formatDateTime } from "@/features/orders/utils";
 import { cn } from "@/lib/utils";
 
 type DealerOrderCardProps = {
@@ -22,26 +22,32 @@ type DealerOrderCardProps = {
 };
 
 export function DealerOrderCard({ order, mode }: DealerOrderCardProps) {
+  const isComplete = order.status === "COMPLETED" || order.status === "DELIVERED";
+  const isRisk = order.status === "CANCELLED" || order.status === "REFUNDING" || order.status === "REFUNDED";
+
   return (
-    <article className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
+    <article className="dealer-card p-4">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="font-semibold text-slate-900">{order.orderNo}</p>
-          <p className="mt-1 text-sm text-slate-500">{order.customer} · {order.amountText}</p>
+        <div className="min-w-0">
+          <p className="font-semibold text-neutral-950">{order.orderNo}</p>
+          <p className="mt-1 text-sm text-neutral-500">{order.customer}</p>
         </div>
-        <span className={cn("rounded-full px-2 py-1 text-xs font-medium", orderStatusClasses[order.status as keyof typeof orderStatusClasses])}>{order.statusLabel}</span>
+        <div className="shrink-0 text-right">
+          <p className="dealer-money">{order.amountText}</p>
+          <span className={cn("mt-1 dealer-status-badge", isComplete ? "dealer-status-success" : "", isRisk ? "dealer-status-risk" : "")}>{order.statusLabel}</span>
+        </div>
       </div>
-      <div className="mt-3 space-y-2 text-sm text-slate-600">
-        <p className="flex items-center gap-2">
-          <MapPin className="h-4 w-4 text-[#dc2626]" />
-          {order.address} · {order.distance.toFixed(2)} km
+      <div className="mt-3 space-y-2 text-sm text-neutral-600">
+        <p className="flex items-start gap-2">
+          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#b9472d]" />
+          <span>{order.address} · {order.distance.toFixed(2)} km</span>
         </p>
         <p className="flex items-center gap-2">
-          <Clock className="h-4 w-4 text-slate-400" />
+          <Clock className="h-4 w-4 text-neutral-400" />
           {formatDateTime(order.createdAt)}
         </p>
       </div>
-      <div className="mt-3 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">
+      <div className="mt-3 rounded-md border border-[#f8d6c9] bg-[#fff1e8] px-3 py-2 text-sm text-neutral-600">
         {order.items.map((item) => `${item.name} x${item.quantity}`).join(" / ")}
       </div>
       <div className="mt-4">

@@ -53,17 +53,17 @@ export function Header({ user, onMenuClick }: HeaderProps) {
   const initials = user.name?.slice(0, 2) ?? "华启";
 
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-slate-200 bg-white px-4 lg:px-6">
+    <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b bg-[var(--dashboard-panel)]/95 px-4 backdrop-blur lg:px-6" style={{ borderColor: "var(--dashboard-line)" }}>
       <Button className="h-10 w-10 lg:hidden" onClick={onMenuClick} size="icon" variant="ghost">
         <Menu className="h-5 w-5" />
       </Button>
 
       <div className="min-w-0 flex-1">
-        <nav className="flex min-w-0 items-center gap-2 text-sm text-slate-500">
+        <nav className="flex min-w-0 items-center gap-2 text-sm text-neutral-500">
           {breadcrumbs.map((breadcrumb, index) => (
             <span className="flex min-w-0 items-center gap-2" key={`${breadcrumb}-${index}`}>
-              {index > 0 ? <span className="text-slate-300">/</span> : null}
-              <span className={index === breadcrumbs.length - 1 ? "truncate font-medium text-slate-900" : "truncate"}>
+              {index > 0 ? <span className="text-neutral-300">/</span> : null}
+              <span className={index === breadcrumbs.length - 1 ? "truncate font-medium text-neutral-950" : "truncate"}>
                 {breadcrumb}
               </span>
             </span>
@@ -71,29 +71,29 @@ export function Header({ user, onMenuClick }: HeaderProps) {
         </nav>
       </div>
 
-      <div className="hidden h-10 w-full max-w-sm items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 md:flex">
-        <Search className="h-4 w-4 text-slate-400" />
+      <div className="hidden h-10 w-full max-w-sm items-center gap-2 rounded-md border px-3 md:flex" style={{ backgroundColor: "var(--dashboard-control)", borderColor: "var(--dashboard-line)" }}>
+        <Search className="h-4 w-4 text-neutral-400" />
         <input
-          className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
+          className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-neutral-400"
           placeholder="搜索产品、订单、客户"
           type="search"
         />
       </div>
 
       <Button className="h-10 w-10" size="icon" variant="ghost">
-        <Bell className="h-5 w-5 text-slate-600" />
+        <Bell className="h-5 w-5 text-neutral-600" />
       </Button>
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="flex items-center gap-3 rounded-md p-1 transition hover:bg-slate-100" type="button">
+          <button className="flex items-center gap-3 rounded-md p-1 transition hover:bg-[#fff1e8]" type="button">
             <Avatar className="h-9 w-9">
               <AvatarImage src={user.image ?? undefined} />
-              <AvatarFallback className="bg-[#1e3a5f] text-white">{initials}</AvatarFallback>
+              <AvatarFallback className="bg-[#e86f51] text-white">{initials}</AvatarFallback>
             </Avatar>
             <span className="hidden text-left md:block">
-              <span className="block text-sm font-medium text-slate-900">{user.name ?? "未登录用户"}</span>
-              <span className="block text-xs text-slate-500">{roleLabels[user.role ?? ""] ?? "待认证"}</span>
+              <span className="block text-sm font-medium text-neutral-950">{user.name ?? "未登录用户"}</span>
+              <span className="block text-xs text-neutral-500">{roleLabels[user.role ?? ""] ?? "待认证"}</span>
             </span>
           </button>
         </DropdownMenuTrigger>

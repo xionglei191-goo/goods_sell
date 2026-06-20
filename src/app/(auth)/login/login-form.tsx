@@ -29,38 +29,34 @@ export function LoginForm() {
     setError(null);
 
     startTransition(async () => {
-      try {
-        const result = await signIn("credentials", {
-          phone: values.phone,
-          password: values.password,
-          redirect: false,
-        });
+      const result = await signIn("credentials", {
+        phone: values.phone,
+        password: values.password,
+        redirect: false,
+      });
 
-        if (!result?.ok || result.error) {
-          setError("手机号或密码错误；员工账号可能已被禁用，经销商申请需审核通过后才能登录");
-          return;
-        }
-
-        const session = await getSession();
-        const redirectUrl = isSafeLocalPath(callbackUrl) ? callbackUrl : getDefaultRedirect(session?.user.role);
-        router.replace(redirectUrl);
-        router.refresh();
-      } catch {
-        setError("手机号或密码错误；员工账号可能已被禁用，经销商申请需审核通过后才能登录");
+      if (!result?.ok) {
+        setError("手机号或密码错误，请检查后重试");
+        return;
       }
+
+      const session = await getSession();
+      const redirectUrl = isSafeLocalPath(callbackUrl) ? callbackUrl : getDefaultRedirect(session?.user.role);
+      router.replace(redirectUrl);
+      router.refresh();
     });
   }
 
   return (
     <form className="space-y-5" onSubmit={form.handleSubmit(onSubmit)}>
       <div className="space-y-2">
-        <label className="text-sm font-medium text-slate-700" htmlFor="phone">
+        <label className="text-sm font-medium text-neutral-700" htmlFor="phone">
           手机号 / 管理员账号
         </label>
         <input
           id="phone"
           autoComplete="username"
-          className="h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-base outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+          className="shop-form-input h-11 text-base"
           placeholder="admin 或 13800138001"
           {...form.register("phone")}
         />
@@ -68,14 +64,14 @@ export function LoginForm() {
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium text-slate-700" htmlFor="password">
+        <label className="text-sm font-medium text-neutral-700" htmlFor="password">
           密码
         </label>
         <input
           id="password"
           type="password"
           autoComplete="current-password"
-          className="h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-base outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+          className="shop-form-input h-11 text-base"
           placeholder="请输入密码"
           {...form.register("password")}
         />
@@ -84,14 +80,14 @@ export function LoginForm() {
 
       {error ? <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
 
-      <Button className="h-11 w-full bg-[#1e3a5f] text-white hover:bg-[#172f4e]" disabled={isPending} type="submit">
+      <Button className="h-11 w-full bg-[#dc2626] text-white hover:bg-[#b91c1c]" disabled={isPending} type="submit">
         {isPending ? "登录中..." : "登录"}
       </Button>
 
-      <p className="text-center text-sm text-slate-500">
+      <p className="text-center text-sm text-neutral-500">
         还没有账号？
-        <Link className="ml-1 font-medium text-[#1e3a5f] hover:underline" href="/register">
-          注册账号/经销商申请
+        <Link className="ml-1 font-medium text-neutral-950 hover:underline" href="/register">
+          注册消费者账号
         </Link>
       </p>
     </form>

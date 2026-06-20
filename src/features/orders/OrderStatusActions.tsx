@@ -57,7 +57,7 @@ export function OrderStatusActions({ orderId, status, allowedActions }: OrderSta
           );
         })}
       </div>
-      {message ? <p className="text-xs text-slate-500">{message}</p> : null}
+      {message ? <p className="text-xs text-neutral-500">{message}</p> : null}
     </div>
   );
 }

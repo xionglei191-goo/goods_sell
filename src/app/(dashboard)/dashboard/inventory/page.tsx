@@ -9,7 +9,7 @@ const dotClasses = {
   green: "bg-emerald-500",
   amber: "bg-amber-500",
   red: "bg-red-500",
-  black: "bg-slate-900",
+  black: "bg-neutral-700",
 };
 
 export default async function InventoryPage() {
@@ -20,9 +20,11 @@ export default async function InventoryPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">库存总览</h1>
-        <p className="mt-1 text-sm text-slate-500">查看当前库存、安全库存和库存价值</p>
+      <div className="dashboard-page-heading">
+        <div>
+          <h1 className="text-2xl font-semibold text-neutral-950">库存总览</h1>
+          <p className="mt-1 text-sm text-neutral-500">查看当前库存、安全库存和库存价值</p>
+        </div>
       </div>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -32,10 +34,10 @@ export default async function InventoryPage() {
         <SummaryCard icon={CircleDollarSign} label="总库存价值" value={formatCurrency(totalValue)} />
       </section>
 
-      <div className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
+      <div className="table-shell">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500">
+            <thead className="dashboard-table-head">
               <tr>
                 <th className="px-4 py-3 font-medium">产品</th>
                 <th className="px-4 py-3 font-medium">SKU</th>
@@ -51,19 +53,19 @@ export default async function InventoryPage() {
                 const status = getInventoryStatus(item);
 
                 return (
-                  <tr className="border-t border-slate-100 hover:bg-slate-50" key={item.id}>
-                    <td className="px-4 py-3 font-medium text-slate-900">{item.name}</td>
-                    <td className="px-4 py-3 text-slate-600">{item.sku}</td>
-                    <td className="px-4 py-3 text-slate-600">{item.category}</td>
-                    <td className="px-4 py-3 text-slate-900">{item.stock}</td>
-                    <td className="px-4 py-3 text-slate-600">{item.safeStock}</td>
+                  <tr className="dashboard-table-row" key={item.id}>
+                    <td className="px-4 py-3 font-medium text-neutral-950">{item.name}</td>
+                    <td className="px-4 py-3 text-neutral-600">{item.sku}</td>
+                    <td className="px-4 py-3 text-neutral-600">{item.category}</td>
+                    <td className={cn("px-4 py-3", item.stock <= 0 ? "metric-risk" : item.stock <= item.safeStock ? "metric-warning" : "metric-positive")}>{item.stock}</td>
+                    <td className="px-4 py-3 text-neutral-600">{item.safeStock}</td>
                     <td className="px-4 py-3">
                       <span className="inline-flex items-center gap-2">
                         <span className={cn("h-2.5 w-2.5 rounded-full", dotClasses[status.tone])} />
                         {status.label}
                       </span>
                     </td>
-                    <td className="px-4 py-3 font-medium text-slate-900">{formatCurrency(item.value)}</td>
+                    <td className="px-4 py-3 money-muted">{formatCurrency(item.value)}</td>
                   </tr>
                 );
               })}
@@ -77,13 +79,13 @@ export default async function InventoryPage() {
 
 function SummaryCard({ icon: Icon, label, value }: { icon: typeof Boxes; label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
+    <div className="dashboard-kpi-card">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-sm text-slate-500">{label}</p>
-          <p className="mt-3 text-2xl font-semibold text-slate-900">{value}</p>
+          <p className="text-sm text-neutral-500">{label}</p>
+          <p className="mt-3 text-2xl font-semibold text-neutral-950">{value}</p>
         </div>
-        <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+        <span className="dashboard-accent-icon">
           <Icon className="h-5 w-5" />
         </span>
       </div>

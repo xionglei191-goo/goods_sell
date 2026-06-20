@@ -26,7 +26,7 @@ export function ProfileRefreshButton({ customerId }: { customerId: string }) {
         <Sparkles className="h-4 w-4" />
         {isPending ? "分析中" : "刷新画像"}
       </Button>
-      {message ? <p className="text-xs text-slate-500">{message}</p> : null}
+      {message ? <p className="text-xs text-neutral-500">{message}</p> : null}
     </div>
   );
 }

@@ -79,10 +79,10 @@ export function CartClient({ initialItems }: CartClientProps) {
 
   if (items.length === 0) {
     return (
-      <div className="rounded-lg bg-white px-4 py-16 text-center shadow-sm ring-1 ring-stone-200">
-        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-red-50 text-3xl font-bold text-[#dc2626]">空</div>
-        <h1 className="mt-5 text-xl font-bold text-stone-950">购物车还是空的</h1>
-        <p className="mt-2 text-sm text-stone-500">去挑几件湘潭本地好货吧。</p>
+      <div className="shop-empty-state py-16">
+        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-red-50 text-3xl font-bold commerce-accent">空</div>
+        <h1 className="mt-5 text-xl font-bold text-neutral-950">购物车还是空的</h1>
+        <p className="mt-2 text-sm text-neutral-500">去挑几件湘潭本地好货吧。</p>
         <Button asChild className="mt-6 bg-[#dc2626] text-white hover:bg-[#b91c1c]">
           <Link href="/shop">去逛逛</Link>
         </Button>
@@ -93,51 +93,51 @@ export function CartClient({ initialItems }: CartClientProps) {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-stone-950">购物车</h1>
-        <p className="mt-1 text-sm text-stone-500">已加入 {items.length} 种商品</p>
+        <h1 className="text-2xl font-bold text-neutral-950">购物车</h1>
+        <p className="mt-1 text-sm text-neutral-500">已加入 {items.length} 种商品</p>
       </div>
 
       {message ? <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{message}</p> : null}
 
       <div className="space-y-3">
         {items.map((item) => (
-          <article className="rounded-lg bg-white p-3 shadow-sm ring-1 ring-stone-200" key={item.id}>
+          <article className="shop-block-card p-3" key={item.id}>
             <div className="flex gap-3">
-              <input checked={item.selected} className="mt-10 h-5 w-5 shrink-0 accent-[#dc2626]" onChange={(event) => toggleSelected(item, event.target.checked)} type="checkbox" />
-              <Link className="block h-24 w-24 shrink-0 overflow-hidden rounded-md" href={`/shop/product/${item.productId}`}>
+              <input checked={item.selected} className="mt-10 h-5 w-5 shrink-0 accent-red-800" onChange={(event) => toggleSelected(item, event.target.checked)} type="checkbox" />
+              <Link className="block h-20 w-20 shrink-0 overflow-hidden rounded-md sm:h-24 sm:w-24" href={`/shop/product/${item.productId}`}>
                 <ProductArt categoryName={item.brandName} className="h-full w-full" name={item.name} />
               </Link>
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <Link className="line-clamp-2 font-semibold text-stone-950" href={`/shop/product/${item.productId}`}>
+                    <Link className="line-clamp-2 font-semibold text-neutral-950" href={`/shop/product/${item.productId}`}>
                       {item.name}
                     </Link>
-                    <p className="mt-1 text-xs text-stone-500">{item.brandName} · {item.spec ?? item.unit}</p>
+                    <p className="mt-1 text-xs text-neutral-500">{item.brandName} · {item.spec ?? item.unit}</p>
                     {!item.isAvailable ? <p className="mt-2 text-xs font-medium text-red-600">{item.stock <= 0 ? "该商品已售罄" : `库存仅剩 ${item.stock}`}</p> : null}
                   </div>
-                  <button aria-label="删除商品" className="rounded-full p-2 text-stone-400 hover:bg-stone-100 hover:text-red-600" onClick={() => removeItem(item.id)} type="button">
+                  <button aria-label="删除商品" className="rounded-full p-2 text-neutral-400 hover:bg-orange-50 hover:text-red-600" onClick={() => removeItem(item.id)} type="button">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="font-bold text-[#dc2626]">{formatCurrency(item.price)}</p>
-                    <p className="text-xs text-stone-400">小计 {formatCurrency(item.price * item.quantity)}</p>
+                    <p className="font-bold commerce-accent">{formatCurrency(item.price)}</p>
+                    <p className="text-xs text-neutral-400">小计 {formatCurrency(item.price * item.quantity)}</p>
                   </div>
-                  <div className="flex h-9 overflow-hidden rounded-md border border-stone-200">
-                    <button aria-label="减少数量" className="flex w-9 items-center justify-center hover:bg-stone-50 disabled:text-stone-300" disabled={item.quantity <= 1 || isPending} onClick={() => changeQuantity(item, item.quantity - 1)} type="button">
+                  <div className="flex h-9 w-fit overflow-hidden rounded-md border border-orange-100 bg-[var(--shop-control)]">
+                    <button aria-label="减少数量" className="flex w-9 items-center justify-center hover:bg-[#fff8f6] disabled:text-stone-300" disabled={item.quantity <= 1 || isPending} onClick={() => changeQuantity(item, item.quantity - 1)} type="button">
                       <Minus className="h-4 w-4" />
                     </button>
                     <input
-                      className="w-12 border-x border-stone-200 text-center text-sm outline-none"
+                      className="w-12 border-x border-orange-100 bg-[var(--shop-control)] text-center text-sm outline-none"
                       max={item.stock}
                       min={1}
                       onChange={(event) => changeQuantity(item, Number(event.target.value))}
                       type="number"
                       value={item.quantity}
                     />
-                    <button aria-label="增加数量" className="flex w-9 items-center justify-center hover:bg-stone-50 disabled:text-stone-300" disabled={item.quantity >= item.stock || isPending} onClick={() => changeQuantity(item, item.quantity + 1)} type="button">
+                    <button aria-label="增加数量" className="flex w-9 items-center justify-center hover:bg-[#fff8f6] disabled:text-stone-300" disabled={item.quantity >= item.stock || isPending} onClick={() => changeQuantity(item, item.quantity + 1)} type="button">
                       <Plus className="h-4 w-4" />
                     </button>
                   </div>
@@ -148,18 +148,18 @@ export function CartClient({ initialItems }: CartClientProps) {
         ))}
       </div>
 
-      <div className="sticky bottom-16 z-30 rounded-lg border border-stone-200 bg-white p-4 shadow-lg md:bottom-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <label className="flex items-center gap-2 text-sm text-stone-600">
-            <input checked={allSelected} className="h-5 w-5 accent-[#dc2626]" onChange={toggleAll} type="checkbox" />
+      <div className="shop-mobile-action-bar bottom-16 md:bottom-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <label className="flex items-center gap-2 text-sm text-neutral-600">
+            <input checked={allSelected} className="h-5 w-5 accent-red-800" onChange={toggleAll} type="checkbox" />
             全选
           </label>
-          <div className="flex flex-1 items-center justify-end gap-3">
-            <div className="text-right">
-              <p className="text-xs text-stone-400">合计</p>
-              <p className="text-xl font-bold text-[#dc2626]">{formatCurrency(total)}</p>
+          <div className="flex items-center justify-between gap-3 sm:flex-1 sm:justify-end">
+            <div className="min-w-0">
+              <p className="text-xs text-neutral-400">合计</p>
+              <p className="text-xl font-bold commerce-accent">{formatCurrency(total)}</p>
             </div>
-            <Button className="h-11 bg-[#dc2626] px-5 text-white hover:bg-[#b91c1c]" disabled={selectedItems.length === 0 || isPending} onClick={checkout}>
+            <Button className="h-11 shrink-0 bg-[#dc2626] px-5 text-white hover:bg-[#b91c1c]" disabled={selectedItems.length === 0 || isPending} onClick={checkout}>
               结算({selectedItems.length})
             </Button>
           </div>

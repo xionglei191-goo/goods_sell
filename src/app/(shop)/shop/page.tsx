@@ -104,13 +104,19 @@ export default async function ShopPage() {
         <div className="grid grid-cols-3 gap-3">
           {data.categories.map((category) => {
             const Icon = categoryIcons[category.slug as Exclude<ShopCategorySlug, "all">];
+            const tone =
+              category.slug === "wine"
+                ? "bg-red-50 text-red-700 ring-red-100"
+                : category.slug === "food"
+                  ? "bg-orange-50 text-orange-700 ring-orange-100"
+                  : "bg-emerald-50 text-emerald-700 ring-emerald-100";
             return (
-              <Link className="rounded-lg bg-white p-4 text-center shadow-sm ring-1 ring-stone-200 transition hover:-translate-y-0.5 hover:shadow-md" href={`/shop/catalog?category=${category.slug}`} key={category.slug}>
-                <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-[#dc2626]">
+              <Link className="shop-block-card p-4 text-center" href={`/shop/catalog?category=${category.slug}`} key={category.slug}>
+                <span className={`mx-auto flex h-12 w-12 items-center justify-center rounded-md ring-1 ${tone}`}>
                   <Icon className="h-6 w-6" />
                 </span>
-                <span className="mt-2 block text-sm font-semibold text-stone-900">{category.label}</span>
-                <span className="mt-1 block text-xs text-stone-400">{category.count} 件</span>
+                <span className="mt-2 block text-sm font-semibold text-neutral-950">{category.label}</span>
+                <span className="mt-1 block text-xs text-neutral-400">{category.count} 件</span>
               </Link>
             );
           })}
@@ -120,10 +126,10 @@ export default async function ShopPage() {
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold text-stone-950">猜你喜欢</h2>
-            <p className="mt-1 text-sm text-stone-500">{data.recommendationReason}</p>
+            <h2 className="text-xl font-bold text-neutral-950">猜你喜欢</h2>
+            <p className="mt-1 text-sm text-neutral-500">{data.recommendationReason}</p>
           </div>
-          <Link className="text-sm font-medium text-[#dc2626]" href="/shop/fun">
+          <Link className="text-sm font-medium shop-promo-accent" href="/shop/fun">
             做个小测试
           </Link>
         </div>
@@ -139,10 +145,10 @@ export default async function ShopPage() {
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold text-stone-950">热门推荐</h2>
-            <p className="mt-1 text-sm text-stone-500">按销量优先展示</p>
+            <h2 className="text-xl font-bold text-neutral-950">热门推荐</h2>
+            <p className="mt-1 text-sm text-neutral-500">按销量优先展示</p>
           </div>
-          <Link className="text-sm font-medium text-[#dc2626]" href="/shop/catalog?sort=sales">
+          <Link className="text-sm font-medium shop-promo-accent" href="/shop/catalog?sort=sales">
             查看更多
           </Link>
         </div>
@@ -158,10 +164,10 @@ export default async function ShopPage() {
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold text-stone-950">新品上架</h2>
-            <p className="mt-1 text-sm text-stone-500">最近补充的本地供应商品</p>
+            <h2 className="text-xl font-bold text-neutral-950">新品上架</h2>
+            <p className="mt-1 text-sm text-neutral-500">最近补充的本地供应商品</p>
           </div>
-          <Link className="text-sm font-medium text-[#dc2626]" href="/shop/catalog?sort=new">
+          <Link className="text-sm font-medium commerce-accent" href="/shop/catalog?sort=new">
             全部新品
           </Link>
         </div>

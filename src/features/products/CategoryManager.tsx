@@ -70,11 +70,11 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
 
   return (
     <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
-      <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
-        <h2 className="text-lg font-semibold text-slate-900">新增分类</h2>
+      <section className="surface-panel p-5">
+        <h2 className="text-lg font-semibold text-neutral-950">新增分类</h2>
         <div className="mt-5 space-y-4">
           <label className="block">
-            <span className="mb-2 block text-sm font-medium text-slate-700">父级分类</span>
+            <span className="mb-2 block text-sm font-medium text-neutral-700">父级分类</span>
             <select className="form-input" onChange={(event) => setParentId(event.target.value)} value={parentId}>
               <option value="">作为一级分类</option>
               {categories.map((category) => (
@@ -85,18 +85,18 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
             </select>
           </label>
           <label className="block">
-            <span className="mb-2 block text-sm font-medium text-slate-700">分类名称</span>
+            <span className="mb-2 block text-sm font-medium text-neutral-700">分类名称</span>
             <input className="form-input" onChange={(event) => setName(event.target.value)} placeholder="如：白酒" value={name} />
           </label>
-          {message ? <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{message}</p> : null}
+          {message ? <p className="rounded-md bg-orange-50 px-3 py-2 text-sm text-orange-700">{message}</p> : null}
           <Button disabled={isPending || !name} onClick={addCategory} type="button">
             保存分类
           </Button>
         </div>
       </section>
 
-      <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
-        <h2 className="text-lg font-semibold text-slate-900">分类树</h2>
+      <section className="surface-panel p-5">
+        <h2 className="text-lg font-semibold text-neutral-950">分类树</h2>
         <div className="mt-5 space-y-3">
           {rootCategories.map((category) => (
             <CategoryNode categories={categories} category={category} key={category.id} onDelete={removeCategory} onEdit={editCategory} />
@@ -124,8 +124,8 @@ function CategoryNode({
 
   return (
     <div style={{ marginLeft: level * 18 }}>
-      <div className="flex items-center justify-between rounded-md border border-slate-100 px-3 py-2">
-        <span className="text-sm font-medium text-slate-800">{category.name}</span>
+      <div className="flex items-center justify-between rounded-md border border-neutral-100 px-3 py-2">
+        <span className="text-sm font-medium text-neutral-800">{category.name}</span>
         <div className="flex items-center gap-1">
           <Button className="h-8 w-8" onClick={() => onEdit(category)} size="icon" variant="ghost">
             <Pencil className="h-4 w-4" />

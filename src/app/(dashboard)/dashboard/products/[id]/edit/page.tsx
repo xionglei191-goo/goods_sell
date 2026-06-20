@@ -19,8 +19,8 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">编辑产品</h1>
-        <p className="mt-1 text-sm text-slate-500">{product.name}</p>
+        <h1 className="text-2xl font-semibold text-neutral-950">编辑产品</h1>
+        <p className="mt-1 text-sm text-neutral-500">{product.name}</p>
       </div>
       <ProductForm brands={brands} categories={categories} product={product} />
     </div>

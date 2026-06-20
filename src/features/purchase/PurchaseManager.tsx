@@ -80,11 +80,11 @@ export function PurchaseManager({ orders, products, suppliers }: PurchaseManager
 
   return (
     <div className="grid gap-6 xl:grid-cols-[380px_1fr]">
-      <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
-        <h2 className="text-lg font-semibold text-slate-900">创建采购单</h2>
+      <section className="surface-panel p-5">
+        <h2 className="text-lg font-semibold text-neutral-950">创建采购单</h2>
         <form className="mt-5 space-y-4" onSubmit={form.handleSubmit(submit)}>
           <label className="block">
-            <span className="mb-2 block text-sm font-medium text-slate-700">供应商</span>
+            <span className="mb-2 block text-sm font-medium text-neutral-700">供应商</span>
             <select className="form-input" {...form.register("supplierId")}>
               {suppliers.map((supplier) => (
                 <option key={supplier.id} value={supplier.id}>
@@ -94,7 +94,7 @@ export function PurchaseManager({ orders, products, suppliers }: PurchaseManager
             </select>
           </label>
           <label className="block">
-            <span className="mb-2 block text-sm font-medium text-slate-700">产品</span>
+            <span className="mb-2 block text-sm font-medium text-neutral-700">产品</span>
             <select className="form-input" {...form.register("productId")}>
               {products.map((product) => (
                 <option key={product.id} value={product.id}>
@@ -104,30 +104,30 @@ export function PurchaseManager({ orders, products, suppliers }: PurchaseManager
             </select>
           </label>
           <label className="block">
-            <span className="mb-2 block text-sm font-medium text-slate-700">数量</span>
+            <span className="mb-2 block text-sm font-medium text-neutral-700">数量</span>
             <input className="form-input" min={1} type="number" {...form.register("quantity")} />
           </label>
           <label className="block">
-            <span className="mb-2 block text-sm font-medium text-slate-700">采购单价</span>
+            <span className="mb-2 block text-sm font-medium text-neutral-700">采购单价</span>
             <input className="form-input" step="0.01" type="number" {...form.register("unitCost")} />
           </label>
           <label className="block">
-            <span className="mb-2 block text-sm font-medium text-slate-700">备注</span>
+            <span className="mb-2 block text-sm font-medium text-neutral-700">备注</span>
             <textarea className="form-input min-h-20 resize-y py-3" {...form.register("remark")} />
           </label>
-          {message ? <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{message}</p> : null}
+          {message ? <p className="rounded-md bg-orange-50 px-3 py-2 text-sm text-orange-700">{message}</p> : null}
           <Button disabled={isPending} type="submit">
             创建并提交
           </Button>
         </form>
       </section>
 
-      <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
-        <h2 className="text-lg font-semibold text-slate-900">采购订单</h2>
+      <section className="surface-panel p-5">
+        <h2 className="text-lg font-semibold text-neutral-950">采购订单</h2>
         <div className="mt-5 overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="text-slate-500">
-              <tr className="border-b border-slate-100">
+            <thead className="text-neutral-500">
+              <tr className="border-b border-neutral-100">
                 <th className="py-3 font-medium">采购单号</th>
                 <th className="py-3 font-medium">供应商</th>
                 <th className="py-3 font-medium">状态</th>
@@ -138,12 +138,12 @@ export function PurchaseManager({ orders, products, suppliers }: PurchaseManager
             </thead>
             <tbody>
               {orders.map((order) => (
-                <tr className="border-b border-slate-100 last:border-0" key={order.id}>
-                  <td className="py-3 font-medium text-slate-900">{order.purchaseNo}</td>
-                  <td className="py-3 text-slate-600">{order.supplier}</td>
-                  <td className="py-3 text-slate-600">{statusLabels[order.status]}</td>
-                  <td className="py-3 font-medium text-slate-900">{formatCurrency(order.totalAmount)}</td>
-                  <td className="py-3 text-slate-600">{order.createdAt}</td>
+                <tr className="border-b border-neutral-100 last:border-0" key={order.id}>
+                  <td className="py-3 font-medium text-neutral-950">{order.purchaseNo}</td>
+                  <td className="py-3 text-neutral-600">{order.supplier}</td>
+                  <td className="py-3 text-neutral-600">{statusLabels[order.status]}</td>
+                  <td className="py-3 font-medium text-neutral-950">{formatCurrency(order.totalAmount)}</td>
+                  <td className="py-3 text-neutral-600">{order.createdAt}</td>
                   <td className="py-3">
                     <div className="flex justify-end gap-2">
                       <Button disabled={isPending || order.status === "COMPLETED"} onClick={() => receive(order.id)} size="sm" variant="outline">

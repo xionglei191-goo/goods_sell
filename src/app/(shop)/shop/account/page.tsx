@@ -20,7 +20,7 @@ export default async function AccountPage() {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-lg bg-gradient-to-br from-red-700 via-red-600 to-stone-900 p-5 text-white shadow-sm">
+      <section className="rounded-md bg-gradient-to-br from-red-700 via-red-600 to-rose-900 p-5 text-white shadow-[var(--surface-raised-shadow)]">
         <div className="flex items-center gap-4">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/15 text-2xl font-bold">{data.customer.name.slice(0, 1)}</div>
           <div className="min-w-0">
@@ -52,22 +52,22 @@ export default async function AccountPage() {
         {links.map((item) => {
           const Icon = item.icon;
           return (
-            <Link className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-stone-200 transition hover:-translate-y-0.5 hover:shadow-md" href={item.href} key={item.href}>
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50 text-[#dc2626]">
+            <Link className="shop-block-card p-4" href={item.href} key={item.href}>
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50 commerce-accent">
                 <Icon className="h-5 w-5" />
               </span>
-              <span className="mt-3 block font-semibold text-stone-950">{item.label}</span>
+              <span className="mt-3 block font-semibold text-neutral-950">{item.label}</span>
             </Link>
           );
         })}
       </section>
 
-      <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-stone-200">
+      <section className="shop-block-card p-4">
         <div className="flex items-center gap-3">
-          <PackageCheck className="h-5 w-5 text-[#dc2626]" />
+          <PackageCheck className="h-5 w-5 commerce-accent" />
           <div>
-            <h2 className="font-bold text-stone-950">湘潭本地配送</h2>
-            <p className="mt-1 text-sm text-stone-500">订单可进入总仓履约或智能分单，优惠券会在结算时自动匹配。</p>
+            <h2 className="font-bold text-neutral-950">湘潭本地配送</h2>
+            <p className="mt-1 text-sm text-neutral-500">订单可进入总仓履约或智能分单，优惠券会在结算时自动匹配。</p>
           </div>
         </div>
       </section>

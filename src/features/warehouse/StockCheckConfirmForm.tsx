@@ -45,11 +45,11 @@ export function StockCheckConfirmForm({ stockCheckId, disabled, items }: { stock
 
   return (
     <div className="space-y-4">
-      {message ? <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{message}</p> : null}
-      <div className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
+      {message ? <p className="rounded-md bg-orange-50 px-3 py-2 text-sm text-orange-700">{message}</p> : null}
+      <div className="table-shell">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[860px] text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500">
+            <thead className="dashboard-table-head">
               <tr>
                 <th className="px-4 py-3 font-medium">商品</th>
                 <th className="px-4 py-3 font-medium">SKU</th>
@@ -63,13 +63,13 @@ export function StockCheckConfirmForm({ stockCheckId, disabled, items }: { stock
                 const actual = values.get(item.id) ?? item.actualStock;
                 const diff = actual - item.systemStock;
                 return (
-                  <tr className="border-t border-slate-100" key={item.id}>
-                    <td className="px-4 py-3 font-medium text-slate-900">{item.name}</td>
-                    <td className="px-4 py-3 text-slate-500">{item.sku}</td>
-                    <td className="px-4 py-3 text-slate-700">{item.systemStock}</td>
+                  <tr className="border-t border-neutral-100" key={item.id}>
+                    <td className="px-4 py-3 font-medium text-neutral-950">{item.name}</td>
+                    <td className="px-4 py-3 text-neutral-500">{item.sku}</td>
+                    <td className="px-4 py-3 text-neutral-700">{item.systemStock}</td>
                     <td className="px-4 py-3">
                       <input
-                        className="h-9 w-28 rounded-md border border-slate-200 px-2 outline-none focus:border-red-300 disabled:bg-slate-50"
+                        className="form-input h-9 w-28 px-2 disabled:bg-orange-50"
                         disabled={disabled}
                         min={0}
                         onChange={(event) => setItemValue(item.id, Number(event.target.value))}
@@ -77,7 +77,7 @@ export function StockCheckConfirmForm({ stockCheckId, disabled, items }: { stock
                         value={actual}
                       />
                     </td>
-                    <td className={diff === 0 ? "px-4 py-3 text-slate-500" : diff > 0 ? "px-4 py-3 font-semibold text-emerald-700" : "px-4 py-3 font-semibold text-red-700"}>{diff}</td>
+                    <td className={diff === 0 ? "px-4 py-3 text-neutral-500" : diff > 0 ? "px-4 py-3 font-semibold text-emerald-700" : "px-4 py-3 font-semibold text-orange-700"}>{diff}</td>
                   </tr>
                 );
               })}
@@ -86,7 +86,7 @@ export function StockCheckConfirmForm({ stockCheckId, disabled, items }: { stock
         </div>
       </div>
       {!disabled ? (
-        <Button className="bg-[#dc2626] text-white hover:bg-[#b91c1c]" disabled={isPending} onClick={submit} type="button">
+        <Button className="bg-orange-500 text-white hover:bg-orange-600" disabled={isPending} onClick={submit} type="button">
           <CheckCircle2 className="h-4 w-4" />
           {isPending ? "确认中" : "确认盘点并调整库存"}
         </Button>

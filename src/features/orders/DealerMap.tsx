@@ -183,7 +183,7 @@ export function DealerMap({ data, amapKey, amapSecurityCode }: DealerMapProps) {
         const circle = new AMap.Circle({
           center: [dealer.longitude, dealer.latitude],
           radius: dealer.serviceRadius,
-          strokeColor: dealer.isAccepting ? "#dc2626" : "#64748b",
+          strokeColor: dealer.isAccepting ? "#d8001b" : "#64748b",
           fillColor: dealer.isAccepting ? "#fecaca" : "#cbd5e1",
           fillOpacity: 0.22,
         });
@@ -221,34 +221,34 @@ export function DealerMap({ data, amapKey, amapSecurityCode }: DealerMapProps) {
   return (
     <div className="space-y-5">
       <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
-          <p className="text-sm text-slate-500">经销商</p>
-          <p className="mt-2 text-2xl font-bold text-slate-900">{data.dealers.length}</p>
+        <div className="surface-panel p-4">
+          <p className="text-sm text-neutral-500">经销商</p>
+          <p className="mt-2 text-2xl font-bold text-neutral-950">{data.dealers.length}</p>
         </div>
-        <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
-          <p className="text-sm text-slate-500">可接单</p>
+        <div className="surface-panel p-4">
+          <p className="text-sm text-neutral-500">可接单</p>
           <p className="mt-2 text-2xl font-bold text-emerald-700">{data.dealers.filter((dealer) => dealer.isAccepting).length}</p>
         </div>
-        <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
-          <p className="text-sm text-slate-500">热力订单</p>
-          <p className="mt-2 text-2xl font-bold text-slate-900">{data.heatPoints.length}</p>
+        <div className="surface-panel p-4">
+          <p className="text-sm text-neutral-500">热力订单</p>
+          <p className="mt-2 text-2xl font-bold text-neutral-950">{data.heatPoints.length}</p>
         </div>
       </div>
 
-      <section className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
-        <div className="border-b border-slate-100 px-4 py-3">
-          <h2 className="font-semibold text-slate-900">湘潭经销商地图</h2>
-          <p className="mt-1 text-sm text-slate-500">
+      <section className="table-shell">
+        <div className="border-b border-neutral-100 px-4 py-3">
+          <h2 className="font-semibold text-neutral-950">湘潭经销商地图</h2>
+          <p className="mt-1 text-sm text-neutral-500">
             {amapKey ? "已配置高德地图 Key，加载 JS API 2.0 展示经销商与热力订单。" : "当前未配置高德地图 Key，展示本地坐标示意图。"}
             {amapKey && !amapSecurityCode ? " 如使用新申请 Key，请同步配置安全密钥。" : null}
           </p>
         </div>
-        <div className="relative h-[560px] bg-slate-100" ref={mapRef}>
+        <div className="relative h-[560px] bg-[var(--dashboard-control)]" ref={mapRef}>
           {loadState !== "loaded" ? (
-            <div className="absolute inset-0 overflow-hidden bg-[linear-gradient(90deg,rgba(148,163,184,0.18)_1px,transparent_1px),linear-gradient(rgba(148,163,184,0.18)_1px,transparent_1px)] bg-[size:48px_48px]">
-              {loadState === "loading" ? <div className="absolute left-4 top-4 rounded-md bg-white px-3 py-2 text-sm text-slate-600 shadow-sm ring-1 ring-slate-200">正在加载高德地图...</div> : null}
+            <div className="absolute inset-0 overflow-hidden bg-[linear-gradient(90deg,rgba(232,111,81,0.16)_1px,transparent_1px),linear-gradient(rgba(232,111,81,0.12)_1px,transparent_1px)] bg-[size:48px_48px]">
+              {loadState === "loading" ? <div className="absolute left-4 top-4 rounded-md border bg-[var(--dashboard-panel)] px-3 py-2 text-sm text-neutral-600 shadow-[var(--surface-raised-shadow)]" style={{ borderColor: "var(--dashboard-line)" }}>正在加载高德地图...</div> : null}
               {loadState === "error" ? (
-                <div className="absolute left-4 top-4 z-10 max-w-[calc(100%-2rem)] rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 shadow-sm ring-1 ring-red-100">{loadError ?? AMAP_LOAD_ERROR_MESSAGE}</div>
+                <div className="absolute left-4 top-4 z-10 max-w-[calc(100%-2rem)] rounded-md bg-orange-50 px-3 py-2 text-sm text-orange-700 shadow-sm ring-1 ring-orange-100">{loadError ?? AMAP_LOAD_ERROR_MESSAGE}</div>
               ) : null}
               {data.heatPoints.map((point) => {
                 const left = normalize(point.longitude, bounds.minLng, bounds.maxLng);
@@ -270,11 +270,11 @@ export function DealerMap({ data, amapKey, amapSecurityCode }: DealerMapProps) {
                     <div
                       className={cn(
                         "absolute left-1/2 top-1/2 -z-10 -translate-x-1/2 -translate-y-1/2 rounded-full border",
-                        dealer.isAccepting ? "border-red-300 bg-red-100/30" : "border-slate-300 bg-slate-200/40",
+                        dealer.isAccepting ? "border-orange-300 bg-orange-100/40" : "border-[#d8c2b2] bg-[#efe3d7]/60",
                       )}
                       style={{ width: `${Math.max(70, dealer.serviceRadius / 25)}px`, height: `${Math.max(70, dealer.serviceRadius / 25)}px` }}
                     />
-                    <div className={cn("flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium shadow-sm", dealer.isAccepting ? "bg-red-600 text-white" : "bg-slate-600 text-white")}>
+                    <div className={cn("flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium shadow-sm", dealer.isAccepting ? "bg-[#dc2626] text-white" : "bg-[#8a7264] text-white")}>
                       <MapPinned className="h-4 w-4" />
                       {dealer.name}
                     </div>

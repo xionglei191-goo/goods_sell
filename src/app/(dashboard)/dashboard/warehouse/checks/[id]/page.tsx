@@ -26,8 +26,8 @@ export default async function StockCheckDetailPage({ params }: StockCheckPagePro
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">盘点任务 {check.checkNo}</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="text-2xl font-semibold text-neutral-950">盘点任务 {check.checkNo}</h1>
+          <p className="mt-1 text-sm text-neutral-500">
             {check.operator} · {statusLabels[check.status]} · 创建于 {formatDateTime(check.createdAt)}
           </p>
         </div>
@@ -49,9 +49,9 @@ export default async function StockCheckDetailPage({ params }: StockCheckPagePro
 
 function InfoCard({ label, value }: { label: string; value: string }) {
   return (
-    <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
-      <p className="text-sm text-slate-500">{label}</p>
-      <p className="mt-3 text-xl font-semibold text-slate-900">{value}</p>
+    <section className="surface-panel p-5">
+      <p className="text-sm text-neutral-500">{label}</p>
+      <p className="mt-3 text-xl font-semibold text-neutral-950">{value}</p>
     </section>
   );
 }

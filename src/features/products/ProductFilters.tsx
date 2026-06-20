@@ -44,9 +44,9 @@ export function ProductFilters({ brands, categories, initial }: ProductFiltersPr
   }, [brandId, categoryId, pathname, q, router, status]);
 
   return (
-    <div className="grid gap-3 rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200 lg:grid-cols-[1fr_180px_180px_160px]">
+    <div className="dashboard-toolbar lg:grid-cols-[1fr_180px_180px_160px]">
       <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
         <input
           className="form-input pl-9"
           onChange={(event) => setQ(event.target.value)}

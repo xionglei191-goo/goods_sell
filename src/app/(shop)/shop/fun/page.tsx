@@ -10,8 +10,8 @@ export const dynamic = "force-dynamic";
 const FunClient = nextDynamic(() => import("@/features/ai/FunClient").then((mod) => mod.FunClient), {
   loading: () => (
     <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
-      <div className="h-96 animate-pulse rounded-lg bg-stone-100" />
-      <div className="h-48 animate-pulse rounded-lg bg-stone-100" />
+      <div className="shop-block-card h-96 animate-pulse" />
+      <div className="shop-block-card h-48 animate-pulse" />
     </div>
   ),
 });
@@ -28,7 +28,7 @@ export default async function FunPage() {
 
   return (
     <div className="space-y-6">
-      <section className="overflow-hidden rounded-lg bg-gradient-to-br from-red-700 via-red-600 to-stone-900 p-6 text-white">
+      <section className="overflow-hidden rounded-md bg-gradient-to-br from-red-700 via-red-600 to-rose-900 p-6 text-white">
         <p className="text-sm text-white/75">节气养生推荐</p>
         <h1 className="mt-2 text-3xl font-bold">{solar.term.name}</h1>
         <p className="mt-1 text-sm text-white/75">{seasonLabels[solar.term.season]} · 湘潭本地推荐</p>
@@ -38,13 +38,13 @@ export default async function FunPage() {
       <AlcoholComplianceNotice />
 
       <section className="space-y-4">
-        <h2 className="text-xl font-bold text-stone-950">节气相关商品</h2>
+        <h2 className="text-xl font-bold text-neutral-950">节气相关商品</h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {solar.products.map((product) => (
-            <Link className="rounded-lg bg-white p-3 shadow-sm ring-1 ring-stone-200" href={`/shop/product/${product.id}`} key={product.id}>
-              <div className="flex aspect-square items-center justify-center rounded-md bg-red-50 text-2xl font-bold text-[#dc2626]">{product.name.slice(0, 1)}</div>
-              <p className="mt-2 line-clamp-1 text-sm font-semibold text-stone-900">{product.name}</p>
-              <p className="mt-1 text-sm font-bold text-[#dc2626]">{formatCurrency(Number(product.retailPrice))}</p>
+            <Link className="shop-block-card p-3" href={`/shop/product/${product.id}`} key={product.id}>
+              <div className="flex aspect-square items-center justify-center rounded-md bg-red-50 text-2xl font-bold commerce-accent">{product.name.slice(0, 1)}</div>
+              <p className="mt-2 line-clamp-1 text-sm font-semibold text-neutral-950">{product.name}</p>
+              <p className="mt-1 text-sm font-bold commerce-accent">{formatCurrency(Number(product.retailPrice))}</p>
             </Link>
           ))}
         </div>

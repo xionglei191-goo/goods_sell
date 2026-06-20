@@ -11,8 +11,8 @@ export default async function DashboardMapPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">地图管理</h1>
-        <p className="mt-1 text-sm text-slate-500">经销商 Marker、服务半径与订单热力分布</p>
+        <h1 className="text-2xl font-semibold text-neutral-950">地图管理</h1>
+        <p className="mt-1 text-sm text-neutral-500">经销商 Marker、服务半径与订单热力分布</p>
       </div>
       <DealerMap amapKey={amapKey} amapSecurityCode={amapSecurityCode} data={data} />
     </div>

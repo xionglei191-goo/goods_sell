@@ -56,15 +56,15 @@ export function Sidebar({ user, onNavigate }: SidebarProps) {
   const initials = user.name?.slice(0, 2) ?? "华启";
 
   return (
-    <aside className={cn("flex h-full flex-col bg-[#0f172a] text-slate-100 transition-all duration-300", compact ? "w-20" : "w-60")}>
+    <aside className={cn("flex h-full flex-col border-r text-neutral-800 transition-all duration-300", compact ? "w-20" : "w-60")} style={{ backgroundColor: "var(--dashboard-panel)", borderColor: "var(--dashboard-line)" }}>
       <div className="flex h-16 items-center justify-between px-4">
         <Link className="flex items-center gap-3" href="/dashboard" onClick={onNavigate}>
-          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-[#3b82f6] text-sm font-bold text-white">华启</span>
-          {compact ? null : <span className="text-base font-semibold">华启商城</span>}
+          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-[#e86f51] text-sm font-bold text-white">华启</span>
+          {compact ? null : <span className="text-base font-semibold text-neutral-950">华启商城</span>}
         </Link>
         <button
           aria-label={compact ? "展开菜单" : "折叠菜单"}
-          className="hidden rounded-md p-2 text-slate-300 transition hover:bg-slate-800 hover:text-white lg:block"
+          className="hidden rounded-md p-2 text-neutral-400 transition hover:bg-[#fff1e8] hover:text-[#b9472d] lg:block"
           onClick={() => setCompact((value) => !value)}
           type="button"
         >
@@ -72,7 +72,7 @@ export function Sidebar({ user, onNavigate }: SidebarProps) {
         </button>
       </div>
 
-      <Separator className="bg-slate-800" />
+      <Separator style={{ backgroundColor: "var(--dashboard-line)" }} />
 
       <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
         <div className="space-y-1">
@@ -88,7 +88,7 @@ export function Sidebar({ user, onNavigate }: SidebarProps) {
                   <Link
                     className={cn(
                       "flex h-10 flex-1 items-center gap-3 rounded-md px-3 text-sm transition",
-                      itemActive ? "bg-[#1e3a5f] text-white" : "text-slate-300 hover:bg-slate-800 hover:text-white",
+                      itemActive ? "bg-[#fff1e8] text-[#b9472d]" : "text-neutral-600 hover:bg-[#fff6ed] hover:text-neutral-950",
                     )}
                     href={item.href}
                     onClick={onNavigate}
@@ -99,7 +99,7 @@ export function Sidebar({ user, onNavigate }: SidebarProps) {
                   {hasChildren && !compact ? (
                     <button
                       aria-label={isExpanded ? "收起子菜单" : "展开子菜单"}
-                      className="flex h-10 w-8 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-800 hover:text-white"
+                      className="flex h-10 w-8 items-center justify-center rounded-md text-neutral-400 transition hover:bg-[#fff1e8] hover:text-[#b9472d]"
                       onClick={() => toggleExpanded(item.href)}
                       type="button"
                     >
@@ -109,7 +109,7 @@ export function Sidebar({ user, onNavigate }: SidebarProps) {
                 </div>
 
                 {hasChildren && isExpanded && !compact ? (
-                  <div className="ml-7 mt-1 space-y-1 border-l border-slate-800 pl-3">
+                  <div className="ml-7 mt-1 space-y-1 border-l pl-3" style={{ borderColor: "var(--dashboard-line)" }}>
                     {item.children?.map((child) => {
                       const childActive = isItemActive(pathname, child.href);
 
@@ -117,7 +117,7 @@ export function Sidebar({ user, onNavigate }: SidebarProps) {
                         <Link
                           className={cn(
                             "block rounded-md px-3 py-2 text-sm transition",
-                            childActive ? "bg-slate-800 text-white" : "text-slate-400 hover:bg-slate-800 hover:text-white",
+                            childActive ? "bg-[#fff1e8] text-[#b9472d]" : "text-neutral-500 hover:bg-[#fff6ed] hover:text-neutral-950",
                           )}
                           href={child.href}
                           key={child.href}
@@ -135,24 +135,25 @@ export function Sidebar({ user, onNavigate }: SidebarProps) {
         </div>
       </nav>
 
-      <Separator className="bg-slate-800" />
+      <Separator style={{ backgroundColor: "var(--dashboard-line)" }} />
 
       <div className="p-4">
-        <div className={cn("mb-3 flex items-center gap-3 rounded-md bg-slate-900 p-3", compact ? "justify-center" : "")}>
+        <div className={cn("mb-3 flex items-center gap-3 rounded-md border p-3", compact ? "justify-center" : "")} style={{ backgroundColor: "var(--dashboard-control)", borderColor: "var(--dashboard-line)" }}>
           <Avatar className="h-9 w-9">
             <AvatarImage src={user.image ?? undefined} />
-            <AvatarFallback className="bg-[#1e3a5f] text-white">{initials}</AvatarFallback>
+            <AvatarFallback className="bg-[#e86f51] text-white">{initials}</AvatarFallback>
           </Avatar>
           <div className={cn("min-w-0 flex-1", compact ? "hidden" : "")}>
-            <p className="truncate text-sm font-medium text-white">{user.name ?? "未登录用户"}</p>
-            <p className="text-xs text-slate-400">{roleLabels[user.role ?? ""] ?? "待认证"}</p>
+            <p className="truncate text-sm font-medium text-neutral-950">{user.name ?? "未登录用户"}</p>
+            <p className="text-xs text-neutral-500">{roleLabels[user.role ?? ""] ?? "待认证"}</p>
           </div>
         </div>
         <Button
           className={cn(
-            "h-10 w-full gap-2 border-slate-700 text-slate-200 hover:bg-slate-800 hover:text-white",
+            "h-10 w-full gap-2 text-neutral-600 hover:bg-[#fff1e8] hover:text-[#b9472d]",
             compact ? "justify-center px-0" : "justify-start",
           )}
+          style={{ backgroundColor: "var(--dashboard-panel)", borderColor: "var(--dashboard-line)" }}
           onClick={() => signOut({ callbackUrl: "/login" })}
           variant="outline"
         >

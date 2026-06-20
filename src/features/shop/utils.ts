@@ -19,9 +19,9 @@ export const categorySlugs: ShopCategorySlug[] = ["all", "wine", "food", "drink"
 
 export const categoryAccents: Record<string, { bg: string; text: string; ring: string; label: string }> = {
   酒类: { bg: "bg-red-50", text: "text-red-700", ring: "ring-red-100", label: "酒" },
-  食品: { bg: "bg-amber-50", text: "text-amber-700", ring: "ring-amber-100", label: "食" },
+  食品: { bg: "bg-orange-50", text: "text-orange-700", ring: "ring-orange-100", label: "食" },
   饮料: { bg: "bg-emerald-50", text: "text-emerald-700", ring: "ring-emerald-100", label: "饮" },
-  default: { bg: "bg-stone-100", text: "text-stone-700", ring: "ring-stone-200", label: "华" },
+  default: { bg: "bg-neutral-100", text: "text-neutral-700", ring: "ring-neutral-200", label: "华" },
 };
 
 export const orderStatusLabels: Record<OrderStatus, string> = {
@@ -42,10 +42,10 @@ export const orderStatusClasses: Record<OrderStatus, string> = {
   CONFIRMED: "bg-red-50 text-red-700",
   SHIPPING: "bg-blue-50 text-blue-700",
   DELIVERED: "bg-emerald-50 text-emerald-700",
-  COMPLETED: "bg-stone-100 text-stone-700",
-  CANCELLED: "bg-slate-100 text-slate-500",
+  COMPLETED: "bg-neutral-100 text-neutral-700",
+  CANCELLED: "bg-neutral-100 text-neutral-500",
   REFUNDING: "bg-purple-50 text-purple-700",
-  REFUNDED: "bg-slate-100 text-slate-500",
+  REFUNDED: "bg-neutral-100 text-neutral-500",
 };
 
 export const payMethodLabels: Record<PayMethod, string> = {

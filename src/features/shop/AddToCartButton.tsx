@@ -57,7 +57,7 @@ export function AddToCartButton({ productId, quantity = 1, disabled, className, 
         )}
       </Button>
       {message ? (
-        <span className="absolute -top-10 right-0 z-20 whitespace-nowrap rounded-full bg-stone-950 px-3 py-1 text-xs font-medium text-white shadow-lg">
+        <span className="absolute -top-10 right-0 z-20 whitespace-nowrap rounded-full bg-[#dc2626] px-3 py-1 text-xs font-medium text-white shadow-[var(--overlay-shadow)]">
           {message}
         </span>
       ) : null}

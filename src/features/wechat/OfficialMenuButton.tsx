@@ -19,11 +19,11 @@ export function OfficialMenuButton() {
 
   return (
     <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
-      <Button className="bg-[#dc2626] text-white hover:bg-[#b91c1c]" disabled={isPending} onClick={handleClick} type="button">
+      <Button className="bg-orange-500 text-white hover:bg-orange-600" disabled={isPending} onClick={handleClick} type="button">
         <RefreshCw className={isPending ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
         同步公众号菜单
       </Button>
-      {message ? <span className="text-sm text-stone-500">{message}</span> : null}
+      {message ? <span className="text-sm text-neutral-500">{message}</span> : null}
     </div>
   );
 }

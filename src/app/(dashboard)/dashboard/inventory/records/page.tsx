@@ -29,11 +29,11 @@ export default async function StockRecordsPage({ searchParams }: RecordsPageProp
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">库存变动记录</h1>
-        <p className="mt-1 text-sm text-slate-500">查看所有入库、出库、调整和盘点流水</p>
+        <h1 className="text-2xl font-semibold text-neutral-950">库存变动记录</h1>
+        <p className="mt-1 text-sm text-neutral-500">查看所有入库、出库、调整和盘点流水</p>
       </div>
 
-      <form className="grid gap-3 rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200 md:grid-cols-[1fr_180px_auto]">
+      <form className="grid gap-3 surface-panel p-4 md:grid-cols-[1fr_180px_auto]">
         <select className="form-input" defaultValue={productId} name="productId">
           <option value="">全部产品</option>
           {products.map((product) => (
@@ -49,15 +49,15 @@ export default async function StockRecordsPage({ searchParams }: RecordsPageProp
           <option value="ADJUST">调整</option>
           <option value="CHECK">盘点</option>
         </select>
-        <button className="rounded-md bg-[#1e3a5f] px-4 text-sm font-medium text-white" type="submit">
+        <button className="rounded-md bg-orange-500 px-4 text-sm font-medium text-white" type="submit">
           筛选
         </button>
       </form>
 
-      <div className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
+      <div className="table-shell">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[920px] text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500">
+            <thead className="dashboard-table-head">
               <tr>
                 <th className="px-4 py-3 font-medium">时间</th>
                 <th className="px-4 py-3 font-medium">产品</th>
@@ -71,20 +71,20 @@ export default async function StockRecordsPage({ searchParams }: RecordsPageProp
             </thead>
             <tbody>
               {records.map((record) => (
-                <tr className="border-t border-slate-100 hover:bg-slate-50" key={record.id}>
-                  <td className="px-4 py-3 text-slate-600">{record.createdAt}</td>
+                <tr className="dashboard-table-row" key={record.id}>
+                  <td className="px-4 py-3 text-neutral-600">{record.createdAt}</td>
                   <td className="px-4 py-3">
-                    <p className="font-medium text-slate-900">{record.productName}</p>
-                    <p className="mt-1 text-xs text-slate-500">{record.sku}</p>
+                    <p className="font-medium text-neutral-950">{record.productName}</p>
+                    <p className="mt-1 text-xs text-neutral-500">{record.sku}</p>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{typeLabels[record.type]}</td>
+                  <td className="px-4 py-3 text-neutral-600">{typeLabels[record.type]}</td>
                   <td className={cn("px-4 py-3 font-medium", record.quantity >= 0 ? "text-emerald-600" : "text-red-600")}>
                     {record.quantity > 0 ? `+${record.quantity}` : record.quantity}
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{record.beforeStock}</td>
-                  <td className="px-4 py-3 text-slate-900">{record.afterStock}</td>
-                  <td className="px-4 py-3 text-slate-600">{record.operator}</td>
-                  <td className="px-4 py-3 text-slate-600">{record.remark ?? "-"}</td>
+                  <td className="px-4 py-3 text-neutral-600">{record.beforeStock}</td>
+                  <td className="px-4 py-3 text-neutral-950">{record.afterStock}</td>
+                  <td className="px-4 py-3 text-neutral-600">{record.operator}</td>
+                  <td className="px-4 py-3 text-neutral-600">{record.remark ?? "-"}</td>
                 </tr>
               ))}
             </tbody>

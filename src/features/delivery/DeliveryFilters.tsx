@@ -19,8 +19,8 @@ export function DeliveryFilters({ initial }: { initial: { status: string; q: str
   }
 
   return (
-    <div className="grid gap-3 rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200 md:grid-cols-[180px_1fr_auto]">
-      <select className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-red-300" onChange={(event) => setStatus(event.target.value)} value={status}>
+    <div className="grid gap-3 surface-panel p-4 md:grid-cols-[180px_1fr_auto]">
+      <select className="form-input" onChange={(event) => setStatus(event.target.value)} value={status}>
         <option value="">全部配送状态</option>
         <option value="PAID">待发货</option>
         <option value="CONFIRMED">已确认</option>
@@ -29,7 +29,7 @@ export function DeliveryFilters({ initial }: { initial: { status: string; q: str
         <option value="COMPLETED">已完成</option>
       </select>
       <input
-        className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-red-300"
+        className="form-input"
         onChange={(event) => setQ(event.target.value)}
         placeholder="订单号 / 客户 / 手机号"
         value={q}

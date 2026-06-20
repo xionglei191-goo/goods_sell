@@ -24,13 +24,13 @@ export function DashboardShell({ children, user }: DashboardShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] lg:flex">
+    <div className="dashboard-shell min-h-screen bg-[var(--dashboard-surface)] text-neutral-950 lg:flex">
       <div className="hidden shrink-0 lg:block">
         <Sidebar user={user} />
       </div>
 
       <Sheet onOpenChange={setMobileOpen} open={mobileOpen}>
-        <SheetContent className="w-60 border-none bg-[#0f172a] p-0" side="left">
+        <SheetContent className="w-60 border-r p-0 text-neutral-950" side="left" style={{ backgroundColor: "var(--dashboard-panel)", borderColor: "var(--dashboard-line)" }}>
           <SheetTitle className="sr-only">管理后台菜单</SheetTitle>
           <Sidebar onNavigate={() => setMobileOpen(false)} user={user} />
         </SheetContent>

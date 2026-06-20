@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -47,40 +48,68 @@
 }
 
 :root {
-  --font-geist-sans: "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", Arial, sans-serif;
-  --font-geist-mono: "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.984 0.003 247.858);
-  --sidebar-foreground: oklch(0.129 0.042 264.695);
-  --sidebar-primary: oklch(0.208 0.042 265.755);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.968 0.007 247.896);
-  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
-  --sidebar-border: oklch(0.929 0.013 255.508);
-  --sidebar-ring: oklch(0.704 0.04 256.788);
+  --radius: 0.5rem;
+  --background: #fff8f6;
+  --foreground: #171717;
+  --card: #ffffff;
+  --card-foreground: #171717;
+  --popover: #ffffff;
+  --popover-foreground: #171717;
+  --primary: #dc2626;
+  --primary-foreground: #ffffff;
+  --secondary: #f2f2f2;
+  --secondary-foreground: #171717;
+  --muted: #f2f2f2;
+  --muted-foreground: #4d4d4d;
+  --accent: #f2f2f2;
+  --accent-foreground: #171717;
+  --destructive: #ea001d;
+  --border: #eaeaea;
+  --input: #eaeaea;
+  --ring: #dc2626;
+  --chart-1: #107d32;
+  --chart-2: #f97316;
+  --chart-3: #ffa600;
+  --chart-4: #ea001d;
+  --chart-5: #00ac96;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #4d4d4d;
+  --sidebar-primary: #dc2626;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #fff1f1;
+  --sidebar-accent-foreground: #dc2626;
+  --sidebar-border: #f0dede;
+  --sidebar-ring: #dc2626;
+  --brand-commerce: #dc2626;
+  --shop-brand: #dc2626;
+  --shop-brand-strong: #b91c1c;
+  --shop-success: #16a34a;
+  --shop-success-soft: #dcfce7;
+  --shop-promo: #f97316;
+  --shop-promo-soft: #ffedd5;
+  --shop-surface: #fff7ed;
+  --shop-card: #fff4e8;
+  --shop-card-alt: #fff1f1;
+  --shop-card-green: #f0fdf4;
+  --shop-line: #fed7aa;
+  --shop-control: #fffaf4;
+  --shop-art-panel: #fff0df;
+  --shop-art-panel-alt: #ffe7dd;
+  --dashboard-transaction: #e86f51;
+  --dashboard-transaction-strong: #cf5638;
+  --dashboard-transaction-soft: #fff1e8;
+  --dashboard-growth: #16a34a;
+  --dashboard-growth-soft: #dcfce7;
+  --dashboard-risk: #dc2626;
+  --dashboard-risk-soft: #fee2e2;
+  --dashboard-surface: #fbf7f0;
+  --dashboard-panel: #fffaf4;
+  --dashboard-control: #fff8f1;
+  --dashboard-table-head: #fff3e9;
+  --dashboard-line: #eadfd2;
+  --dashboard-row-hover: #fff6ed;
+  --surface-raised-shadow: 0 1px 2px rgba(92, 54, 34, 0.05);
+  --overlay-shadow: 0 1px 1px rgba(0, 0, 0, 0.02), 0 4px 8px -4px rgba(0, 0, 0, 0.04), 0 16px 24px -8px rgba(0, 0, 0, 0.06);
 }
 
 .dark {
@@ -131,7 +160,355 @@
 }
 
 @layer components {
+  .page-title {
+    @apply text-2xl font-semibold tracking-normal text-neutral-950;
+  }
+
+  .page-subtitle {
+    @apply mt-1 text-sm leading-5 text-neutral-500;
+  }
+
+  .section-title {
+    @apply text-lg font-semibold tracking-normal text-neutral-950;
+  }
+
+  .surface-card {
+    @apply rounded-md border bg-[var(--dashboard-panel)] shadow-[var(--surface-raised-shadow)];
+    border-color: var(--dashboard-line);
+  }
+
+  .surface-panel {
+    @apply rounded-md border bg-[var(--dashboard-panel)] shadow-[var(--surface-raised-shadow)];
+    border-color: var(--dashboard-line);
+  }
+
+  .table-shell {
+    @apply overflow-hidden rounded-md border bg-[var(--dashboard-panel)] shadow-[var(--surface-raised-shadow)];
+    border-color: var(--dashboard-line);
+  }
+
+  .empty-state {
+    @apply rounded-md border px-4 py-12 text-center text-sm text-neutral-500;
+    background-color: var(--dashboard-panel);
+    border-color: var(--dashboard-line);
+  }
+
+  .field-control {
+    @apply h-10 rounded-md border px-3 text-sm text-neutral-950 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100;
+    background-color: var(--dashboard-control);
+    border-color: var(--dashboard-line);
+  }
+
+  .status-badge {
+    @apply inline-flex items-center rounded-full px-2 py-1 text-xs font-medium text-neutral-700;
+    background-color: var(--dashboard-transaction-soft);
+  }
+
+  .money-text {
+    color: var(--brand-commerce);
+    @apply font-semibold tabular-nums;
+  }
+
+  .money-muted {
+    @apply font-semibold tabular-nums text-neutral-800;
+  }
+
+  .metric-positive {
+    @apply font-semibold text-green-700 tabular-nums;
+  }
+
+  .metric-warning {
+    @apply font-semibold text-orange-700 tabular-nums;
+  }
+
+  .metric-risk {
+    @apply font-semibold text-red-600 tabular-nums;
+  }
+
+  .commerce-accent {
+    color: var(--brand-commerce);
+  }
+
+  .shop-block-card {
+    @apply rounded-md border shadow-[var(--surface-raised-shadow)] transition-colors;
+    background-color: var(--shop-card);
+    border-color: var(--shop-line);
+  }
+
+  .shop-block-card:hover {
+    border-color: #fb923c;
+    background-color: #fff1e4;
+  }
+
+  .shop-card-red {
+    background-color: var(--shop-card-alt);
+    border-color: #fecaca;
+  }
+
+  .shop-card-green {
+    background-color: var(--shop-card-green);
+    border-color: #bbf7d0;
+  }
+
+  .shop-product-art {
+    @apply relative flex aspect-square items-center justify-center overflow-hidden rounded-md border;
+    background:
+      radial-gradient(circle at 22% 18%, rgba(255, 255, 255, 0.65), transparent 24%),
+      linear-gradient(135deg, var(--shop-art-panel), var(--shop-art-panel-alt));
+    border-color: var(--shop-line);
+  }
+
+  .shop-product-art-inner {
+    @apply absolute inset-3 rounded-md border;
+    border-color: color-mix(in srgb, var(--shop-line) 74%, white);
+  }
+
+  .shop-product-art-mark {
+    @apply relative flex items-center justify-center rounded-full shadow-[var(--surface-raised-shadow)] ring-1;
+    background-color: color-mix(in srgb, var(--shop-control) 86%, white);
+  }
+
+  .shop-mobile-action-bar {
+    @apply sticky z-30 rounded-md border p-3 shadow-[var(--overlay-shadow)] sm:p-4;
+    background-color: color-mix(in srgb, var(--shop-card) 94%, white);
+    border-color: var(--shop-line);
+  }
+
+  .shop-form-input {
+    @apply w-full rounded-md border px-3 text-sm text-neutral-950 outline-none transition focus:ring-4;
+    background-color: var(--shop-control);
+    border-color: var(--shop-line);
+  }
+
+  .shop-form-input:focus {
+    border-color: var(--shop-brand);
+    box-shadow: 0 0 0 3px #fecaca;
+  }
+
+  .shop-empty-state {
+    @apply rounded-md border px-4 py-12 text-center text-sm text-neutral-500 shadow-[var(--surface-raised-shadow)];
+    background-color: var(--shop-card);
+    border-color: var(--shop-line);
+  }
+
+  .shop-tag,
+  .shop-tag-promo,
+  .shop-tag-success {
+    @apply inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold;
+  }
+
+  .shop-tag-promo {
+    @apply text-orange-700;
+    background-color: var(--shop-promo-soft);
+  }
+
+  .shop-tag-success {
+    @apply text-green-700;
+    background-color: var(--shop-success-soft);
+  }
+
+  .auth-card {
+    @apply rounded-md border p-6 shadow-[var(--surface-raised-shadow)] sm:p-8;
+    background-color: var(--shop-card);
+    border-color: var(--shop-line);
+  }
+
+  .dealer-card {
+    @apply rounded-md border shadow-[var(--surface-raised-shadow)] transition-colors;
+    background-color: var(--dashboard-panel);
+    border-color: var(--dashboard-line);
+  }
+
+  .dealer-card:hover {
+    border-color: #f8d6c9;
+    background-color: #fff7ee;
+  }
+
+  .dealer-empty-state {
+    @apply rounded-md border px-4 py-12 text-center text-sm text-neutral-500 shadow-[var(--surface-raised-shadow)];
+    background-color: var(--dashboard-panel);
+    border-color: var(--dashboard-line);
+  }
+
+  .dealer-status-badge {
+    @apply inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold;
+    background-color: var(--dashboard-transaction-soft);
+    color: #b9472d;
+  }
+
+  .dealer-status-success {
+    background-color: var(--dashboard-growth-soft);
+    color: #15803d;
+  }
+
+  .dealer-status-risk {
+    background-color: var(--dashboard-risk-soft);
+    color: var(--dashboard-risk);
+  }
+
+  .dealer-money {
+    @apply font-semibold tabular-nums;
+    color: #b9472d;
+  }
+
+  .shop-success-accent {
+    color: var(--shop-success);
+  }
+
+  .shop-promo-accent {
+    color: var(--shop-promo);
+  }
+
+  .dashboard-data-card {
+    @apply rounded-md border bg-[var(--dashboard-panel)] shadow-[var(--surface-raised-shadow)] transition-colors;
+    border-color: var(--dashboard-line);
+  }
+
+  .dashboard-page-heading {
+    @apply flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between;
+  }
+
+  .dashboard-toolbar {
+    @apply grid gap-3 rounded-md border bg-[var(--dashboard-panel)] p-4 shadow-[var(--surface-raised-shadow)];
+    border-color: var(--dashboard-line);
+  }
+
+  .dashboard-table-head {
+    background-color: var(--dashboard-table-head);
+    @apply text-neutral-500;
+  }
+
+  .dashboard-table-row {
+    @apply border-t transition-colors;
+    border-color: color-mix(in srgb, var(--dashboard-line) 62%, white);
+  }
+
+  .dashboard-table-row:hover {
+    background-color: var(--dashboard-row-hover);
+  }
+
+  .dashboard-kpi-card {
+    @apply rounded-md border bg-[var(--dashboard-panel)] p-5 shadow-[var(--surface-raised-shadow)];
+    border-color: var(--dashboard-line);
+  }
+
+  .dashboard-accent-icon {
+    @apply flex h-11 w-11 items-center justify-center rounded-md text-[#b9472d];
+    background-color: var(--dashboard-transaction-soft);
+  }
+
   .form-input {
-    @apply h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-base outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100;
+    @apply h-10 w-full rounded-md border px-3 text-sm text-neutral-950 outline-none transition focus:ring-4;
+    background-color: var(--dashboard-control);
+    border-color: var(--dashboard-line);
+  }
+
+  .dashboard-shell [data-slot="button"][data-variant="default"] {
+    @apply bg-[#e86f51] text-white hover:bg-[#cf5638] focus-visible:ring-[#f8d6c9];
+  }
+
+  .dashboard-shell [data-slot="button"][data-variant="secondary"] {
+    @apply bg-[#fff1e8] text-[#b9472d] hover:bg-[#fde3d6];
+  }
+
+  .dashboard-shell [data-slot="button"][data-variant="outline"] {
+    @apply bg-[var(--dashboard-panel)] text-neutral-700 hover:text-[#b9472d];
+    border-color: var(--dashboard-line);
+  }
+
+  .dashboard-shell .bg-orange-50 {
+    background-color: var(--dashboard-transaction-soft);
+  }
+
+  .dashboard-shell .bg-white {
+    background-color: var(--dashboard-panel) !important;
+  }
+
+  .dashboard-shell .bg-white\/70,
+  .dashboard-shell .bg-white\/75,
+  .dashboard-shell .bg-white\/95 {
+    background-color: color-mix(in srgb, var(--dashboard-panel) 88%, var(--dashboard-surface)) !important;
+  }
+
+  .dashboard-shell .bg-neutral-50,
+  .dashboard-shell .bg-slate-50 {
+    background-color: var(--dashboard-control) !important;
+  }
+
+  .dashboard-shell .bg-neutral-100,
+  .dashboard-shell .bg-slate-100 {
+    background-color: var(--dashboard-transaction-soft) !important;
+  }
+
+  .dashboard-shell .hover\:bg-neutral-50:hover,
+  .dashboard-shell .hover\:bg-slate-50:hover,
+  .dashboard-shell .hover\:bg-neutral-100:hover {
+    background-color: var(--dashboard-row-hover);
+  }
+
+  .dashboard-shell .border-neutral-200,
+  .dashboard-shell .border-slate-200 {
+    border-color: var(--dashboard-line) !important;
+  }
+
+  .dashboard-shell .bg-orange-500 {
+    background-color: var(--dashboard-transaction) !important;
+  }
+
+  .dashboard-shell .hover\:bg-orange-50:hover,
+  .dashboard-shell .hover\:bg-orange-50\/70:hover {
+    background-color: #fff6ed;
+  }
+
+  .dashboard-shell .hover\:bg-orange-600:hover {
+    background-color: var(--dashboard-transaction-strong) !important;
+  }
+
+  .dashboard-shell .text-orange-500,
+  .dashboard-shell .text-orange-600,
+  .dashboard-shell .text-orange-700,
+  .dashboard-shell .hover\:text-orange-700:hover {
+    color: #b9472d;
+  }
+
+  .dashboard-shell .border-orange-200,
+  .dashboard-shell .hover\:border-orange-200:hover {
+    border-color: #f8d6c9;
+  }
+
+  .dashboard-shell .form-input,
+  .dashboard-shell .field-control {
+    @apply focus:border-[#e86f51] focus:ring-[#f8d6c9];
+  }
+
+  .dashboard-shell input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  .dashboard-shell select,
+  .dashboard-shell textarea {
+    background-color: var(--dashboard-control) !important;
+    border-color: var(--dashboard-line) !important;
+    color: #171717;
+  }
+
+  .dashboard-shell input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
+  .dashboard-shell select:focus,
+  .dashboard-shell textarea:focus {
+    border-color: var(--dashboard-transaction);
+    box-shadow: 0 0 0 3px #f8d6c9;
+  }
+
+  .dashboard-shell input::placeholder,
+  .dashboard-shell textarea::placeholder {
+    color: #a18a7a;
+  }
+
+  .dashboard-shell .recharts-default-tooltip {
+    background-color: var(--dashboard-panel) !important;
+    border-color: var(--dashboard-line) !important;
+    box-shadow: var(--surface-raised-shadow);
+  }
+
+  .dashboard-shell .recharts-tooltip-label,
+  .dashboard-shell .recharts-tooltip-item {
+    color: #3f2b20 !important;
   }
 }

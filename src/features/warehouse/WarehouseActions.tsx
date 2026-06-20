@@ -22,7 +22,7 @@ export function SafeStockEditor({ productId, initialValue }: { productId: string
   return (
     <div className="flex min-w-[150px] items-center gap-2">
       <input
-        className="h-9 w-20 rounded-md border border-slate-200 px-2 text-sm outline-none focus:border-red-300"
+        className="form-input h-9 w-20 px-2"
         min={0}
         onChange={(event) => setValue(Number(event.target.value))}
         type="number"
@@ -31,7 +31,7 @@ export function SafeStockEditor({ productId, initialValue }: { productId: string
       <Button disabled={isPending} onClick={submit} size="sm" type="button" variant="outline">
         <Save className="h-4 w-4" />
       </Button>
-      {message ? <span className="text-xs text-slate-500">{message}</span> : null}
+      {message ? <span className="text-xs text-neutral-500">{message}</span> : null}
     </div>
   );
 }
@@ -55,7 +55,7 @@ export function CreateStockCheckButton() {
 
   return (
     <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
-      <Button className="bg-[#dc2626] text-white hover:bg-[#b91c1c]" disabled={isPending} onClick={submit} type="button">
+      <Button className="bg-orange-500 text-white hover:bg-orange-600" disabled={isPending} onClick={submit} type="button">
         <ClipboardCheck className="h-4 w-4" />
         新建盘点
       </Button>

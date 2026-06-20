@@ -8,9 +8,11 @@ export default async function CategoriesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">分类管理</h1>
-        <p className="mt-1 text-sm text-slate-500">维护三级分类树，有子分类或关联产品时禁止删除</p>
+      <div className="dashboard-page-heading">
+        <div>
+          <h1 className="text-2xl font-semibold text-neutral-950">分类管理</h1>
+          <p className="mt-1 text-sm text-neutral-500">维护三级分类树，有子分类或关联产品时禁止删除</p>
+        </div>
       </div>
       <CategoryManager categories={categories} />
     </div>

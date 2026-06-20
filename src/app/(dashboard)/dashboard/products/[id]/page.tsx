@@ -2,11 +2,8 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { auth } from "@/auth";
 import { Button } from "@/components/ui/button";
-import { roleHasPermission } from "@/features/auth/permissions";
 import { formatCurrency, getProductDetail } from "@/features/products/queries";
-import { ProductArt } from "@/features/shop/ProductArt";
 
 export const dynamic = "force-dynamic";
 
@@ -21,9 +18,6 @@ const statusLabels = {
 };
 
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
-  const session = await auth();
-  const canViewCostPrice = roleHasPermission(session?.user.role, "products:write") || roleHasPermission(session?.user.role, "finance:manage");
-  const canViewWholesalePrice = canViewCostPrice || roleHasPermission(session?.user.role, "sales:view");
   const { id } = await params;
   const product = await getProductDetail(id);
   if (!product) {
@@ -39,20 +33,22 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">{product.name}</h1>
-          <p className="mt-1 text-sm text-slate-500">{product.sku}</p>
+          <h1 className="text-2xl font-semibold text-neutral-950">{product.name}</h1>
+          <p className="mt-1 text-sm text-neutral-500">{product.sku}</p>
         </div>
       </div>
 
       <section className="grid gap-6 lg:grid-cols-[280px_1fr]">
-        <ProductArt categoryName={product.category} className="rounded-lg shadow-sm ring-1 ring-slate-200" imageUrl={product.imageUrl} name={product.name} />
-        <div className="grid gap-4 rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:grid-cols-2">
+        <div className="flex aspect-square items-center justify-center surface-panel text-sm text-neutral-400">
+          暂无图片
+        </div>
+        <div className="grid gap-4 surface-panel p-5 sm:grid-cols-2">
           <Info label="分类" value={product.category} />
           <Info label="品牌" value={product.brand} />
           <Info label="规格" value={product.spec ?? "-"} />
           <Info label="单位" value={product.unit} />
-          {canViewCostPrice ? <Info label="进价" value={formatCurrency(product.costPrice)} /> : null}
-          {canViewWholesalePrice ? <Info label="批发价" value={formatCurrency(product.wholesalePrice)} /> : null}
+          <Info label="进价" value={formatCurrency(product.costPrice)} />
+          <Info label="批发价" value={formatCurrency(product.wholesalePrice)} />
           <Info label="零售价" value={formatCurrency(product.retailPrice)} />
           <Info label="会员价" value={product.memberPrice ? formatCurrency(product.memberPrice) : "-"} />
           <Info label="当前库存" value={`${product.stock}`} />
@@ -62,9 +58,9 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
         </div>
       </section>
 
-      <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
-        <h2 className="text-lg font-semibold text-slate-900">产品描述</h2>
-        <p className="mt-3 text-sm leading-6 text-slate-600">{product.description ?? "暂无描述"}</p>
+      <section className="surface-panel p-5">
+        <h2 className="text-lg font-semibold text-neutral-950">产品描述</h2>
+        <p className="mt-3 text-sm leading-6 text-neutral-600">{product.description ?? "暂无描述"}</p>
       </section>
     </div>
   );
@@ -73,8 +69,8 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
 function Info({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-sm text-slate-500">{label}</p>
-      <p className="mt-1 font-medium text-slate-900">{value}</p>
+      <p className="text-sm text-neutral-500">{label}</p>
+      <p className="mt-1 font-medium text-neutral-950">{value}</p>
     </div>
   );
 }

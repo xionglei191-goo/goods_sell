@@ -34,7 +34,7 @@ export function DeliveryActions({ orderId, status, initialTrackingNo }: { orderI
       {status === "PAID" || status === "CONFIRMED" ? (
         <div className="flex flex-wrap items-center gap-2">
           <input
-            className="h-9 w-44 rounded-md border border-slate-200 px-2 text-sm outline-none focus:border-red-300"
+            className="form-input h-9 w-44 px-2"
             onChange={(event) => setTrackingNo(event.target.value)}
             placeholder="物流单号"
             value={trackingNo}
@@ -51,7 +51,7 @@ export function DeliveryActions({ orderId, status, initialTrackingNo }: { orderI
           确认送达
         </Button>
       ) : null}
-      {message ? <p className={message.includes("失败") || message.includes("不可") ? "text-xs text-red-600" : "text-xs text-slate-500"}>{message}</p> : null}
+      {message ? <p className={message.includes("失败") || message.includes("不可") ? "text-xs text-red-600" : "text-xs text-neutral-500"}>{message}</p> : null}
     </div>
   );
 }

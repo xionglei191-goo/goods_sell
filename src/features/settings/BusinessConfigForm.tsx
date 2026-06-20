@@ -30,15 +30,15 @@ export function BusinessConfigForm({ configs }: { configs: BusinessConfig[] }) {
   }
 
   return (
-    <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
-      <h2 className="font-semibold text-slate-900">业务参数</h2>
+    <section className="surface-panel p-5">
+      <h2 className="font-semibold text-neutral-950">业务参数</h2>
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         {configs.map((config) => (
-          <label className="block rounded-lg border border-slate-200 p-3" key={config.key}>
-            <span className="block font-medium text-slate-900">{config.label}</span>
-            <span className="mt-1 block text-xs text-slate-500">{config.description}</span>
+          <label className="block rounded-md border p-3" key={config.key} style={{ borderColor: "var(--dashboard-line)" }}>
+            <span className="block font-medium text-neutral-950">{config.label}</span>
+            <span className="mt-1 block text-xs text-neutral-500">{config.description}</span>
             <input
-              className="mt-3 h-10 w-full rounded-md border border-slate-200 px-3 outline-none focus:border-red-300"
+              className="form-input mt-3"
               min={0}
               onChange={(event) => setValue(config.key, Number(event.target.value))}
               type="number"
@@ -47,11 +47,11 @@ export function BusinessConfigForm({ configs }: { configs: BusinessConfig[] }) {
           </label>
         ))}
       </div>
-      <Button className="mt-4 bg-[#dc2626] text-white hover:bg-[#b91c1c]" disabled={isPending} onClick={submit} type="button">
+      <Button className="mt-4 bg-orange-500 text-white hover:bg-orange-600" disabled={isPending} onClick={submit} type="button">
         <Save className="h-4 w-4" />
         保存参数
       </Button>
-      {message ? <p className="mt-3 text-sm text-slate-600">{message}</p> : null}
+      {message ? <p className="mt-3 text-sm text-neutral-600">{message}</p> : null}
     </section>
   );
 }

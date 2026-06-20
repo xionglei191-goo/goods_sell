@@ -41,8 +41,8 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">订单管理</h1>
-          <p className="mt-1 text-sm text-slate-500">统一处理商城订单、线下开单和履约状态</p>
+          <h1 className="text-2xl font-semibold text-neutral-950">订单管理</h1>
+          <p className="mt-1 text-sm text-neutral-500">统一处理商城订单、线下开单和履约状态</p>
         </div>
         <div className="flex gap-2">
           <ExportOrdersButton orders={data.items} />
@@ -59,10 +59,10 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
 
       <OrderFilters initial={data.filters} />
 
-      <div className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
+      <div className="table-shell">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1180px] text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500">
+            <thead className="dashboard-table-head">
               <tr>
                 <th className="px-4 py-3 font-medium">订单号</th>
                 <th className="px-4 py-3 font-medium">客户</th>
@@ -77,18 +77,18 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
             </thead>
             <tbody>
               {data.items.map((order) => (
-                <tr className="border-t border-slate-100 hover:bg-slate-50" key={order.id}>
+                <tr className="dashboard-table-row" key={order.id}>
                   <td className="px-4 py-3">
-                    <Link className="font-medium text-slate-900 hover:text-blue-700" href={`/dashboard/orders/${order.id}`}>
+                    <Link className="font-medium text-neutral-950 hover:text-orange-700" href={`/dashboard/orders/${order.id}`}>
                       {order.orderNo}
                     </Link>
                   </td>
                   <td className="px-4 py-3">
-                    <p className="font-medium text-slate-900">{order.customerName}</p>
-                    <p className="mt-1 text-xs text-slate-500">{order.customerPhone}</p>
+                    <p className="font-medium text-neutral-950">{order.customerName}</p>
+                    <p className="mt-1 text-xs text-neutral-500">{order.customerPhone}</p>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{orderTypeLabels[order.type]}</td>
-                  <td className="px-4 py-3 font-medium text-slate-900">{formatCurrency(order.payableAmount)}</td>
+                  <td className="px-4 py-3 text-neutral-600">{orderTypeLabels[order.type]}</td>
+                  <td className="px-4 py-3 money-muted">{formatCurrency(order.payableAmount)}</td>
                   <td className="px-4 py-3">
                     <span className={cn("rounded-full px-2 py-1 text-xs font-medium", getPaymentClass(order.payableAmount, order.paidAmount))}>
                       {order.paymentLabel}
@@ -99,8 +99,8 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
                       {orderStatusLabels[order.status]}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{routingTypeLabels[order.routingType]}</td>
-                  <td className="px-4 py-3 text-slate-500">{formatDateTime(order.createdAt)}</td>
+                  <td className="px-4 py-3 text-neutral-600">{routingTypeLabels[order.routingType]}</td>
+                  <td className="px-4 py-3 text-neutral-500">{formatDateTime(order.createdAt)}</td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end">
                       {canOperateOrders ? <OrderStatusActions allowedActions={allowedOrderActions} orderId={order.id} status={order.status} /> : null}
@@ -111,7 +111,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
             </tbody>
           </table>
         </div>
-        <div className="border-t border-slate-100 px-4 py-3 text-sm text-slate-500">共 {data.total} 张订单</div>
+        <div className="border-t px-4 py-3 text-sm text-neutral-500" style={{ borderColor: "var(--dashboard-line)" }}>共 {data.total} 张订单</div>
       </div>
     </div>
   );

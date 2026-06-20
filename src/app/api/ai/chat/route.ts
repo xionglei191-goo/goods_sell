@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 
-import { answerCustomerQuestion, getChatCustomerId } from "@/features/ai/chat-service";
+import { answerCustomerQuestion, answerStatelessQuestion, canUseAiChat, getAiChatRole, getChatCustomerId } from "@/features/ai/chat-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,10 +10,12 @@ function encoderPayload(event: string, data: unknown) {
 }
 
 export async function POST(request: NextRequest) {
-  const customerId = await getChatCustomerId();
-  if (!customerId) {
+  const canUse = await canUseAiChat();
+  if (!canUse) {
     return Response.json({ error: "请先登录后再使用 AI 客服" }, { status: 401 });
   }
+  const role = await getAiChatRole();
+  const customerId = await getChatCustomerId();
 
   const body = (await request.json().catch(() => null)) as { message?: string } | null;
   const message = body?.message?.trim();
@@ -25,7 +27,8 @@ export async function POST(request: NextRequest) {
     async start(controller) {
       const encoder = new TextEncoder();
       try {
-        const { answer, suggestion } = await answerCustomerQuestion(customerId, message);
+        const result = customerId ? await answerCustomerQuestion(customerId, message) : { answer: await answerStatelessQuestion(message, role), suggestion: null };
+        const { answer, suggestion } = result;
         const chars = Array.from(answer);
         for (const char of chars) {
           controller.enqueue(encoder.encode(encoderPayload("delta", { text: char })));

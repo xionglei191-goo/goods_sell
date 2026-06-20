@@ -23,16 +23,16 @@ export function LogFilters({ initial, modules }: { initial: { module: string; op
   }
 
   return (
-    <div className="grid gap-3 rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200 lg:grid-cols-[180px_1fr_160px_160px_auto]">
-      <select className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-red-300" onChange={(event) => setModule(event.target.value)} value={module}>
+    <div className="grid gap-3 surface-panel p-4 lg:grid-cols-[180px_1fr_160px_160px_auto]">
+      <select className="form-input" onChange={(event) => setModule(event.target.value)} value={module}>
         <option value="">全部模块</option>
         {modules.map((item) => (
           <option key={item} value={item}>{item}</option>
         ))}
       </select>
-      <input className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-red-300" onChange={(event) => setOperator(event.target.value)} placeholder="操作人" value={operator} />
-      <input className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-red-300" onChange={(event) => setStartDate(event.target.value)} type="date" value={startDate} />
-      <input className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-red-300" onChange={(event) => setEndDate(event.target.value)} type="date" value={endDate} />
+      <input className="form-input" onChange={(event) => setOperator(event.target.value)} placeholder="操作人" value={operator} />
+      <input className="form-input" onChange={(event) => setStartDate(event.target.value)} type="date" value={startDate} />
+      <input className="form-input" onChange={(event) => setEndDate(event.target.value)} type="date" value={endDate} />
       <Button onClick={apply} type="button">
         <Search className="h-4 w-4" />
         筛选

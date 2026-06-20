@@ -23,14 +23,14 @@ export function IssueCouponButton({ couponId, tags }: { couponId: string; tags: 
 
   return (
     <div className="flex min-w-[260px] items-center gap-2">
-      <select className="h-9 min-w-0 flex-1 rounded-md border border-slate-200 bg-white px-2 text-xs" onChange={(event) => setTag(event.target.value)} value={tag}>
+      <select className="form-input h-9 min-w-0 flex-1 px-2 text-xs" onChange={(event) => setTag(event.target.value)} value={tag}>
         {tags.map((item) => <option key={item} value={item}>{item}</option>)}
       </select>
       <Button disabled={!tag || isPending} onClick={issue} size="sm" variant="outline">
         <Send className="h-4 w-4" />
         发放
       </Button>
-      {message ? <span className="text-xs text-slate-500">{message}</span> : null}
+      {message ? <span className="text-xs text-neutral-500">{message}</span> : null}
     </div>
   );
 }

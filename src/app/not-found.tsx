@@ -7,12 +7,12 @@ export default function NotFound() {
       <span className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-50">
         <SearchX className="h-8 w-8 text-amber-500" />
       </span>
-      <h1 className="mt-6 text-2xl font-semibold text-slate-900">页面未找到</h1>
-      <p className="mt-2 max-w-md text-sm text-slate-500">
+      <h1 className="mt-6 text-2xl font-semibold text-neutral-950">页面未找到</h1>
+      <p className="mt-2 max-w-md text-sm text-neutral-500">
         您访问的页面不存在或已被移除，请检查地址是否正确。
       </p>
       <Link
-        className="mt-6 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
+        className="mt-6 inline-flex items-center gap-2 rounded-md bg-[#dc2626] px-5 py-2.5 text-sm font-medium text-white transition hover:bg-[#b91c1c]"
         href="/"
       >
         <Home className="h-4 w-4" />

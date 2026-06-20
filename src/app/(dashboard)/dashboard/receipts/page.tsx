@@ -27,8 +27,8 @@ export default async function ReceiptsPage({ searchParams }: ReceiptsPageProps) 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">票据记录</h1>
-        <p className="mt-1 text-sm text-slate-500">收付款单据、电子发票和税控接口 Mock 开票。</p>
+        <h1 className="text-2xl font-semibold text-neutral-950">票据记录</h1>
+        <p className="mt-1 text-sm text-neutral-500">收付款单据、电子发票和税控接口 Mock 开票。</p>
       </div>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -40,17 +40,17 @@ export default async function ReceiptsPage({ searchParams }: ReceiptsPageProps) 
 
       <InvoiceForm orders={data.invoiceableOrders} />
 
-      <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
+      <section className="surface-panel p-5">
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
           <div>
-            <h2 className="font-semibold text-slate-900">收付款单据</h2>
-            <p className="mt-1 text-sm text-slate-500">支持导出当前列表 CSV。</p>
+            <h2 className="font-semibold text-neutral-950">收付款单据</h2>
+            <p className="mt-1 text-sm text-neutral-500">支持导出当前列表 CSV。</p>
           </div>
           <ExportPaymentsButton payments={data.payments} />
         </div>
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[940px] text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500">
+            <thead className="dashboard-table-head">
               <tr>
                 <th className="px-4 py-3 font-medium">订单</th>
                 <th className="px-4 py-3 font-medium">客户</th>
@@ -63,17 +63,17 @@ export default async function ReceiptsPage({ searchParams }: ReceiptsPageProps) 
             </thead>
             <tbody>
               {data.payments.map((payment) => (
-                <tr className="border-t border-slate-100" key={payment.id}>
-                  <td className="px-4 py-3 font-mono text-xs text-slate-600">{payment.orderNo}</td>
+                <tr className="border-t border-neutral-100" key={payment.id}>
+                  <td className="px-4 py-3 font-mono text-xs text-neutral-600">{payment.orderNo}</td>
                   <td className="px-4 py-3">
-                    <p className="font-medium text-slate-900">{payment.customerName}</p>
-                    <p className="text-xs text-slate-500">{payment.customerPhone}</p>
+                    <p className="font-medium text-neutral-950">{payment.customerName}</p>
+                    <p className="text-xs text-neutral-500">{payment.customerPhone}</p>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{paymentTypeLabels[payment.type]}</td>
-                  <td className="px-4 py-3 font-semibold text-slate-900">{formatCurrency(payment.amount)}</td>
-                  <td className="px-4 py-3 text-slate-600">{payment.method}</td>
-                  <td className="px-4 py-3 text-slate-600">{payment.status}</td>
-                  <td className="px-4 py-3 text-slate-500">{formatDateTime(payment.paidAt ?? payment.createdAt)}</td>
+                  <td className="px-4 py-3 text-neutral-600">{paymentTypeLabels[payment.type]}</td>
+                  <td className="px-4 py-3 font-semibold text-neutral-950">{formatCurrency(payment.amount)}</td>
+                  <td className="px-4 py-3 text-neutral-600">{payment.method}</td>
+                  <td className="px-4 py-3 text-neutral-600">{payment.status}</td>
+                  <td className="px-4 py-3 text-neutral-500">{formatDateTime(payment.paidAt ?? payment.createdAt)}</td>
                 </tr>
               ))}
             </tbody>
@@ -81,11 +81,11 @@ export default async function ReceiptsPage({ searchParams }: ReceiptsPageProps) 
         </div>
       </section>
 
-      <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
-        <h2 className="font-semibold text-slate-900">电子发票列表</h2>
+      <section className="surface-panel p-5">
+        <h2 className="font-semibold text-neutral-950">电子发票列表</h2>
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[900px] text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500">
+            <thead className="dashboard-table-head">
               <tr>
                 <th className="px-4 py-3 font-medium">发票号</th>
                 <th className="px-4 py-3 font-medium">购方</th>
@@ -98,20 +98,20 @@ export default async function ReceiptsPage({ searchParams }: ReceiptsPageProps) 
             </thead>
             <tbody>
               {data.invoices.map((invoice) => (
-                <tr className="border-t border-slate-100" key={invoice.id}>
-                  <td className="px-4 py-3 font-mono text-xs text-slate-700">{invoice.invoiceNo}</td>
-                  <td className="px-4 py-3 font-medium text-slate-900">{invoice.buyerName}</td>
-                  <td className="px-4 py-3 text-slate-600">{invoice.orderNo}</td>
-                  <td className="px-4 py-3 text-slate-600">{invoiceTypeLabels[invoice.type]}</td>
-                  <td className="px-4 py-3 font-semibold text-slate-900">{formatCurrency(invoice.amount)}</td>
-                  <td className="px-4 py-3 text-slate-600">{invoice.provider}</td>
-                  <td className="px-4 py-3 text-slate-500">{formatDateTime(invoice.issuedAt)}</td>
+                <tr className="border-t border-neutral-100" key={invoice.id}>
+                  <td className="px-4 py-3 font-mono text-xs text-neutral-700">{invoice.invoiceNo}</td>
+                  <td className="px-4 py-3 font-medium text-neutral-950">{invoice.buyerName}</td>
+                  <td className="px-4 py-3 text-neutral-600">{invoice.orderNo}</td>
+                  <td className="px-4 py-3 text-neutral-600">{invoiceTypeLabels[invoice.type]}</td>
+                  <td className="px-4 py-3 font-semibold text-neutral-950">{formatCurrency(invoice.amount)}</td>
+                  <td className="px-4 py-3 text-neutral-600">{invoice.provider}</td>
+                  <td className="px-4 py-3 text-neutral-500">{formatDateTime(invoice.issuedAt)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        {data.invoices.length === 0 ? <p className="py-8 text-center text-sm text-slate-500">暂无发票记录</p> : null}
+        {data.invoices.length === 0 ? <p className="py-8 text-center text-sm text-neutral-500">暂无发票记录</p> : null}
       </section>
     </div>
   );
@@ -119,13 +119,13 @@ export default async function ReceiptsPage({ searchParams }: ReceiptsPageProps) 
 
 function SummaryCard({ icon: Icon, label, value }: { icon: typeof ReceiptText; label: string; value: string }) {
   return (
-    <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
+    <section className="surface-panel p-5">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-sm text-slate-500">{label}</p>
-          <p className="mt-3 text-xl font-semibold text-slate-900">{value}</p>
+          <p className="text-sm text-neutral-500">{label}</p>
+          <p className="mt-3 text-xl font-semibold text-neutral-950">{value}</p>
         </div>
-        <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-red-50 text-[#dc2626]">
+        <span className="flex h-11 w-11 items-center justify-center rounded-md bg-orange-50 text-orange-700">
           <Icon className="h-5 w-5" />
         </span>
       </div>
