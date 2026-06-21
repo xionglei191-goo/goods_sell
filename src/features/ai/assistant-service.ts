@@ -31,6 +31,7 @@ type AssistantPlannerDebug = {
   toolNames?: string[];
   confidence?: number;
   planSource?: AiPlanSource;
+  candidates?: Array<{ name: string; score: number; reasons: string[] }>;
 };
 
 type AssistantResponse = {
@@ -205,6 +206,7 @@ function buildPlannerMeta(params: {
   plan?: AiToolPlan | null;
   steps: readonly AiToolPlan[];
   source: AiPlanSource;
+  rankedTools?: readonly RankedAiTool[];
 }): Partial<AssistantResponse> {
   const toolNames = params.steps.length ? params.steps.map((step) => step.toolName) : params.plan ? [params.plan.toolName] : [];
   const confidence = params.intentFrame?.confidence ?? params.plan?.confidence;
@@ -217,7 +219,17 @@ function buildPlannerMeta(params: {
 
   return {
     ...meta,
-    debug: params.role === "ADMIN" ? { ...meta, planSource: params.source } : undefined,
+    debug: params.role === "ADMIN"
+      ? {
+          ...meta,
+          planSource: params.source,
+          candidates: params.rankedTools?.slice(0, 12).map((item) => ({
+            name: item.tool.name,
+            score: Number(item.score.toFixed(2)),
+            reasons: item.reasons,
+          })),
+        }
+      : undefined,
   };
 }
 
@@ -373,7 +385,7 @@ export async function answerAssistantMessage(input: string | AssistantRequest): 
   }
 
   if (!plan) {
-    const meta = buildPlannerMeta({ role: context.role, plannerVersion, intentFrame, plan, steps, source });
+    const meta = buildPlannerMeta({ role: context.role, plannerVersion, intentFrame, plan, steps, source, rankedTools });
     const response = noPlanResponse(message, rankedTools, missingSlots, source, lastPlanError, meta);
     await auditAiAssistant({
       action: "AI 未命中工具",
@@ -390,7 +402,7 @@ export async function answerAssistantMessage(input: string | AssistantRequest): 
     steps = [plan];
   }
 
-  const meta = buildPlannerMeta({ role: context.role, plannerVersion, intentFrame, plan, steps, source });
+  const meta = buildPlannerMeta({ role: context.role, plannerVersion, intentFrame, plan, steps, source, rankedTools });
   const trace: AiPlannerTrace = {
     plannerVersion,
     intentKind: intentFrame?.intentKind,

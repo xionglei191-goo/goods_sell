@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import type { AppRole } from "@/features/auth/types";
 import { cn } from "@/lib/utils";
 
 type AiToolDetail = {
@@ -67,6 +68,32 @@ type AiFloatingBubbleProps = {
   contextLabel?: string;
 };
 
+const roleLabels: Record<AppRole, string> = {
+  ADMIN: "系统管理员",
+  SALESPERSON: "销售",
+  WAREHOUSE: "仓储",
+  FINANCE: "财务",
+  CONSUMER: "消费者",
+  DEALER: "经销商",
+};
+
+const roleHints: Record<AppRole, string> = {
+  ADMIN: "按管理员权限处理全局运营、配置和高风险代办",
+  SALESPERSON: "按销售权限处理客户、线索、订单和业绩",
+  WAREHOUSE: "按仓储权限处理库存、盘点、出入库和配送",
+  FINANCE: "按财务权限处理收款、应收、对账和票据",
+  CONSUMER: "按消费者权限处理商品、购物车、订单和优惠券",
+  DEALER: "按经销商权限处理接单、履约、结算和门店库存",
+};
+
+function roleLabel(role: AppRole | null) {
+  return role ? roleLabels[role] : "未登录";
+}
+
+function roleHint(role: AppRole | null) {
+  return role ? roleHints[role] : "登录后会按账号角色自动切换可用能力";
+}
+
 function parseSseChunk(buffer: string) {
   const events = buffer.split("\n\n");
   return { complete: events.slice(0, -1), rest: events.at(-1) ?? "" };
@@ -112,7 +139,7 @@ function CardView({ card, onConfirm, isPending }: { card: AiAssistantCard; onCon
     const requiresText = Boolean(action.confirmTextRequired);
     const canConfirm = !requiresText || confirmText.trim() === action.confirmTextRequired;
     return (
-      <div className="mt-3 min-w-0 max-w-full overflow-hidden rounded-lg bg-white p-3 text-stone-900 shadow-sm ring-1 ring-amber-200">
+      <div className="mt-3 min-w-0 max-w-full overflow-hidden rounded-lg bg-[var(--dashboard-panel)] p-3 text-stone-900 shadow-sm ring-1 ring-amber-200">
         <p className="break-words text-sm font-semibold [overflow-wrap:anywhere]">{action.title}</p>
         <p className="mt-1 break-words text-xs leading-5 text-stone-600 [overflow-wrap:anywhere]">{action.summary}</p>
         <div className="mt-3 grid gap-1.5">
@@ -140,7 +167,7 @@ function CardView({ card, onConfirm, isPending }: { card: AiAssistantCard; onCon
   }
 
   return (
-    <div className="mt-3 min-w-0 max-w-full overflow-hidden rounded-lg bg-white p-3 text-stone-900 shadow-sm ring-1 ring-stone-200">
+    <div className="mt-3 min-w-0 max-w-full overflow-hidden rounded-lg bg-[var(--dashboard-panel)] p-3 text-stone-900 shadow-sm ring-1 ring-stone-200">
       <p className="break-words text-sm font-semibold [overflow-wrap:anywhere]">{card.title}</p>
       <p className="mt-1 break-words text-xs leading-5 text-stone-600 [overflow-wrap:anywhere]">{card.summary}</p>
       {card.details.length ? (
@@ -170,6 +197,7 @@ export function AiFloatingBubble({ className, contextLabel = "AI 助手" }: AiFl
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [quickPrompts, setQuickPrompts] = useState<AiQuickPrompt[]>([]);
+  const [currentRole, setCurrentRole] = useState<AppRole | null>(null);
   const [isPending, startTransition] = useTransition();
   const assistantIdRef = useRef("");
 
@@ -178,11 +206,13 @@ export function AiFloatingBubble({ className, contextLabel = "AI 助手" }: AiFl
     const controller = new AbortController();
     fetch("/api/ai/quick-prompts", { signal: controller.signal })
       .then((response) => (response.ok ? response.json() : null))
-      .then((data: { prompts?: AiQuickPrompt[] } | null) => {
+      .then((data: { role?: AppRole | null; prompts?: AiQuickPrompt[] } | null) => {
+        setCurrentRole(data?.role ?? null);
         setQuickPrompts(data?.prompts ?? []);
       })
       .catch((err) => {
         if (err instanceof DOMException && err.name === "AbortError") return;
+        setCurrentRole(null);
         setQuickPrompts([]);
       });
     return () => controller.abort();
@@ -321,7 +351,7 @@ export function AiFloatingBubble({ className, contextLabel = "AI 助手" }: AiFl
   }
 
   return (
-    <div className={cn("fixed bottom-20 right-3 z-50 w-[calc(100vw-1.5rem)] max-w-[390px] overflow-hidden rounded-lg bg-white shadow-2xl ring-1 ring-stone-200 md:bottom-6", expanded ? "md:max-w-[520px]" : "", className)}>
+    <div className={cn("fixed bottom-20 right-3 z-50 w-[calc(100vw-1.5rem)] max-w-[390px] overflow-hidden rounded-lg bg-[var(--dashboard-panel)] shadow-2xl ring-1 ring-stone-200 md:bottom-6", expanded ? "md:max-w-[520px]" : "", className)}>
       <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-50 text-[#dc2626]">
@@ -329,10 +359,13 @@ export function AiFloatingBubble({ className, contextLabel = "AI 助手" }: AiFl
           </span>
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-stone-950">{contextLabel}</p>
-            <p className="truncate text-xs text-stone-500">可查数据，也可生成确认卡片代办</p>
+            <p className="truncate text-xs text-stone-500">{roleHint(currentRole)}</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
+          <span className="hidden shrink-0 rounded-full bg-red-50 px-2 py-1 text-xs font-semibold text-[#dc2626] sm:inline-flex">
+            {roleLabel(currentRole)}
+          </span>
           <Button aria-label="切换大小" className="h-8 w-8" onClick={() => setExpanded((value) => !value)} size="icon-sm" variant="ghost">
             <Maximize2 className="h-4 w-4" />
           </Button>
@@ -347,16 +380,16 @@ export function AiFloatingBubble({ className, contextLabel = "AI 助手" }: AiFl
 
       <div className="max-h-[55vh] min-h-72 space-y-3 overflow-x-hidden overflow-y-auto bg-stone-50 px-3 py-4">
         {messages.length === 0 ? (
-          <div className="rounded-lg bg-white p-3 text-sm text-stone-600 shadow-sm ring-1 ring-stone-200">
+          <div className="rounded-lg bg-[var(--dashboard-panel)] p-3 text-sm text-stone-600 shadow-sm ring-1 ring-stone-200">
             <p className="font-semibold text-stone-950">直接说你要办什么</p>
-            <p className="mt-1 text-xs leading-5">查询类会直接返回，调价、下单、库存等操作会先给你确认。</p>
+            <p className="mt-1 text-xs leading-5">当前身份：{roleLabel(currentRole)}。查询类会直接返回，调价、下单、库存等操作会先给你确认。</p>
           </div>
         ) : null}
         {messages.map((message) => {
           const isUser = message.role === "USER";
           return (
             <div className={cn("flex", isUser ? "justify-end" : "justify-start")} key={message.id}>
-              <div className={cn("min-w-0 max-w-[86%] break-words rounded-lg px-3 py-2 text-sm leading-6 [overflow-wrap:anywhere]", isUser ? "bg-stone-900 text-white" : "bg-white text-stone-800 shadow-sm ring-1 ring-stone-200")}>
+              <div className={cn("min-w-0 max-w-[86%] break-words rounded-lg px-3 py-2 text-sm leading-6 [overflow-wrap:anywhere]", isUser ? "bg-stone-900 text-white" : "bg-[var(--dashboard-panel)] text-stone-800 shadow-sm ring-1 ring-stone-200")}>
                 {message.content || "正在处理..."}
                 {message.card ? <CardView card={message.card} isPending={isPending} onConfirm={confirmAction} /> : null}
                 {message.debug ? <DebugLine debug={message.debug} /> : null}

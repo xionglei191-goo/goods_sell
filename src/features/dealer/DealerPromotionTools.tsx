@@ -23,7 +23,7 @@ export function CopyLinkButton({ value, label = "复制链接" }: CopyLinkButton
   }
 
   return (
-    <Button className="bg-slate-900 hover:bg-slate-800" onClick={copy} size="sm" type="button">
+    <Button className="bg-[#e86f51] hover:bg-[#cf5638]" onClick={copy} size="sm" type="button">
       {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
       {copied ? "已复制" : label}
     </Button>

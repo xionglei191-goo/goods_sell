@@ -23,8 +23,8 @@ export default async function ForbiddenPage({ searchParams }: ForbiddenPageProps
   const href = getDefaultAuthorizedPath(role);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
-      <section className="w-full max-w-lg rounded-lg bg-white p-8 shadow-sm ring-1 ring-slate-200">
+    <main className="flex min-h-screen items-center justify-center bg-[var(--dashboard-control)] px-4 py-10">
+      <section className="w-full max-w-lg rounded-lg bg-[var(--dashboard-panel)] p-8 shadow-sm ring-1 ring-slate-200">
         <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-md bg-amber-100 text-lg font-bold text-amber-700">
           403
         </div>
@@ -34,10 +34,10 @@ export default async function ForbiddenPage({ searchParams }: ForbiddenPageProps
         </p>
         {params.from ? <p className="mt-2 break-all text-xs text-slate-400">来源页面：{params.from}</p> : null}
         <div className="mt-6 flex flex-wrap gap-3">
-          <Link className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700" href={href}>
+          <Link className="rounded-md bg-[#e86f51] px-4 py-2 text-sm font-medium text-white hover:bg-[#cf5638]" href={href}>
             进入可用入口
           </Link>
-          <Link className="rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" href="/login">
+          <Link className="rounded-md border border-[var(--dashboard-line)] px-4 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--dashboard-control)]" href="/login">
             切换账号
           </Link>
         </div>

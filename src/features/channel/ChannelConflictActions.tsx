@@ -44,7 +44,7 @@ export function ChannelConflictActions({ conflictId, initialOwnerId, initialStat
     <div className="grid min-w-64 gap-2">
       <div className="grid grid-cols-2 gap-2">
         <select
-          className="h-9 rounded-md border border-slate-200 bg-white px-2 text-xs outline-none focus:border-blue-400"
+          className="h-9 rounded-md border border-[var(--dashboard-line)] bg-[var(--dashboard-panel)] px-2 text-xs outline-none focus:border-[#e86f51]"
           onChange={(event) => setStatus(event.target.value as ChannelConflictStatus)}
           value={status}
         >
@@ -55,7 +55,7 @@ export function ChannelConflictActions({ conflictId, initialOwnerId, initialStat
           ))}
         </select>
         <select
-          className="h-9 rounded-md border border-slate-200 bg-white px-2 text-xs outline-none focus:border-blue-400"
+          className="h-9 rounded-md border border-[var(--dashboard-line)] bg-[var(--dashboard-panel)] px-2 text-xs outline-none focus:border-[#e86f51]"
           onChange={(event) => setOwnerId(event.target.value)}
           value={ownerId}
         >
@@ -68,14 +68,14 @@ export function ChannelConflictActions({ conflictId, initialOwnerId, initialStat
         </select>
       </div>
       <textarea
-        className="min-h-16 rounded-md border border-slate-200 px-2 py-2 text-xs outline-none focus:border-blue-400"
+        className="min-h-16 rounded-md border border-[var(--dashboard-line)] px-2 py-2 text-xs outline-none focus:border-[#e86f51]"
         onChange={(event) => setNote(event.target.value)}
         placeholder="处理备注"
         value={note}
       />
       <div className="flex items-center justify-between gap-2">
         {message ? <p className="truncate text-xs text-slate-500">{message}</p> : <span />}
-        <Button className="h-8 bg-slate-900 px-3 text-xs text-white hover:bg-slate-700" disabled={isPending || !isChanged} onClick={submit} type="button">
+        <Button className="h-8 bg-[#e86f51] px-3 text-xs text-white hover:bg-[#cf5638]" disabled={isPending || !isChanged} onClick={submit} type="button">
           <Save className="h-3.5 w-3.5" />
           保存
         </Button>

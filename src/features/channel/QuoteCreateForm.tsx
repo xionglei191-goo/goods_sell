@@ -46,11 +46,11 @@ export function QuoteCreateForm({ options }: QuoteCreateFormProps) {
   }
 
   return (
-    <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
+    <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-sm ring-1 ring-slate-200">
       <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="grid gap-3 sm:grid-cols-2">
           <select
-            className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400 sm:col-span-2"
+            className="h-10 rounded-md border border-[var(--dashboard-line)] bg-[var(--dashboard-panel)] px-3 text-sm outline-none focus:border-[#e86f51] sm:col-span-2"
             onChange={(event) => setForm((current) => ({ ...current, inquiryId: event.target.value }))}
             value={form.inquiryId}
           >
@@ -62,7 +62,7 @@ export function QuoteCreateForm({ options }: QuoteCreateFormProps) {
             ))}
           </select>
           <input
-            className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-blue-400"
+            className="h-10 rounded-md border border-[var(--dashboard-line)] px-3 text-sm outline-none focus:border-[#e86f51]"
             min={0}
             onChange={(event) => setForm((current) => ({ ...current, totalAmount: event.target.value }))}
             placeholder="报价金额"
@@ -70,19 +70,19 @@ export function QuoteCreateForm({ options }: QuoteCreateFormProps) {
             value={form.totalAmount}
           />
           <input
-            className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-blue-400"
+            className="h-10 rounded-md border border-[var(--dashboard-line)] px-3 text-sm outline-none focus:border-[#e86f51]"
             onChange={(event) => setForm((current) => ({ ...current, validUntil: event.target.value }))}
             type="date"
             value={form.validUntil}
           />
           <textarea
-            className="min-h-24 rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400 sm:col-span-2"
+            className="min-h-24 rounded-md border border-[var(--dashboard-line)] px-3 py-2 text-sm outline-none focus:border-[#e86f51] sm:col-span-2"
             onChange={(event) => setForm((current) => ({ ...current, content: event.target.value }))}
             placeholder="报价说明、配送范围、开票或账期约定"
             value={form.content}
           />
         </div>
-        <div className="rounded-md bg-slate-50 p-4 text-sm text-slate-600">
+        <div className="rounded-md bg-[var(--dashboard-control)] p-4 text-sm text-slate-600">
           <p className="font-medium text-slate-900">当前询价</p>
           {selectedInquiry ? (
             <div className="mt-3 space-y-2">

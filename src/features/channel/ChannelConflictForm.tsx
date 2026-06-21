@@ -54,14 +54,14 @@ export function ChannelConflictForm({ options }: ChannelConflictFormProps) {
   }
 
   return (
-    <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
+    <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-sm ring-1 ring-slate-200">
       <div className="flex items-center gap-2 text-sm font-medium text-slate-900">
         <AlertTriangle className="h-4 w-4 text-amber-600" />
         记录渠道冲突
       </div>
       <div className="mt-4 grid gap-3 lg:grid-cols-6">
         <select
-          className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400"
+          className="h-10 rounded-md border border-[var(--dashboard-line)] bg-[var(--dashboard-panel)] px-3 text-sm outline-none focus:border-[#e86f51]"
           onChange={(event) => setForm((current) => ({ ...current, type: event.target.value as ChannelConflictType }))}
           value={form.type}
         >
@@ -72,13 +72,13 @@ export function ChannelConflictForm({ options }: ChannelConflictFormProps) {
           ))}
         </select>
         <input
-          className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 lg:col-span-2"
+          className="h-10 rounded-md border border-[var(--dashboard-line)] px-3 text-sm outline-none focus:border-[#e86f51] lg:col-span-2"
           onChange={(event) => setForm((current) => ({ ...current, summary: event.target.value }))}
           placeholder="冲突摘要"
           value={form.summary}
         />
         <select
-          className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400"
+          className="h-10 rounded-md border border-[var(--dashboard-line)] bg-[var(--dashboard-panel)] px-3 text-sm outline-none focus:border-[#e86f51]"
           onChange={(event) => setForm((current) => ({ ...current, orderId: event.target.value }))}
           value={form.orderId}
         >
@@ -90,7 +90,7 @@ export function ChannelConflictForm({ options }: ChannelConflictFormProps) {
           ))}
         </select>
         <select
-          className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400"
+          className="h-10 rounded-md border border-[var(--dashboard-line)] bg-[var(--dashboard-panel)] px-3 text-sm outline-none focus:border-[#e86f51]"
           onChange={(event) => setForm((current) => ({ ...current, dealerId: event.target.value }))}
           value={form.dealerId}
         >
@@ -102,7 +102,7 @@ export function ChannelConflictForm({ options }: ChannelConflictFormProps) {
           ))}
         </select>
         <select
-          className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400"
+          className="h-10 rounded-md border border-[var(--dashboard-line)] bg-[var(--dashboard-panel)] px-3 text-sm outline-none focus:border-[#e86f51]"
           onChange={(event) => setForm((current) => ({ ...current, customerId: event.target.value }))}
           value={form.customerId}
         >
@@ -114,7 +114,7 @@ export function ChannelConflictForm({ options }: ChannelConflictFormProps) {
           ))}
         </select>
         <select
-          className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400"
+          className="h-10 rounded-md border border-[var(--dashboard-line)] bg-[var(--dashboard-panel)] px-3 text-sm outline-none focus:border-[#e86f51]"
           onChange={(event) => setForm((current) => ({ ...current, ownerId: event.target.value }))}
           value={form.ownerId}
         >
@@ -126,7 +126,7 @@ export function ChannelConflictForm({ options }: ChannelConflictFormProps) {
           ))}
         </select>
         <textarea
-          className="min-h-20 rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400 lg:col-span-5"
+          className="min-h-20 rounded-md border border-[var(--dashboard-line)] px-3 py-2 text-sm outline-none focus:border-[#e86f51] lg:col-span-5"
           onChange={(event) => setForm((current) => ({ ...current, detail: event.target.value }))}
           placeholder="详细说明、客户反馈、价格截图备注或处理线索"
           value={form.detail}

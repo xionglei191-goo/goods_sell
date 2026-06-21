@@ -71,7 +71,7 @@ export function DealerPolicyForm({ data }: DealerPolicyFormProps) {
   }
 
   return (
-    <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
+    <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-sm ring-1 ring-slate-200">
       <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
@@ -98,7 +98,7 @@ export function DealerPolicyForm({ data }: DealerPolicyFormProps) {
           <label className="block">
             <span className="mb-2 block text-sm font-medium text-slate-700">价格等级</span>
             <select
-              className="form-input bg-white"
+              className="form-input bg-[var(--dashboard-panel)]"
               onChange={(event) => setForm((current) => ({ ...current, priceLevel: event.target.value as DealerPriceLevel }))}
               value={form.priceLevel}
             >
@@ -129,7 +129,7 @@ export function DealerPolicyForm({ data }: DealerPolicyFormProps) {
               value={form.rejectLimitPerDay}
             />
           </label>
-          <div className="space-y-3 rounded-md bg-slate-50 p-3 text-sm text-slate-600">
+          <div className="space-y-3 rounded-md bg-[var(--dashboard-control)] p-3 text-sm text-slate-600">
             <label className="flex items-center gap-2">
               <input checked={form.allowCrossZone} onChange={(event) => setForm((current) => ({ ...current, allowCrossZone: event.target.checked }))} type="checkbox" />
               <span>允许跨区域接单</span>
@@ -159,7 +159,7 @@ export function DealerPolicyForm({ data }: DealerPolicyFormProps) {
           </div>
           <div className="mt-3 grid max-h-[360px] gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
             {data.brands.map((brand) => (
-              <label className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700" key={brand.id}>
+              <label className="flex items-center gap-2 rounded-md border border-[var(--dashboard-line)] px-3 py-2 text-sm text-slate-700" key={brand.id}>
                 <input checked={form.brandIds.includes(brand.id)} onChange={() => toggleBrand(brand.id)} type="checkbox" />
                 <span>{brand.name}</span>
               </label>

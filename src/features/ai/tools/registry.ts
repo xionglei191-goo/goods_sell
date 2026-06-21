@@ -30,6 +30,17 @@ import { revalidatePath, revalidateTag } from "@/lib/revalidate";
 import type { AiToolDefinition, AiToolResult, AiToolContext, AiToolDetail } from "@/features/ai/tools/types";
 
 const revenueStatuses: OrderStatus[] = ["PAID", "CONFIRMED", "SHIPPING", "DELIVERED", "COMPLETED"];
+const orderStatusLabels: Record<OrderStatus, string> = {
+  PENDING_PAYMENT: "待支付",
+  PAID: "已支付",
+  CONFIRMED: "已确认",
+  SHIPPING: "配送中",
+  DELIVERED: "已送达",
+  COMPLETED: "已完成",
+  CANCELLED: "已取消",
+  REFUNDING: "退款中",
+  REFUNDED: "已退款",
+};
 
 function money(value: number) {
   return new Intl.NumberFormat("zh-CN", { style: "currency", currency: "CNY", minimumFractionDigits: 2 }).format(value);
@@ -69,6 +80,25 @@ function details(rows: Array<[string, string | number | null | undefined]>): AiT
     .filter(([, value]) => value !== null && value !== undefined && String(value).length > 0)
     .map(([label, value]) => ({ label, value: String(value) }));
 }
+
+const customerLookupSchema = z.object({
+  customerQuery: z.string().trim().min(1, "请说明客户姓名或手机号"),
+  limit: z.coerce.number().int().min(1).max(20).default(8),
+});
+
+const dealerLookupSchema = z.object({
+  dealerQuery: z.string().trim().min(1, "请说明经销商门店、联系人或手机号"),
+  period: z.enum(["day", "week", "month", "all"]).default("month"),
+  limit: z.coerce.number().int().min(1).max(20).default(8),
+});
+
+const customerOrderDraftSchema = z.object({
+  customerQuery: z.string().trim().min(1, "请说明客户姓名或手机号"),
+  productQuery: z.string().trim().min(1, "请说明要买的商品"),
+  quantity: z.coerce.number().int().min(1).max(9999),
+  payMethod: z.enum(["WECHAT", "CASH", "TRANSFER", "CREDIT"]).default("WECHAT"),
+  remark: z.string().max(200).optional(),
+});
 
 async function findProductByQuery(productQuery: string) {
   const query = productQuery.trim();
@@ -311,7 +341,7 @@ function revalidateOrderLikeViews(orderId?: string) {
 
 async function buildCustomerOrderDraft(input: { productQuery: string; quantity: number; addressId?: string | null }, context: AiToolContext) {
   const [product, customer] = await Promise.all([
-    findProductByQuery(input.productQuery),
+    findProductByQuery(input.productQuery!),
     prisma.customer.findUnique({
       where: { id: context.user.id },
       include: { addresses: { orderBy: [{ isDefault: "desc" }, { updatedAt: "desc" }], take: 1 } },
@@ -498,6 +528,9 @@ const summaryQuerySchema = z.object({
   query: z.string().trim().optional().default(""),
   limit: z.coerce.number().int().min(1).max(20).default(8),
   period: z.enum(["all", "day", "week", "month"]).default("month"),
+});
+const orderSummarySchema = summaryQuerySchema.extend({
+  status: z.enum(["", "PENDING_PAYMENT", "PAID", "CONFIRMED", "SHIPPING", "DELIVERED", "COMPLETED", "CANCELLED", "REFUNDING", "REFUNDED"]).optional().default(""),
 });
 
 function periodCreatedAtWhere(period?: string) {
@@ -892,6 +925,197 @@ export const aiTools: AiToolDefinition[] = [
     },
   },
   {
+    name: "admin_customer_account_summary",
+    title: "客户账户代查",
+    description: "管理员或销售代查指定客户账户、地址、订单、购物车、优惠券和欠款概况。",
+    riskLevel: "READ",
+    access: { permission: "customers:view" },
+    inputSchema: customerLookupSchema,
+    handler: async (input, context) => {
+      const target = await findCustomerByQuery(input.customerQuery!, context);
+      const [customer, cartCount, couponCount, orderCount] = await Promise.all([
+        prisma.customer.findUnique({
+          where: { id: target.id },
+          include: {
+            addresses: { select: { name: true, phone: true, city: true, district: true, detail: true, isDefault: true }, take: input.limit },
+            salesPerson: { select: { name: true } },
+          },
+        }),
+        prisma.cartItem.count({ where: { customerId: target.id } }),
+        prisma.customerCoupon.count({ where: { customerId: target.id, status: "UNUSED" } }),
+        prisma.order.count({ where: { customerId: target.id, parentId: null } }),
+      ]);
+      if (!customer) throw new Error("未找到客户账户");
+
+      return {
+        title: "客户账户代查",
+        summary: `${customer.name}，地址 ${customer.addresses.length} 个，购物车 ${cartCount} 项，可用券 ${couponCount} 张，订单 ${orderCount} 笔。`,
+        href: `/dashboard/customers?query=${encodeURIComponent(customer.phone ?? customer.name)}`,
+        details: [
+          ...details([
+            ["客户", customer.name],
+            ["手机号", customer.phone],
+            ["类型", customer.type],
+            ["归属销售", customer.salesPerson?.name ?? "未分配"],
+            ["积分", customer.points],
+            ["信用额度", money(Number(customer.creditLimit))],
+            ["欠款余额", money(Number(customer.balance))],
+            ["购物车", cartCount],
+            ["可用券", couponCount],
+            ["订单数", orderCount],
+          ]),
+          ...customer.addresses.map((address) => ({
+            label: address.isDefault ? "默认地址" : "地址",
+            value: `${address.name} ${address.phone}｜${address.city}${address.district}${address.detail}`,
+          })),
+        ],
+      };
+    },
+  },
+  {
+    name: "admin_customer_cart_summary",
+    title: "客户购物车代查",
+    description: "管理员或销售代查指定客户购物车商品、数量、选中状态和估算金额。",
+    riskLevel: "READ",
+    access: { permission: "customers:view" },
+    inputSchema: customerLookupSchema,
+    handler: async (input, context) => {
+      const customer = await findCustomerByQuery(input.customerQuery!, context);
+      const items = await prisma.cartItem.findMany({
+        where: { customerId: customer.id },
+        include: { product: { select: { name: true, sku: true, retailPrice: true, stock: true, status: true } } },
+        orderBy: { updatedAt: "desc" },
+        take: input.limit,
+      });
+      const selectedAmount = items.filter((item) => item.selected).reduce((total, item) => total + Number(item.product.retailPrice) * item.quantity, 0);
+
+      return {
+        title: "客户购物车代查",
+        summary: items.length ? `${customer.name} 购物车 ${items.length} 项，已选估算 ${money(selectedAmount)}。` : `${customer.name} 的购物车为空。`,
+        href: `/dashboard/customers?query=${encodeURIComponent(customer.phone ?? customer.name)}`,
+        details: items.map((item) => ({
+          label: item.product.name,
+          value: `${item.quantity} 件｜${item.selected ? "已选" : "未选"}｜${money(Number(item.product.retailPrice) * item.quantity)}｜库存 ${item.product.stock}｜${item.product.status}`,
+        })),
+      };
+    },
+  },
+  {
+    name: "admin_customer_coupon_summary",
+    title: "客户优惠券代查",
+    description: "管理员或销售代查指定客户优惠券、可用券、已用券和过期券。",
+    riskLevel: "READ",
+    access: { permission: "customers:view" },
+    inputSchema: customerLookupSchema,
+    handler: async (input, context) => {
+      const customer = await findCustomerByQuery(input.customerQuery!, context);
+      const [statusRows, coupons] = await Promise.all([
+        prisma.customerCoupon.groupBy({ by: ["status"], where: { customerId: customer.id }, _count: { _all: true } }),
+        prisma.customerCoupon.findMany({
+          where: { customerId: customer.id },
+          include: { coupon: { select: { name: true, type: true, amount: true, percent: true, threshold: true, endsAt: true, isActive: true } } },
+          orderBy: { receivedAt: "desc" },
+          take: input.limit,
+        }),
+      ]);
+
+      return {
+        title: "客户优惠券代查",
+        summary: statusRows.length ? `${customer.name}：${statusRows.map((row) => `${row.status} ${row._count._all} 张`).join("，")}` : `${customer.name} 暂时没有优惠券。`,
+        href: `/dashboard/customers?query=${encodeURIComponent(customer.phone ?? customer.name)}`,
+        details: coupons.map((item) => ({
+          label: item.coupon.name,
+          value: `${item.status}｜${item.coupon.type === "AMOUNT" ? money(Number(item.coupon.amount ?? 0)) : `${item.coupon.percent}%`}｜门槛 ${money(Number(item.coupon.threshold))}｜到期 ${compactDate(item.coupon.endsAt)}`,
+        })),
+      };
+    },
+  },
+  {
+    name: "admin_customer_orders",
+    title: "客户订单代查",
+    description: "管理员或销售查询指定客户订单、配送和售后状态。",
+    riskLevel: "READ",
+    access: { permission: "orders:view" },
+    inputSchema: customerLookupSchema,
+    handler: async (input, context) => {
+      const customer = await findCustomerByQuery(input.customerQuery!, context);
+      const orders = await prisma.order.findMany({
+        where: { customerId: customer.id, parentId: null },
+        include: { delivery: true, items: true },
+        orderBy: { createdAt: "desc" },
+        take: input.limit,
+      });
+      return {
+        title: "客户订单代查",
+        summary: orders.length ? `${customer.name} 最近 ${orders.length} 个订单如下。` : `${customer.name} 还没有订单记录。`,
+        href: `/dashboard/orders?query=${encodeURIComponent(customer.phone ?? customer.name)}`,
+        details: orders.map((order) => ({
+          label: order.orderNo,
+          value: `${orderStatusLabels[order.status]}｜${money(Number(order.payableAmount))}｜${order.items.reduce((sum, item) => sum + item.quantity, 0)} 件｜配送 ${order.delivery?.status ?? "未发货"}｜${compactDate(order.createdAt)}`,
+        })),
+      };
+    },
+  },
+  {
+    name: "admin_customer_receivables",
+    title: "客户待付款代查",
+    description: "管理员或财务查询指定客户赊账、欠款和待付款订单。",
+    riskLevel: "READ",
+    access: { permission: "finance:manage" },
+    inputSchema: customerLookupSchema.omit({ limit: true }).extend({ limit: z.coerce.number().int().min(1).max(50).default(20) }),
+    handler: async (input, context) => {
+      const customer = await findCustomerByQuery(input.customerQuery!, context);
+      const orders = await prisma.order.findMany({
+        where: { customerId: customer.id, parentId: null, status: { in: ["PENDING_PAYMENT", "PAID", "CONFIRMED", "SHIPPING", "DELIVERED", "COMPLETED", "REFUNDING"] } },
+        orderBy: { createdAt: "asc" },
+        take: input.limit,
+      });
+      const rows = orders
+        .map((order) => ({ orderNo: order.orderNo, status: order.status, createdAt: order.createdAt, remaining: Math.max(0, Number(order.payableAmount) - Number(order.paidAmount)) }))
+        .filter((row) => row.remaining > 0);
+      return {
+        title: "客户待付款代查",
+        summary: rows.length ? `${customer.name} 当前待付款合计 ${money(rows.reduce((sum, item) => sum + item.remaining, 0))}。` : `${customer.name} 当前没有待付款订单。`,
+        href: `/dashboard/finance/statements?query=${encodeURIComponent(customer.phone ?? customer.name)}`,
+        details: [
+          ...details([
+            ["客户余额", money(Number(customer.balance))],
+            ["信用额度", money(Number(customer.creditLimit))],
+          ]),
+          ...rows.slice(0, 8).map((row) => ({ label: row.orderNo, value: `${orderStatusLabels[row.status]}｜${money(row.remaining)}｜${compactDate(row.createdAt)}` })),
+        ],
+      };
+    },
+  },
+  {
+    name: "admin_customer_order_draft",
+    title: "客户开单草稿",
+    description: "管理员或销售为指定客户生成开单草稿，不直接创建订单。",
+    riskLevel: "DRAFT",
+    access: { permission: "orders:write" },
+    inputSchema: customerOrderDraftSchema,
+    handler: async (input, context) => {
+      const [customer, product] = await Promise.all([findCustomerByQuery(input.customerQuery!, context), findProductByQuery(input.productQuery!)]);
+      const amount = Number(product.retailPrice) * input.quantity;
+      return {
+        title: "客户开单草稿",
+        summary: `已整理 ${customer.name} 的开单意图：${input.quantity} 件 ${product.name}，预计 ${money(amount)}。`,
+        href: "/dashboard/orders/new",
+        details: details([
+          ["客户", `${customer.name} ${customer.phone}`],
+          ["归属销售", customer.salesPerson?.name ?? "未分配"],
+          ["商品", `${product.name}｜${product.sku}`],
+          ["单价", money(Number(product.retailPrice))],
+          ["数量", input.quantity],
+          ["预计金额", money(amount)],
+          ["支付方式", input.payMethod],
+          ["备注", input.remark],
+          ["下一步", "进入后台开单页确认地址、商品明细和支付方式后再创建"],
+        ]),
+      };
+    },
+  },
+  {
     name: "audit_log_summary",
     title: "操作日志摘要",
     description: "按模块、动作、操作人或关键词查询审计日志和 AI 工具调用记录。",
@@ -1057,6 +1281,131 @@ export const aiTools: AiToolDefinition[] = [
           ...inquiryStatuses.map((row) => ({ label: `询价 ${row.status}`, value: `${row._count._all} 张` })),
           ...recentLeads.map((lead) => ({ label: lead.name ?? lead.phone ?? lead.id, value: `${lead.scene}｜${lead.status}｜${compactDate(lead.createdAt)}` })),
         ],
+      };
+    },
+  },
+  {
+    name: "admin_dealer_promotion_summary",
+    title: "经销商推广代查",
+    description: "管理员或销售查询指定经销商推广码、扫码线索、询价和订单转化。",
+    riskLevel: "READ",
+    access: { permission: "channel:manage" },
+    inputSchema: dealerLookupSchema,
+    handler: async (input, context) => {
+      const dealer = await findDealerByQuery(input.dealerQuery!, context);
+      const where = periodCreatedAtWhere(input.period);
+      const [codes, leadStatuses, inquiryStatuses, routingCount, recentLeads] = await Promise.all([
+        prisma.promoterCode.findMany({ where: { dealerId: dealer.id }, orderBy: { createdAt: "desc" }, take: input.limit }),
+        prisma.lead.groupBy({ by: ["status"], where: { ...where, dealerId: dealer.id }, _count: { _all: true } }),
+        prisma.inquiry.groupBy({ by: ["status"], where: { ...where, dealerId: dealer.id }, _count: { _all: true } }),
+        prisma.orderRouting.count({ where: { dealerId: dealer.id } }),
+        prisma.lead.findMany({ where: { ...where, dealerId: dealer.id }, orderBy: { createdAt: "desc" }, take: input.limit }),
+      ]);
+
+      return {
+        title: "经销商推广代查",
+        summary: `${dealer.shopName} 有 ${codes.length} 个推广码，历史派单 ${routingCount} 个。`,
+        href: `/dashboard/dealers?query=${encodeURIComponent(dealer.shopName)}`,
+        details: [
+          ...details([
+            ["门店", dealer.shopName],
+            ["联系人", `${dealer.customer.name} ${dealer.customer.phone}`],
+            ["接单状态", dealer.isAccepting ? "可接单" : "暂停接单"],
+            ["服务区域", dealer.zone],
+          ]),
+          ...codes.map((code) => ({ label: code.label, value: `${code.code}｜扫码 ${code.scanCount}｜线索 ${code.leadCount}｜订单 ${code.orderCount}` })),
+          ...leadStatuses.map((row) => ({ label: `线索 ${row.status}`, value: `${row._count._all} 条` })),
+          ...inquiryStatuses.map((row) => ({ label: `询价 ${row.status}`, value: `${row._count._all} 张` })),
+          ...recentLeads.map((lead) => ({ label: lead.name ?? lead.phone ?? lead.id, value: `${lead.scene}｜${lead.status}｜${compactDate(lead.createdAt)}` })),
+        ],
+      };
+    },
+  },
+  {
+    name: "admin_dealer_incoming_orders",
+    title: "经销商待接订单代查",
+    description: "管理员或销售查询指定经销商当前待接订单。",
+    riskLevel: "READ",
+    access: { permission: "orders:view" },
+    inputSchema: dealerLookupSchema.pick({ dealerQuery: true, limit: true }),
+    handler: async (input, context) => {
+      const dealer = await findDealerByQuery(input.dealerQuery!, context);
+      const routings = await prisma.orderRouting.findMany({
+        where: { dealerId: dealer.id, status: "PENDING" },
+        include: { order: { include: { customer: { select: { name: true, phone: true } }, items: true } } },
+        orderBy: { assignedAt: "asc" },
+        take: input.limit,
+      });
+      return {
+        title: "经销商待接订单代查",
+        summary: routings.length ? `${dealer.shopName} 当前有 ${routings.length} 个待接订单。` : `${dealer.shopName} 当前没有待接订单。`,
+        href: "/dashboard/orders",
+        details: routings.map((routing) => ({
+          label: routing.order.orderNo,
+          value: `${routing.order.customer.name} ${routing.order.customer.phone}｜${money(Number(routing.order.payableAmount))}｜${routing.order.items.reduce((sum, item) => sum + item.quantity, 0)} 件｜派单 ${compactDate(routing.assignedAt)}`,
+        })),
+      };
+    },
+  },
+  {
+    name: "admin_dealer_settlement_summary",
+    title: "经销商结算代查",
+    description: "管理员或财务查询指定经销商本月完成订单和预估结算。",
+    riskLevel: "READ",
+    access: { permission: "finance:manage" },
+    inputSchema: dealerLookupSchema.pick({ dealerQuery: true, limit: true }),
+    handler: async (input, context) => {
+      const dealer = await findDealerByQuery(input.dealerQuery!, context);
+      const start = new Date();
+      start.setDate(1);
+      start.setHours(0, 0, 0, 0);
+      const routings = await prisma.orderRouting.findMany({
+        where: { dealerId: dealer.id, status: "ACCEPTED", order: { status: "COMPLETED", updatedAt: { gte: start } } },
+        include: { order: { include: { customer: { select: { name: true } } } } },
+        orderBy: { updatedAt: "desc" },
+        take: input.limit,
+      });
+      const amount = routings.reduce((sum, routing) => sum + Number(routing.order.payableAmount), 0);
+      return {
+        title: "经销商结算代查",
+        summary: `${dealer.shopName} 本月完成 ${routings.length} 单，预估结算 ${money(amount * 0.9)}。`,
+        href: "/dashboard/finance/statements",
+        details: [
+          ...details([
+            ["门店", dealer.shopName],
+            ["完成订单", routings.length],
+            ["订单金额", money(amount)],
+            ["预估结算", money(amount * 0.9)],
+          ]),
+          ...routings.slice(0, 8).map((routing) => ({ label: routing.order.orderNo, value: `${routing.order.customer.name}｜${money(Number(routing.order.payableAmount))}｜${compactDate(routing.order.updatedAt)}` })),
+        ],
+      };
+    },
+  },
+  {
+    name: "admin_dealer_stock_summary",
+    title: "经销商库存代查",
+    description: "管理员或销售查询指定经销商上报的门店库存。",
+    riskLevel: "READ",
+    access: { permission: "inventory:manage" },
+    inputSchema: dealerLookupSchema.pick({ dealerQuery: true, limit: true }),
+    handler: async (input, context) => {
+      const dealer = await findDealerByQuery(input.dealerQuery!, context);
+      const stocks = await prisma.dealerStock.findMany({
+        where: { dealerId: dealer.id },
+        include: { product: { select: { name: true, sku: true, stock: true, safeStock: true, retailPrice: true } } },
+        orderBy: { reportedAt: "desc" },
+        take: input.limit,
+      });
+      const total = stocks.reduce((sum, row) => sum + row.stock, 0);
+      return {
+        title: "经销商库存代查",
+        summary: stocks.length ? `${dealer.shopName} 最近上报 ${stocks.length} 个 SKU，门店库存合计 ${total} 件。` : `${dealer.shopName} 暂无门店库存上报。`,
+        href: `/dashboard/dealers?query=${encodeURIComponent(dealer.shopName)}`,
+        details: stocks.map((stock) => ({
+          label: stock.product.name,
+          value: `${stock.product.sku}｜门店 ${stock.stock} 件｜总仓 ${stock.product.stock}｜安全库存 ${stock.product.safeStock}｜上报 ${compactDate(stock.reportedAt)}`,
+        })),
       };
     },
   },
@@ -1234,6 +1583,92 @@ export const aiTools: AiToolDefinition[] = [
           ["库存预警 SKU", lowStock],
           ["未关闭渠道冲突", openConflicts],
         ]),
+      };
+    },
+  },
+  {
+    name: "order_summary",
+    title: "订单摘要",
+    description: "查询后台订单总数、状态分布、最近订单、客户、金额和配送状态。",
+    riskLevel: "READ",
+    access: { permission: "orders:view" },
+    inputSchema: orderSummarySchema,
+    handler: async (input, context) => {
+      const query = String(input.query ?? "").trim();
+      const scope: Prisma.OrderWhereInput =
+        context.role === "SALESPERSON" ? { OR: [{ salesPersonId: context.user.id }, { customer: { salesPersonId: context.user.id } }] } : {};
+      const where: Prisma.OrderWhereInput = {
+        parentId: null,
+        ...scope,
+        ...periodCreatedAtWhere(input.period),
+        ...(input.status ? { status: input.status as OrderStatus } : {}),
+        ...(query
+          ? {
+              OR: [
+                { orderNo: { contains: query, mode: "insensitive" } },
+                { customer: { name: { contains: query, mode: "insensitive" } } },
+                { customer: { phone: { contains: query, mode: "insensitive" } } },
+                { items: { some: { productName: { contains: query, mode: "insensitive" } } } },
+              ],
+            }
+          : {}),
+      };
+      const [count, amount, statusRows, recent] = await Promise.all([
+        prisma.order.count({ where }),
+        prisma.order.aggregate({ where, _sum: { payableAmount: true, paidAmount: true } }),
+        prisma.order.groupBy({ by: ["status"], where, _count: { _all: true }, _sum: { payableAmount: true } }),
+        prisma.order.findMany({
+          where,
+          include: {
+            customer: { select: { name: true, phone: true, salesPerson: { select: { name: true } } } },
+            delivery: { select: { status: true } },
+            _count: { select: { items: true } },
+          },
+          orderBy: { createdAt: "desc" },
+          take: input.limit,
+        }),
+      ]);
+      const periodLabel = input.period === "all" ? "累计" : input.period === "day" ? "今日" : input.period === "week" ? "近 7 天" : "本月";
+      const paid = Number(amount._sum.paidAmount ?? 0);
+      const payable = Number(amount._sum.payableAmount ?? 0);
+      return {
+        title: "订单摘要",
+        summary: `${periodLabel}${query ? `「${query}」` : ""}订单 ${count} 单，应收 ${money(payable)}，已收 ${money(paid)}。`,
+        href: "/dashboard/orders",
+        details: [
+          ...details([
+            ["周期", periodLabel],
+            ["订单数", count],
+            ["应收金额", money(payable)],
+            ["已收金额", money(paid)],
+            ["未收金额", money(Math.max(0, payable - paid))],
+          ]),
+          ...statusRows.map((row) => ({
+            label: `状态 ${orderStatusLabels[row.status] ?? row.status}`,
+            value: `${row._count._all} 单｜${money(Number(row._sum.payableAmount ?? 0))}`,
+          })),
+          ...recent.map((order) => ({
+            label: order.orderNo,
+            value: `${order.customer.name}｜${orderStatusLabels[order.status] ?? order.status}｜${money(Number(order.payableAmount))}｜${order._count.items} 项｜${order.customer.salesPerson?.name ?? "未分配"}｜${compactDate(order.createdAt)}`,
+          })),
+        ],
+        data: {
+          count,
+          payable,
+          paid,
+          statusRows,
+          recent: recent.map((order) => ({
+            id: order.id,
+            orderNo: order.orderNo,
+            status: order.status,
+            customerName: order.customer.name,
+            customerPhone: order.customer.phone,
+            payableAmount: Number(order.payableAmount),
+            paidAmount: Number(order.paidAmount),
+            deliveryStatus: order.delivery?.status ?? null,
+            createdAt: order.createdAt,
+          })),
+        },
       };
     },
   },
@@ -1516,7 +1951,7 @@ export const aiTools: AiToolDefinition[] = [
     access: { permission: "customers:view" },
     inputSchema: z.object({ customerQuery: z.string().trim().min(1, "请说明客户姓名或手机号"), limit: z.coerce.number().int().min(1).max(20).default(8) }),
     handler: async (input, context) => {
-      const customer = await findCustomerByQuery(input.customerQuery, context);
+      const customer = await findCustomerByQuery(input.customerQuery!, context);
       const orders = await prisma.order.findMany({
         where: { customerId: customer.id, parentId: null },
         include: { items: true },
@@ -1665,7 +2100,7 @@ export const aiTools: AiToolDefinition[] = [
       })
       .refine((data) => data.name !== undefined || data.phone !== undefined || data.creditLimit !== undefined || data.customerType !== undefined, "请说明要修改的客户字段"),
     buildConfirmation: async (input, context) => {
-      const customer = await findCustomerByQuery(input.customerQuery, context);
+      const customer = await findCustomerByQuery(input.customerQuery!, context);
       return {
         title: "确认修改客户资料",
         summary: `准备修改客户 ${customer.name} 的资料。`,
@@ -1680,7 +2115,7 @@ export const aiTools: AiToolDefinition[] = [
       };
     },
     handler: async (input, context) => {
-      const customer = await findCustomerByQuery(input.customerQuery, context);
+      const customer = await findCustomerByQuery(input.customerQuery!, context);
       const before = { id: customer.id, name: customer.name, phone: customer.phone, creditLimit: Number(customer.creditLimit), type: customer.type };
       if (input.phone && input.phone !== customer.phone) {
         const exists = await prisma.customer.findUnique({ where: { phone: input.phone }, select: { id: true } });
@@ -1729,7 +2164,7 @@ export const aiTools: AiToolDefinition[] = [
     access: { roles: ["ADMIN"] },
     inputSchema: z.object({ customerQuery: z.string().trim().min(1), salesPersonQuery: z.string().trim().min(1) }),
     buildConfirmation: async (input, context) => {
-      const [customer, salesperson] = await Promise.all([findCustomerByQuery(input.customerQuery, context), findSalespersonByQuery(input.salesPersonQuery)]);
+      const [customer, salesperson] = await Promise.all([findCustomerByQuery(input.customerQuery!, context), findSalespersonByQuery(input.salesPersonQuery)]);
       return {
         title: "确认调整客户归属",
         summary: `准备把 ${customer.name} 调整给 ${salesperson?.name ?? ""}。`,
@@ -1742,7 +2177,7 @@ export const aiTools: AiToolDefinition[] = [
       };
     },
     handler: async (input, context) => {
-      const [customer, salesperson] = await Promise.all([findCustomerByQuery(input.customerQuery, context), findSalespersonByQuery(input.salesPersonQuery)]);
+      const [customer, salesperson] = await Promise.all([findCustomerByQuery(input.customerQuery!, context), findSalespersonByQuery(input.salesPersonQuery)]);
       if (!salesperson) throw new Error("未找到销售员");
       const updated = await prisma.customer.update({
         where: { id: customer.id },
@@ -1784,7 +2219,7 @@ export const aiTools: AiToolDefinition[] = [
       mode: z.enum(["replace", "add", "remove"]).default("replace"),
     }),
     buildConfirmation: async (input, context) => {
-      const customer = await findCustomerByQuery(input.customerQuery, context);
+      const customer = await findCustomerByQuery(input.customerQuery!, context);
       return {
         title: "确认调整客户标签",
         summary: `准备${input.mode === "replace" ? "替换" : input.mode === "remove" ? "移除" : "追加"} ${customer.name} 的标签。`,
@@ -1798,7 +2233,7 @@ export const aiTools: AiToolDefinition[] = [
       };
     },
     handler: async (input, context) => {
-      const customer = await findCustomerByQuery(input.customerQuery, context);
+      const customer = await findCustomerByQuery(input.customerQuery!, context);
       const tags = Array.from(new Set(input.tags ?? []));
       await prisma.$transaction(async (tx) => {
         if (input.mode === "replace") {
@@ -1998,7 +2433,7 @@ export const aiTools: AiToolDefinition[] = [
       })
       .refine((data) => data.newRetailPrice !== undefined || data.adjustRetailPrice !== undefined, "请提供新价格或调整金额"),
     buildConfirmation: async (input) => {
-      const product = await findProductByQuery(input.productQuery);
+      const product = await findProductByQuery(input.productQuery!);
       const current = Number(product.retailPrice);
       const next = input.newRetailPrice ?? current + (input.adjustRetailPrice ?? 0);
       if (next <= 0) throw new Error("调整后价格必须大于 0");
@@ -2015,7 +2450,7 @@ export const aiTools: AiToolDefinition[] = [
       };
     },
     handler: async (input) => {
-      const product = await findProductByQuery(input.productQuery);
+      const product = await findProductByQuery(input.productQuery!);
       const before = { id: product.id, name: product.name, retailPrice: Number(product.retailPrice) };
       const next = input.newRetailPrice ?? Number(product.retailPrice) + (input.adjustRetailPrice ?? 0);
       if (next <= 0) throw new Error("调整后价格必须大于 0");
@@ -2056,7 +2491,7 @@ export const aiTools: AiToolDefinition[] = [
     access: { permission: "products:write" },
     inputSchema: z.object({ productQuery: z.string().trim().min(1), status: z.enum(["ACTIVE", "INACTIVE", "OUT_OF_STOCK"]) }),
     buildConfirmation: async (input) => {
-      const product = await findProductByQuery(input.productQuery);
+      const product = await findProductByQuery(input.productQuery!);
       return {
         title: "确认调整商品状态",
         summary: `准备把 ${product.name} 状态从 ${product.status} 调整为 ${input.status}。`,
@@ -2069,7 +2504,7 @@ export const aiTools: AiToolDefinition[] = [
       };
     },
     handler: async (input) => {
-      const product = await findProductByQuery(input.productQuery);
+      const product = await findProductByQuery(input.productQuery!);
       const before = { id: product.id, name: product.name, status: product.status };
       const updated = await prisma.product.update({ where: { id: product.id }, data: { status: input.status as ProductStatus }, select: { id: true, name: true, status: true } });
       await logAction({
@@ -2102,7 +2537,7 @@ export const aiTools: AiToolDefinition[] = [
     access: { permission: "warehouse:manage" },
     inputSchema: z.object({ productQuery: z.string().trim().min(1), safeStock: z.coerce.number().int().min(0).max(999999) }),
     buildConfirmation: async (input) => {
-      const product = await findProductByQuery(input.productQuery);
+      const product = await findProductByQuery(input.productQuery!);
       return {
         title: "确认调整安全库存",
         summary: `准备把 ${product.name} 安全库存从 ${product.safeStock} 调整为 ${input.safeStock}。`,
@@ -2115,7 +2550,7 @@ export const aiTools: AiToolDefinition[] = [
       };
     },
     handler: async (input) => {
-      const product = await findProductByQuery(input.productQuery);
+      const product = await findProductByQuery(input.productQuery!);
       const result = await updateSafeStock({ productId: product.id, safeStock: input.safeStock });
       errorFromAction(result, "安全库存更新失败");
       return {
@@ -2176,7 +2611,7 @@ export const aiTools: AiToolDefinition[] = [
     access: { permission: "inventory:manage" },
     inputSchema: z.object({ productQuery: z.string().trim().min(1), quantity: z.coerce.number().int().min(1), remark: z.string().max(200).optional() }),
     buildConfirmation: async (input) => {
-      const product = await findProductByQuery(input.productQuery);
+      const product = await findProductByQuery(input.productQuery!);
       return {
         title: "确认入库",
         summary: `准备给 ${product.name} 入库 ${input.quantity} 件。`,
@@ -2190,7 +2625,7 @@ export const aiTools: AiToolDefinition[] = [
       };
     },
     handler: async (input) => {
-      const product = await findProductByQuery(input.productQuery);
+      const product = await findProductByQuery(input.productQuery!);
       const result = await stockIn({ productId: product.id, quantity: input.quantity, remark: input.remark ?? "AI 助手入库" });
       errorFromAction(result, "入库失败");
       return {
@@ -2211,7 +2646,7 @@ export const aiTools: AiToolDefinition[] = [
     access: { permission: "inventory:manage" },
     inputSchema: z.object({ productQuery: z.string().trim().min(1), quantity: z.coerce.number().int().min(1), remark: z.string().max(200).optional() }),
     buildConfirmation: async (input) => {
-      const product = await findProductByQuery(input.productQuery);
+      const product = await findProductByQuery(input.productQuery!);
       return {
         title: "确认出库",
         summary: `准备给 ${product.name} 出库 ${input.quantity} 件。`,
@@ -2225,7 +2660,7 @@ export const aiTools: AiToolDefinition[] = [
       };
     },
     handler: async (input) => {
-      const product = await findProductByQuery(input.productQuery);
+      const product = await findProductByQuery(input.productQuery!);
       const result = await stockOut({ productId: product.id, quantity: input.quantity, remark: input.remark ?? "AI 助手出库" });
       errorFromAction(result, "出库失败");
       return {
@@ -2492,16 +2927,17 @@ export const aiTools: AiToolDefinition[] = [
         summary:
           report.status === "READY"
             ? "所有上线配置检查均已通过。"
-            : `当前有 ${report.blockerCount} 个阻塞项、${report.warningCount} 个提醒项，建议先处理阻塞项。`,
+            : `正式上线口径下当前有 ${report.blockerCount} 个阻塞项、${report.warningCount} 个可延期优化项，必须先处理阻塞项。`,
         details: [
           ...details([
+            ["上线口径", report.mode === "production" ? "正式公开上线" : report.mode],
             ["状态", report.status],
             ["已就绪", report.readyCount],
-            ["提醒项", report.warningCount],
+            ["可延期优化项", report.warningCount],
             ["阻塞项", report.blockerCount],
           ]),
           ...[...blockers, ...warnings].slice(0, 12).map((item) => ({
-            label: item.label,
+            label: `${item.severity === "BLOCKER" ? "阻塞" : "提醒"}｜${item.label}`,
             value: `${item.summary} 下一步：${item.action}`,
           })),
         ],
@@ -2724,7 +3160,7 @@ export const aiTools: AiToolDefinition[] = [
     access: { permission: "channel:manage" },
     inputSchema: z.object({ dealerQuery: z.string().trim().optional(), limit: z.coerce.number().int().min(1).max(20).default(8) }),
     handler: async (input, context) => {
-      const dealer = input.dealerQuery ? await findDealerByQuery(input.dealerQuery, context) : null;
+      const dealer = input.dealerQuery ? await findDealerByQuery(input.dealerQuery!, context) : null;
       const conflicts = await prisma.channelConflict.findMany({
         where: {
           ...(dealer ? { dealerId: dealer.id } : {}),
@@ -2848,7 +3284,7 @@ export const aiTools: AiToolDefinition[] = [
     access: { permission: "marketing:manage" },
     inputSchema: z.object({ productQuery: z.string().trim().min(1), targetTag: z.string().trim().min(1), message: z.string().trim().max(500).optional() }),
     buildConfirmation: async (input) => {
-      const product = await findProductByQuery(input.productQuery);
+      const product = await findProductByQuery(input.productQuery!);
       return {
         title: "二次确认新品推送",
         summary: `准备向「${input.targetTag}」人群推送 ${product.name}。`,
@@ -2862,7 +3298,7 @@ export const aiTools: AiToolDefinition[] = [
       };
     },
     handler: async (input) => {
-      const product = await findProductByQuery(input.productQuery);
+      const product = await findProductByQuery(input.productQuery!);
       const result = await createProductPush({ productId: product.id, targetTag: input.targetTag!, message: input.message });
       errorFromAction(result, "新品推送失败");
       return {
@@ -2911,7 +3347,7 @@ export const aiTools: AiToolDefinition[] = [
     access: { roles: ["DEALER"] },
     inputSchema: z.object({ productQuery: z.string().trim().min(1), stock: z.coerce.number().int().min(0).max(99999) }),
     buildConfirmation: async (input) => {
-      const product = await findProductByQuery(input.productQuery);
+      const product = await findProductByQuery(input.productQuery!);
       return {
         title: "确认上报库存",
         summary: `准备上报 ${product.name} 门店库存 ${input.stock} 件。`,
@@ -2923,7 +3359,7 @@ export const aiTools: AiToolDefinition[] = [
       };
     },
     handler: async (input) => {
-      const product = await findProductByQuery(input.productQuery);
+      const product = await findProductByQuery(input.productQuery!);
       const result = await reportDealerStock({ productId: product.id, stock: input.stock });
       errorFromAction(result, "库存上报失败");
       return { title: "库存已上报", summary: `${product.name} 门店库存已上报为 ${input.stock}。`, details: details([["商品", product.name], ["库存", input.stock]]) };
@@ -3115,6 +3551,36 @@ const aiToolSemanticMetadata: Record<string, AiToolSemanticMetadata> = {
     examples: ["我的优惠券有哪些", "有没有可用券", "优惠券快过期了吗"],
     argumentHints: '{"limit":10}',
   },
+  admin_customer_account_summary: {
+    capabilities: ["代查客户账户", "客户账户", "客户资料", "客户地址", "客户积分", "客户欠款", "客户概况"],
+    examples: ["帮我看张阿姨账户情况", "查一下 13900139001 的地址和欠款", "这个客户资料怎么样"],
+    argumentHints: '{"customerQuery":"客户姓名/手机号","limit":8}',
+  },
+  admin_customer_cart_summary: {
+    capabilities: ["代查客户购物车", "客户购物车", "购物车商品", "客户结算商品"],
+    examples: ["张阿姨购物车里有什么", "帮我看 13900139001 购物车多少钱"],
+    argumentHints: '{"customerQuery":"客户姓名/手机号","limit":8}',
+  },
+  admin_customer_coupon_summary: {
+    capabilities: ["代查客户优惠券", "客户优惠券", "客户可用券", "客户券包"],
+    examples: ["张阿姨有哪些优惠券", "13900139001 有没有可用券"],
+    argumentHints: '{"customerQuery":"客户姓名/手机号","limit":8}',
+  },
+  admin_customer_orders: {
+    capabilities: ["代查客户订单", "客户订单", "客户配送状态", "客户购买订单", "客户下单记录"],
+    examples: ["张阿姨最近有哪些订单", "查 13900139001 的订单状态"],
+    argumentHints: '{"customerQuery":"客户姓名/手机号","limit":8}',
+  },
+  admin_customer_receivables: {
+    capabilities: ["代查客户待付款", "客户欠款", "客户应收", "客户账款", "客户未付款订单"],
+    examples: ["张阿姨还有多少欠款", "查 13900139001 哪些订单没付"],
+    argumentHints: '{"customerQuery":"客户姓名/手机号","limit":20}',
+  },
+  admin_customer_order_draft: {
+    capabilities: ["代客户开单草稿", "帮客户下单草稿", "客户要货草稿", "后台开单草稿"],
+    examples: ["帮张阿姨开单 2 件青岛啤酒", "给 13900139001 下单 1 箱可乐"],
+    argumentHints: '{"customerQuery":"客户姓名/手机号","productQuery":"商品名/SKU","quantity":1,"payMethod":"WECHAT"}',
+  },
   wechat_ecosystem_summary: {
     capabilities: ["微信生态", "公众号菜单", "模板消息", "小程序分享", "微信配置", "微信消息日志"],
     examples: ["微信生态现在怎么样", "微信菜单在哪配置", "模板消息发送情况"],
@@ -3139,6 +3605,26 @@ const aiToolSemanticMetadata: Record<string, AiToolSemanticMetadata> = {
     capabilities: ["经销商推广", "我的推广码", "经销商线索", "门店线索", "扫码客户", "经销商转化"],
     examples: ["我的推广效果怎么样", "我的推广码有多少线索", "经销商线索情况"],
     argumentHints: '{"period":"month","limit":8}',
+  },
+  admin_dealer_promotion_summary: {
+    capabilities: ["代查经销商推广", "经销商推广效果", "门店推广码", "经销商线索转化", "门店扫码线索"],
+    examples: ["莲城便利店推广效果怎么样", "查某经销商推广码和线索"],
+    argumentHints: '{"dealerQuery":"经销商门店/联系人/手机号","period":"month","limit":8}',
+  },
+  admin_dealer_incoming_orders: {
+    capabilities: ["代查经销商待接订单", "经销商待接单", "门店待接订单", "经销商新订单"],
+    examples: ["莲城便利店有哪些待接订单", "查某经销商待接单"],
+    argumentHints: '{"dealerQuery":"经销商门店/联系人/手机号","limit":8}',
+  },
+  admin_dealer_settlement_summary: {
+    capabilities: ["代查经销商结算", "经销商结算", "经销商佣金", "门店账款", "门店结算"],
+    examples: ["莲城便利店本月结算多少", "查某经销商佣金"],
+    argumentHints: '{"dealerQuery":"经销商门店/联系人/手机号","limit":8}',
+  },
+  admin_dealer_stock_summary: {
+    capabilities: ["代查经销商库存", "经销商库存", "门店库存", "门店上报库存"],
+    examples: ["莲城便利店门店库存怎么样", "查某经销商库存"],
+    argumentHints: '{"dealerQuery":"经销商门店/联系人/手机号","limit":8}',
   },
   search_products: {
     capabilities: ["商品搜索", "查商品", "查价格", "查库存", "SKU 查询", "品牌规格查询"],
@@ -3166,9 +3652,14 @@ const aiToolSemanticMetadata: Record<string, AiToolSemanticMetadata> = {
     argumentHints: "{}",
   },
   business_overview: {
-    capabilities: ["经营总览", "销售额", "订单数", "客户数", "回款", "毛利", "库存预警", "待处理事项"],
+    capabilities: ["经营总览", "销售额", "订单数", "经营客户数", "回款", "毛利", "库存预警", "待处理事项"],
     examples: ["这个月经营怎么样", "今天销售额和订单数", "现在有哪些待处理事项"],
     argumentHints: '{"period":"month"}',
+  },
+  order_summary: {
+    capabilities: ["订单摘要", "最近订单", "订单列表", "订单状态", "待支付订单", "订单金额", "有哪些订单", "多少订单", "下单记录"],
+    examples: ["最近有哪些订单", "今天订单情况怎么样", "待支付订单有哪些"],
+    argumentHints: '{"query":"订单号/客户名/手机号/商品名，可为空","period":"month","status":"","limit":8}',
   },
   salesperson_performance: {
     capabilities: ["销售员业绩", "业务员绩效", "销售员数量", "有几个销售员", "哪个销售员最好", "销售转化", "报价转化", "成交", "销售排名", "客户数", "回款"],
@@ -3181,8 +3672,8 @@ const aiToolSemanticMetadata: Record<string, AiToolSemanticMetadata> = {
     argumentHints: '{"query":"客户姓名/手机号/标签/归属销售员","limit":8}',
   },
   customer_analytics_summary: {
-    capabilities: ["客户统计", "客户总数", "一共有多少客户", "多少客户", "消费最高客户", "消费最多客户", "客户消费排行", "客户类型分布"],
-    examples: ["现在一共有多少客户，哪个消费最高", "现在一共有多少客户", "哪个客户消费最多"],
+    capabilities: ["客户统计", "用户统计", "会员统计", "客户总数", "用户总数", "会员数量", "一共有多少客户", "多少客户", "多少用户", "我有多少用户", "消费最高客户", "消费最多客户", "客户消费排行", "客户类型分布"],
+    examples: ["现在一共有多少客户，哪个消费最高", "现在一共有多少用户", "我有多少用户", "哪个客户消费最多"],
     argumentHints: '{"period":"all","limit":5}',
   },
   customer_purchase_history: {

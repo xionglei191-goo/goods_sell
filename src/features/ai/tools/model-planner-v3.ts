@@ -1,7 +1,13 @@
 import { callAnthropicCompatible, hasAiProvider } from "@/features/ai/provider";
 import { describeRankedAgentCapabilitiesForPrompt, rankAgentCapabilitiesForMessage, type RankedAgentCapability } from "@/features/ai/tools/capabilities";
 import { describeAssistantIntentPolicyForPrompt, shouldRejectNavigationPlan } from "@/features/ai/tools/intent-policy";
-import { describeRankedAiToolsForPrompt, rankAiToolsForMessage, type RankedAiTool } from "@/features/ai/tools/model-planner";
+import {
+  AI_PLANNER_CORE_TOOL_LIMIT,
+  AI_PLANNER_EXPANDED_TOOL_LIMIT,
+  describeRankedAiToolsForPrompt,
+  rankAiToolsForMessage,
+  type RankedAiTool,
+} from "@/features/ai/tools/model-planner";
 import type { AiToolContext, AiToolDefinition, AiToolPlan, AiToolResult, AiToolRiskLevel } from "@/features/ai/tools/types";
 
 export type AiIntentKind = "READ_SUMMARY" | "READ_RANKING" | "READ_DETAIL" | "NAVIGATE" | "DRAFT" | "WRITE" | "HIGH_RISK" | "CLARIFY";
@@ -172,10 +178,12 @@ async function callPlannerV3(params: {
   context: AiToolContext;
   rankedTools: readonly RankedAiTool[];
   rankedCapabilities: readonly RankedAgentCapability[];
+  toolLimit?: number;
   repair?: { rejectedPlan: AiPlannerV3Result | null; error: string };
 }) {
-  const toolsText = describeRankedAiToolsForPrompt(params.rankedTools);
-  const toolNames = params.rankedTools.slice(0, 10).map((item) => item.tool.name).join(", ");
+  const toolLimit = params.toolLimit ?? AI_PLANNER_CORE_TOOL_LIMIT;
+  const toolsText = describeRankedAiToolsForPrompt(params.rankedTools, toolLimit);
+  const toolNames = params.rankedTools.slice(0, toolLimit).map((item) => item.tool.name).join(", ");
   const capabilitiesText = describeRankedAgentCapabilitiesForPrompt(params.rankedCapabilities);
   const repairText = params.repair
     ? `\n上一次 V3 计划未通过校验：${JSON.stringify({ frame: params.repair.rejectedPlan?.intentFrame, steps: params.repair.rejectedPlan?.steps })}\n失败原因：${params.repair.error}\n请修复 intentFrame 或 steps。`
@@ -189,7 +197,8 @@ async function callPlannerV3(params: {
       `toolName 必须逐字复制候选工具名之一：${toolNames}。` +
       `READ 查询可以规划 1 到 3 个 READ steps；DRAFT/WRITE/HIGH_RISK 只能规划 1 个 step，且只会生成草稿或确认卡。` +
       `${describeAssistantIntentPolicyForPrompt()}` +
-      `关键工具：销售员数量/排行/最好/转化 -> salesperson_performance；客户总数/消费最高 -> customer_analytics_summary；库存总量/最多/低库存 -> product_operations_summary；欠款排行/应收 -> finance_summary；配送客户/配送订单/待发货/配送中 -> delivery_summary。`,
+      `关键工具：订单列表/最近订单/订单状态分布 -> order_summary；销售员数量/排行/最好/转化 -> salesperson_performance；用户总数/客户总数/会员数量/消费最高 -> customer_analytics_summary；库存总量/最多/低库存 -> product_operations_summary；欠款排行/应收 -> finance_summary；配送客户/配送订单/待发货/配送中 -> delivery_summary。` +
+      `管理员代查指定客户购物车/优惠券/订单/欠款/账户 -> admin_customer_cart_summary/admin_customer_coupon_summary/admin_customer_orders/admin_customer_receivables/admin_customer_account_summary；管理员代查指定经销商待接单/结算/库存/推广 -> admin_dealer_incoming_orders/admin_dealer_settlement_summary/admin_dealer_stock_summary/admin_dealer_promotion_summary。`,
     messages: [
       {
         role: "user",
@@ -205,7 +214,7 @@ export async function planWithModelV3(message: string, context: AiToolContext, t
   if (!hasAiProvider()) return { plan: null, steps: [], intentFrame: null, rankedTools, rankedCapabilities, missingSlots: [], error: "AI provider 未配置" };
 
   try {
-    const rawText = await callPlannerV3({ message, context, rankedTools, rankedCapabilities });
+    const rawText = await callPlannerV3({ message, context, rankedTools, rankedCapabilities, toolLimit: AI_PLANNER_CORE_TOOL_LIMIT });
     const parsed = extractJsonObject(rawText);
     if (!parsed) return { plan: null, steps: [], intentFrame: null, rankedTools, rankedCapabilities, missingSlots: [], rawText, error: "provider 未返回可解析 V3 JSON" };
     return asPlannerResult({ parsed, message, rankedTools, rankedCapabilities, rawText });
@@ -226,7 +235,7 @@ export async function repairModelPlanV3(
   if (!hasAiProvider()) return { plan: null, steps: [], intentFrame: null, rankedTools, rankedCapabilities, missingSlots: [], error: "AI provider 未配置" };
 
   try {
-    const rawText = await callPlannerV3({ message, context, rankedTools, rankedCapabilities, repair: { rejectedPlan, error } });
+    const rawText = await callPlannerV3({ message, context, rankedTools, rankedCapabilities, toolLimit: AI_PLANNER_EXPANDED_TOOL_LIMIT, repair: { rejectedPlan, error } });
     const parsed = extractJsonObject(rawText);
     if (!parsed) return { plan: null, steps: [], intentFrame: null, rankedTools, rankedCapabilities, missingSlots: [], rawText, error: "provider V3 修复未返回可解析 JSON" };
     return asPlannerResult({ parsed, message, rankedTools, rankedCapabilities, rawText });

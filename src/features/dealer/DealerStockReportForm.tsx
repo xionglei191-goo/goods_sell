@@ -32,14 +32,14 @@ export function DealerStockReportForm({ productId, initialStock }: DealerStockRe
   return (
     <form className="flex items-center gap-2" onSubmit={submit}>
       <input
-        className="h-9 w-24 rounded-md border border-slate-200 bg-white px-3 text-center text-sm font-medium text-slate-900 outline-none focus:border-[#dc2626] focus:ring-2 focus:ring-red-100"
+        className="h-9 w-24 rounded-md border border-[var(--dashboard-line)] bg-[var(--dashboard-panel)] px-3 text-center text-sm font-medium text-slate-900 outline-none focus:border-[#dc2626] focus:ring-2 focus:ring-red-100"
         inputMode="numeric"
         min={0}
         onChange={(event) => setStock(event.target.value)}
         type="number"
         value={stock}
       />
-      <Button className="bg-slate-900 hover:bg-slate-800" disabled={isPending} size="sm" type="submit">
+      <Button className="bg-[#e86f51] hover:bg-[#cf5638]" disabled={isPending} size="sm" type="submit">
         {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : message ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
         上报
       </Button>

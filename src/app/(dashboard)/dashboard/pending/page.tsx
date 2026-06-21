@@ -129,13 +129,13 @@ function SummaryCard({
   href: string;
 }) {
   const toneClasses = {
-    blue: "bg-blue-50 text-blue-700",
+    blue: "bg-[var(--dashboard-transaction-soft)] text-[#b9472d]",
     amber: "bg-amber-50 text-amber-700",
     red: "bg-red-50 text-red-700",
   };
 
   return (
-    <Link className="block rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200 transition hover:-translate-y-0.5 hover:shadow-md" href={href}>
+    <Link className="block rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-sm ring-1 ring-slate-200 transition hover:-translate-y-0.5 hover:shadow-md" href={href}>
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-sm text-slate-500">{label}</p>
@@ -178,11 +178,11 @@ function EmptyRow({ colSpan }: { colSpan: number }) {
 
 function PendingOrdersTable({ orders }: { orders: PendingOrder[] }) {
   return (
-    <section className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
+    <section className="overflow-hidden rounded-lg bg-[var(--dashboard-panel)] shadow-sm ring-1 ring-slate-200">
       <SectionHeader actionHref="/dashboard/orders?status=PAID" actionLabel="查看订单" icon={ShoppingCart} title="待确认订单" />
       <div className="overflow-x-auto">
         <table className="w-full min-w-[840px] text-left text-sm">
-          <thead className="bg-slate-50 text-slate-500">
+          <thead className="bg-[var(--dashboard-control)] text-slate-500">
             <tr>
               <th className="px-4 py-3 font-medium">订单号</th>
               <th className="px-4 py-3 font-medium">客户</th>
@@ -194,9 +194,9 @@ function PendingOrdersTable({ orders }: { orders: PendingOrder[] }) {
           <tbody>
             {orders.length === 0 ? <EmptyRow colSpan={5} /> : null}
             {orders.map((order) => (
-              <tr className="border-t border-slate-100 hover:bg-slate-50" key={order.id}>
+              <tr className="border-t border-slate-100 hover:bg-[var(--dashboard-control)]" key={order.id}>
                 <td className="px-4 py-3">
-                  <Link className="font-medium text-slate-900 hover:text-blue-700" href={`/dashboard/orders/${order.id}`}>
+                  <Link className="font-medium text-slate-900 hover:text-[#b9472d]" href={`/dashboard/orders/${order.id}`}>
                     {order.orderNo}
                   </Link>
                 </td>
@@ -219,11 +219,11 @@ function PendingOrdersTable({ orders }: { orders: PendingOrder[] }) {
 
 function LowStockTable({ products }: { products: LowStockProduct[] }) {
   return (
-    <section className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
+    <section className="overflow-hidden rounded-lg bg-[var(--dashboard-panel)] shadow-sm ring-1 ring-slate-200">
       <SectionHeader actionHref="/dashboard/inventory" actionLabel="查看库存" icon={AlertTriangle} title="库存预警" />
       <div className="overflow-x-auto">
         <table className="w-full min-w-[760px] text-left text-sm">
-          <thead className="bg-slate-50 text-slate-500">
+          <thead className="bg-[var(--dashboard-control)] text-slate-500">
             <tr>
               <th className="px-4 py-3 font-medium">商品</th>
               <th className="px-4 py-3 font-medium">SKU</th>
@@ -235,7 +235,7 @@ function LowStockTable({ products }: { products: LowStockProduct[] }) {
           <tbody>
             {products.length === 0 ? <EmptyRow colSpan={5} /> : null}
             {products.map((product) => (
-              <tr className="border-t border-slate-100 hover:bg-slate-50" key={product.id}>
+              <tr className="border-t border-slate-100 hover:bg-[var(--dashboard-control)]" key={product.id}>
                 <td className="px-4 py-3 font-medium text-slate-900">{product.name}</td>
                 <td className="px-4 py-3 text-slate-600">{product.sku}</td>
                 <td className="px-4 py-3 font-semibold text-red-700">{product.stock}</td>
@@ -252,11 +252,11 @@ function LowStockTable({ products }: { products: LowStockProduct[] }) {
 
 function OverduePaymentsTable({ payments }: { payments: OverduePayment[] }) {
   return (
-    <section className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
+    <section className="overflow-hidden rounded-lg bg-[var(--dashboard-panel)] shadow-sm ring-1 ring-slate-200">
       <SectionHeader actionHref="/dashboard/finance/receivable" actionLabel="查看应收" icon={Banknote} title="逾期应收" />
       <div className="overflow-x-auto">
         <table className="w-full min-w-[760px] text-left text-sm">
-          <thead className="bg-slate-50 text-slate-500">
+          <thead className="bg-[var(--dashboard-control)] text-slate-500">
             <tr>
               <th className="px-4 py-3 font-medium">客户</th>
               <th className="px-4 py-3 font-medium">关联订单</th>
@@ -268,11 +268,11 @@ function OverduePaymentsTable({ payments }: { payments: OverduePayment[] }) {
           <tbody>
             {payments.length === 0 ? <EmptyRow colSpan={5} /> : null}
             {payments.map((payment) => (
-              <tr className="border-t border-slate-100 hover:bg-slate-50" key={payment.id}>
+              <tr className="border-t border-slate-100 hover:bg-[var(--dashboard-control)]" key={payment.id}>
                 <td className="px-4 py-3 font-medium text-slate-900">{payment.customerName}</td>
                 <td className="px-4 py-3 text-slate-600">
                   {payment.orderId && payment.orderNo ? (
-                    <Link className="hover:text-blue-700" href={`/dashboard/orders/${payment.orderId}`}>
+                    <Link className="hover:text-[#b9472d]" href={`/dashboard/orders/${payment.orderId}`}>
                       {payment.orderNo}
                     </Link>
                   ) : (

@@ -86,29 +86,29 @@ export const channelConflictStatusLabels: Record<ChannelConflictStatus, string> 
 };
 
 export const leadStatusClasses: Record<LeadStatus, string> = {
-  NEW: "bg-blue-50 text-blue-700",
+  NEW: "bg-[var(--dashboard-transaction-soft)] text-[#b9472d]",
   ASSIGNED: "bg-indigo-50 text-indigo-700",
   FOLLOWING: "bg-amber-50 text-amber-700",
   CONVERTED: "bg-emerald-50 text-emerald-700",
-  LOST: "bg-slate-100 text-slate-500",
+  LOST: "bg-[var(--dashboard-transaction-soft)] text-slate-500",
 };
 
 export const inquiryStatusClasses: Record<InquiryStatus, string> = {
-  NEW: "bg-blue-50 text-blue-700",
+  NEW: "bg-[var(--dashboard-transaction-soft)] text-[#b9472d]",
   ASSIGNED: "bg-indigo-50 text-indigo-700",
-  QUOTED: "bg-purple-50 text-purple-700",
+  QUOTED: "bg-purple-50 text-[#b9472d]",
   WON: "bg-emerald-50 text-emerald-700",
-  LOST: "bg-slate-100 text-slate-500",
-  CANCELLED: "bg-slate-100 text-slate-500",
+  LOST: "bg-[var(--dashboard-transaction-soft)] text-slate-500",
+  CANCELLED: "bg-[var(--dashboard-transaction-soft)] text-slate-500",
 };
 
 export const quoteStatusClasses: Record<QuoteStatus, string> = {
-  DRAFT: "bg-slate-100 text-slate-600",
-  SENT: "bg-blue-50 text-blue-700",
+  DRAFT: "bg-[var(--dashboard-transaction-soft)] text-slate-600",
+  SENT: "bg-[var(--dashboard-transaction-soft)] text-[#b9472d]",
   ACCEPTED: "bg-emerald-50 text-emerald-700",
   REJECTED: "bg-red-50 text-red-700",
   EXPIRED: "bg-amber-50 text-amber-700",
-  CONVERTED: "bg-purple-50 text-purple-700",
+  CONVERTED: "bg-purple-50 text-[#b9472d]",
 };
 
 export const channelConflictTypeClasses: Record<ChannelConflictType, string> = {
@@ -117,12 +117,12 @@ export const channelConflictTypeClasses: Record<ChannelConflictType, string> = {
   REJECTION: "bg-red-50 text-red-700",
   COMPLAINT: "bg-fuchsia-50 text-fuchsia-700",
   STOCK_MISMATCH: "bg-cyan-50 text-cyan-700",
-  OTHER: "bg-slate-100 text-slate-600",
+  OTHER: "bg-[var(--dashboard-transaction-soft)] text-slate-600",
 };
 
 export const channelConflictStatusClasses: Record<ChannelConflictStatus, string> = {
-  OPEN: "bg-blue-50 text-blue-700",
+  OPEN: "bg-[var(--dashboard-transaction-soft)] text-[#b9472d]",
   PROCESSING: "bg-amber-50 text-amber-700",
   RESOLVED: "bg-emerald-50 text-emerald-700",
-  IGNORED: "bg-slate-100 text-slate-500",
+  IGNORED: "bg-[var(--dashboard-transaction-soft)] text-slate-500",
 };

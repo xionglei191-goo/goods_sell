@@ -59,11 +59,11 @@ export function DealerPilotBinder({ data }: DealerPilotBinderProps) {
   }
 
   return (
-    <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
+    <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-sm ring-1 ring-slate-200">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
         <div className="grid gap-3 xl:w-80">
           <select
-            className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400"
+            className="h-10 rounded-md border border-[var(--dashboard-line)] bg-[var(--dashboard-panel)] px-3 text-sm outline-none focus:border-[#e86f51]"
             onChange={(event) => setSalespersonId(event.target.value)}
             value={salespersonId}
           >
@@ -74,7 +74,7 @@ export function DealerPilotBinder({ data }: DealerPilotBinderProps) {
               </option>
             ))}
           </select>
-          <div className="rounded-md bg-slate-50 p-3 text-sm text-slate-600">
+          <div className="rounded-md bg-[var(--dashboard-control)] p-3 text-sm text-slate-600">
             <p className="font-medium text-slate-900">{selectedSalesperson?.name ?? "选择业务员"}</p>
             <p className="mt-2">已绑定经销商：{selectedSalesperson?.assignedDealerCount ?? 0}</p>
             <p className="mt-1">业务员推广码：{selectedSalesperson?.codeCount ?? 0}</p>
@@ -105,8 +105,8 @@ export function DealerPilotBinder({ data }: DealerPilotBinderProps) {
           {message ? <p className="text-sm text-slate-600">{message}</p> : null}
         </div>
 
-        <div className="min-w-0 flex-1 overflow-hidden rounded-md border border-slate-200">
-          <div className="grid grid-cols-[44px_1.4fr_1fr_1fr_1fr] bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500">
+        <div className="min-w-0 flex-1 overflow-hidden rounded-md border border-[var(--dashboard-line)]">
+          <div className="grid grid-cols-[44px_1.4fr_1fr_1fr_1fr] bg-[var(--dashboard-control)] px-3 py-2 text-xs font-medium text-slate-500">
             <span />
             <span>经销商</span>
             <span>当前业务员</span>
@@ -115,7 +115,7 @@ export function DealerPilotBinder({ data }: DealerPilotBinderProps) {
           </div>
           <div className="max-h-[520px] divide-y divide-slate-100 overflow-y-auto">
             {data.dealers.map((dealer) => (
-              <label className="grid cursor-pointer grid-cols-[44px_1.4fr_1fr_1fr_1fr] items-center gap-0 px-3 py-3 text-sm hover:bg-slate-50" key={dealer.id}>
+              <label className="grid cursor-pointer grid-cols-[44px_1.4fr_1fr_1fr_1fr] items-center gap-0 px-3 py-3 text-sm hover:bg-[var(--dashboard-control)]" key={dealer.id}>
                 <input
                   checked={selectedDealerIds.includes(dealer.id)}
                   className="h-4 w-4 rounded border-slate-300"

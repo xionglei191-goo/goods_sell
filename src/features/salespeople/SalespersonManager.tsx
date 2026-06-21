@@ -66,23 +66,23 @@ export function SalespersonManager({ filters: initialFilters, salespeople }: Sal
 
   return (
     <div className="space-y-5">
-      <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
+      <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-sm ring-1 ring-slate-200">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="grid flex-1 gap-3 md:grid-cols-3">
             <input
-              className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-blue-400"
+              className="h-10 rounded-md border border-[var(--dashboard-line)] px-3 text-sm outline-none focus:border-[#e86f51]"
               onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
               placeholder="销售员姓名"
               value={form.name}
             />
             <input
-              className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-blue-400"
+              className="h-10 rounded-md border border-[var(--dashboard-line)] px-3 text-sm outline-none focus:border-[#e86f51]"
               onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
               placeholder="账号 / 手机号"
               value={form.phone}
             />
             <input
-              className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-blue-400"
+              className="h-10 rounded-md border border-[var(--dashboard-line)] px-3 text-sm outline-none focus:border-[#e86f51]"
               onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
               placeholder="初始密码"
               value={form.password}
@@ -96,18 +96,18 @@ export function SalespersonManager({ filters: initialFilters, salespeople }: Sal
         {message ? <p className="mt-3 text-sm text-slate-600">{message}</p> : null}
       </section>
 
-      <section className="grid gap-3 rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200 md:grid-cols-[1.5fr_1fr]">
+      <section className="grid gap-3 rounded-lg bg-[var(--dashboard-panel)] p-4 shadow-sm ring-1 ring-slate-200 md:grid-cols-[1.5fr_1fr]">
         <label className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
-            className="h-10 w-full rounded-md border border-slate-200 pl-9 pr-3 text-sm outline-none focus:border-blue-400"
+            className="h-10 w-full rounded-md border border-[var(--dashboard-line)] pl-9 pr-3 text-sm outline-none focus:border-[#e86f51]"
             onChange={(event) => updateFilter("q", event.target.value)}
             placeholder="搜索姓名 / 手机号"
             value={filters.q}
           />
         </label>
         <select
-          className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400"
+          className="h-10 rounded-md border border-[var(--dashboard-line)] bg-[var(--dashboard-panel)] px-3 text-sm outline-none focus:border-[#e86f51]"
           onChange={(event) => updateFilter("status", event.target.value)}
           value={filters.status}
         >
@@ -117,10 +117,10 @@ export function SalespersonManager({ filters: initialFilters, salespeople }: Sal
         </select>
       </section>
 
-      <section className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
+      <section className="overflow-hidden rounded-lg bg-[var(--dashboard-panel)] shadow-sm ring-1 ring-slate-200">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1500px] text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500">
+            <thead className="bg-[var(--dashboard-control)] text-slate-500">
               <tr>
                 <th className="px-4 py-3 font-medium">销售员</th>
                 <th className="px-4 py-3 font-medium">状态</th>
@@ -136,13 +136,13 @@ export function SalespersonManager({ filters: initialFilters, salespeople }: Sal
             </thead>
             <tbody>
               {salespeople.map((person) => (
-                <tr className="border-t border-slate-100 align-top hover:bg-slate-50" key={person.id}>
+                <tr className="border-t border-slate-100 align-top hover:bg-[var(--dashboard-control)]" key={person.id}>
                   <td className="px-4 py-3">
                     <p className="font-medium text-slate-900">{person.name}</p>
                     <p className="mt-1 text-xs text-slate-500">{person.phone}</p>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={person.isActive ? "rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700" : "rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-500"}>
+                    <span className={person.isActive ? "rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700" : "rounded-full bg-[var(--dashboard-transaction-soft)] px-2 py-1 text-xs text-slate-500"}>
                       {person.isActive ? "启用" : "禁用"}
                     </span>
                   </td>

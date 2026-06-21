@@ -76,7 +76,7 @@ export function ScenarioInquiryForm({ scene, title, description, fields, promote
   }
 
   return (
-    <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-stone-200">
+    <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-sm ring-1 ring-stone-200">
       <div>
         <h2 className="text-xl font-bold text-stone-950">{title}</h2>
         <p className="mt-1 text-sm leading-6 text-stone-500">{description}</p>

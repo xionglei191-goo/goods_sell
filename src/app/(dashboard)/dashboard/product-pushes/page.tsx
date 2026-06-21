@@ -16,12 +16,12 @@ const statusLabels: Record<ProductPushStatus, string> = {
 };
 
 const statusClasses: Record<ProductPushStatus, string> = {
-  DRAFT: "bg-slate-100 text-slate-600",
-  SENT: "bg-blue-50 text-blue-700",
+  DRAFT: "bg-[var(--dashboard-transaction-soft)] text-slate-600",
+  SENT: "bg-[var(--dashboard-transaction-soft)] text-[#b9472d]",
   OPENED: "bg-cyan-50 text-cyan-700",
   CLICKED: "bg-amber-50 text-amber-700",
   CONVERTED: "bg-emerald-50 text-emerald-700",
-  CANCELLED: "bg-slate-100 text-slate-500",
+  CANCELLED: "bg-[var(--dashboard-transaction-soft)] text-slate-500",
 };
 
 export default async function ProductPushesPage() {
@@ -45,13 +45,13 @@ export default async function ProductPushesPage() {
 
       <ProductPushForm products={data.form.products} targetTags={data.form.targetTags} />
 
-      <section className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
+      <section className="overflow-hidden rounded-lg bg-[var(--dashboard-panel)] shadow-sm ring-1 ring-slate-200">
         <div className="border-b border-slate-100 px-4 py-3">
           <h2 className="text-sm font-semibold text-slate-900">新品推送复盘</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[980px] text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500">
+            <thead className="bg-[var(--dashboard-control)] text-slate-500">
               <tr>
                 <th className="px-4 py-3 font-medium">新品 / 人群</th>
                 <th className="px-4 py-3 font-medium">触达</th>
@@ -66,7 +66,7 @@ export default async function ProductPushesPage() {
             </thead>
             <tbody>
               {data.reviews.map((review) => (
-                <tr className="border-t border-slate-100 hover:bg-slate-50" key={`${review.productName}-${review.targetTag}`}>
+                <tr className="border-t border-slate-100 hover:bg-[var(--dashboard-control)]" key={`${review.productName}-${review.targetTag}`}>
                   <td className="px-4 py-3">
                     <p className="font-medium text-slate-900">{review.productName}</p>
                     <p className="mt-1 text-xs text-slate-500">{review.targetTag}</p>
@@ -93,10 +93,10 @@ export default async function ProductPushesPage() {
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
+      <section className="overflow-hidden rounded-lg bg-[var(--dashboard-panel)] shadow-sm ring-1 ring-slate-200">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1380px] text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500">
+            <thead className="bg-[var(--dashboard-control)] text-slate-500">
               <tr>
                 <th className="px-4 py-3 font-medium">新品</th>
                 <th className="px-4 py-3 font-medium">客户</th>
@@ -110,7 +110,7 @@ export default async function ProductPushesPage() {
             </thead>
             <tbody>
               {data.items.map((item) => (
-                <tr className="border-t border-slate-100 align-top hover:bg-slate-50" key={item.id}>
+                <tr className="border-t border-slate-100 align-top hover:bg-[var(--dashboard-control)]" key={item.id}>
                   <td className="px-4 py-3">
                     <p className="font-medium text-slate-900">{item.productName}</p>
                     <p className="mt-1 text-xs text-slate-500">{item.productMeta}</p>
@@ -124,7 +124,7 @@ export default async function ProductPushesPage() {
                     <p className="mt-1 text-xs text-slate-400">{item.targetSource}</p>
                     <div className="mt-2 flex max-w-64 flex-wrap gap-1">
                       {item.matchedLabels.map((label) => (
-                        <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-500" key={label}>{label}</span>
+                        <span className="rounded-full bg-[var(--dashboard-transaction-soft)] px-2 py-1 text-xs text-slate-500" key={label}>{label}</span>
                       ))}
                     </div>
                   </td>
@@ -167,9 +167,9 @@ export default async function ProductPushesPage() {
 }
 
 function SummaryCard({ label, value, tone = "slate" }: { label: string; value: string; tone?: "slate" | "blue" | "amber" | "emerald" }) {
-  const color = tone === "blue" ? "text-blue-700" : tone === "amber" ? "text-amber-700" : tone === "emerald" ? "text-emerald-700" : "text-slate-900";
+  const color = tone === "blue" ? "text-[#b9472d]" : tone === "amber" ? "text-amber-700" : tone === "emerald" ? "text-emerald-700" : "text-slate-900";
   return (
-    <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
+    <div className="rounded-lg bg-[var(--dashboard-panel)] p-4 shadow-sm ring-1 ring-slate-200">
       <p className="text-sm text-slate-500">{label}</p>
       <p className={`mt-2 text-2xl font-bold ${color}`}>{value}</p>
     </div>

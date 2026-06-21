@@ -100,7 +100,7 @@ export function ImageMaterialBulkImportForm({ products }: ImageMaterialBulkImpor
   }
 
   return (
-    <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
+    <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-sm ring-1 ring-slate-200">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-2">
           <FileSpreadsheet className="h-5 w-5 text-slate-500" />
@@ -142,8 +142,8 @@ export function ImageMaterialBulkImportForm({ products }: ImageMaterialBulkImpor
       </div>
 
       {preview ? (
-        <div className="mt-5 overflow-hidden rounded-md border border-slate-200">
-          <div className="grid grid-cols-4 gap-3 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+        <div className="mt-5 overflow-hidden rounded-md border border-[var(--dashboard-line)]">
+          <div className="grid grid-cols-4 gap-3 bg-[var(--dashboard-control)] px-4 py-3 text-sm text-slate-600">
             <span>总行数：{preview.summary.total}</span>
             <span>可导入：{preview.summary.importable}</span>
             <span>错误：{preview.summary.errors}</span>
@@ -151,7 +151,7 @@ export function ImageMaterialBulkImportForm({ products }: ImageMaterialBulkImpor
           </div>
           <div className="max-h-80 overflow-auto">
             <table className="w-full min-w-[980px] text-left text-sm">
-              <thead className="bg-white text-slate-500">
+              <thead className="bg-[var(--dashboard-panel)] text-slate-500">
                 <tr>
                   <th className="px-4 py-3 font-medium">行</th>
                   <th className="px-4 py-3 font-medium">SKU</th>
@@ -174,7 +174,7 @@ export function ImageMaterialBulkImportForm({ products }: ImageMaterialBulkImpor
                       ) : row.approved ? (
                         <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">可导入</span>
                       ) : (
-                        <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">跳过</span>
+                        <span className="rounded-full bg-[var(--dashboard-transaction-soft)] px-2 py-1 text-xs font-medium text-slate-600">跳过</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-600">

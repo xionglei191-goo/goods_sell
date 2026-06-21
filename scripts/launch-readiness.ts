@@ -33,11 +33,13 @@ function loadLocalEnv() {
 const report = getLaunchReadinessReport(loadLocalEnv());
 
 console.log(`Launch readiness: ${report.status}`);
+console.log(`Mode: ${report.mode}`);
+console.log(`Checked at: ${report.checkedAt}`);
 console.log(`READY ${report.readyCount} / WARNING ${report.warningCount} / BLOCKER ${report.blockerCount}`);
 
 for (const item of report.items) {
   const mark = item.severity === "READY" ? "OK" : item.severity === "WARNING" ? "WARN" : "BLOCK";
-  console.log(`[${mark}] ${item.label}: ${item.summary}`);
+  console.log(`[${mark}] ${item.group} / ${item.label}: ${item.summary}`);
   if (!item.configured) {
     console.log(`  action: ${item.action}`);
     console.log(`  vars: ${item.variables.join(", ")}`);

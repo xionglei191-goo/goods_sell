@@ -11,7 +11,7 @@ export const dealerTierLabels: Record<DealerTier, string> = {
 
 export const dealerTierClasses: Record<DealerTier, string> = {
   ACTIVE: "bg-emerald-50 text-emerald-700",
-  STANDARD: "bg-blue-50 text-blue-700",
+  STANDARD: "bg-[var(--dashboard-transaction-soft)] text-[#b9472d]",
   TO_ACTIVATE: "bg-amber-50 text-amber-700",
   RISK: "bg-red-50 text-red-700",
 };

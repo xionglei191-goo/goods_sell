@@ -11,11 +11,11 @@ export const customerSegmentLabels: Record<CustomerSegment, string> = {
 };
 
 export const customerSegmentClasses: Record<CustomerSegment, string> = {
-  HIGH_VALUE_GROUP_BUY: "bg-blue-50 text-blue-700",
+  HIGH_VALUE_GROUP_BUY: "bg-[var(--dashboard-transaction-soft)] text-[#b9472d]",
   RESTAURANT: "bg-emerald-50 text-emerald-700",
   TOBACCO_WINE_STORE: "bg-amber-50 text-amber-700",
   BANQUET: "bg-red-50 text-red-700",
-  REGULAR: "bg-slate-100 text-slate-600",
+  REGULAR: "bg-[var(--dashboard-transaction-soft)] text-slate-600",
 };
 
 type CustomerOrderSignal = {

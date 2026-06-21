@@ -75,7 +75,7 @@ export function DealerApplicationReviewForm({ application, salespeople }: Dealer
         <label className="space-y-1 text-xs text-slate-500">
           区域
           <input
-            className="h-9 w-full rounded-md border border-slate-200 px-2 text-sm text-slate-700 outline-none focus:border-blue-400"
+            className="h-9 w-full rounded-md border border-[var(--dashboard-line)] px-2 text-sm text-slate-700 outline-none focus:border-[#e86f51]"
             defaultValue={application.zone}
             name="zone"
           />
@@ -83,7 +83,7 @@ export function DealerApplicationReviewForm({ application, salespeople }: Dealer
         <label className="space-y-1 text-xs text-slate-500">
           服务半径
           <input
-            className="h-9 w-full rounded-md border border-slate-200 px-2 text-sm text-slate-700 outline-none focus:border-blue-400"
+            className="h-9 w-full rounded-md border border-[var(--dashboard-line)] px-2 text-sm text-slate-700 outline-none focus:border-[#e86f51]"
             defaultValue={3000}
             min={500}
             name="serviceRadius"
@@ -93,7 +93,7 @@ export function DealerApplicationReviewForm({ application, salespeople }: Dealer
         <label className="space-y-1 text-xs text-slate-500">
           纬度
           <input
-            className="h-9 w-full rounded-md border border-slate-200 px-2 text-sm text-slate-700 outline-none focus:border-blue-400"
+            className="h-9 w-full rounded-md border border-[var(--dashboard-line)] px-2 text-sm text-slate-700 outline-none focus:border-[#e86f51]"
             name="latitude"
             placeholder="27.83"
             step="0.000001"
@@ -103,7 +103,7 @@ export function DealerApplicationReviewForm({ application, salespeople }: Dealer
         <label className="space-y-1 text-xs text-slate-500">
           经度
           <input
-            className="h-9 w-full rounded-md border border-slate-200 px-2 text-sm text-slate-700 outline-none focus:border-blue-400"
+            className="h-9 w-full rounded-md border border-[var(--dashboard-line)] px-2 text-sm text-slate-700 outline-none focus:border-[#e86f51]"
             name="longitude"
             placeholder="112.94"
             step="0.000001"
@@ -112,7 +112,7 @@ export function DealerApplicationReviewForm({ application, salespeople }: Dealer
         </label>
         <label className="space-y-1 text-xs text-slate-500 md:col-span-2">
           归属业务员
-          <select className="h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700 outline-none focus:border-blue-400" name="salesPersonId">
+          <select className="h-9 w-full rounded-md border border-[var(--dashboard-line)] bg-[var(--dashboard-panel)] px-2 text-sm text-slate-700 outline-none focus:border-[#e86f51]" name="salesPersonId">
             <option value="">暂不分配</option>
             {salespeople.map((person) => (
               <option key={person.id} value={person.id}>
@@ -123,7 +123,7 @@ export function DealerApplicationReviewForm({ application, salespeople }: Dealer
         </label>
         <label className="space-y-1 text-xs text-slate-500 md:col-span-2">
           审核备注
-          <input className="h-9 w-full rounded-md border border-slate-200 px-2 text-sm text-slate-700 outline-none focus:border-blue-400" name="notes" />
+          <input className="h-9 w-full rounded-md border border-[var(--dashboard-line)] px-2 text-sm text-slate-700 outline-none focus:border-[#e86f51]" name="notes" />
         </label>
         <button className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60" disabled={isPending} type="submit">
           通过并开通
@@ -132,7 +132,7 @@ export function DealerApplicationReviewForm({ application, salespeople }: Dealer
 
       <form action={handleReject} className="flex gap-2">
         <input
-          className="h-9 min-w-0 flex-1 rounded-md border border-slate-200 px-2 text-sm outline-none focus:border-red-400"
+          className="h-9 min-w-0 flex-1 rounded-md border border-[var(--dashboard-line)] px-2 text-sm outline-none focus:border-red-400"
           name="rejectReason"
           placeholder="驳回原因"
         />

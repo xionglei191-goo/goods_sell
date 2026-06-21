@@ -37,14 +37,14 @@ export default async function ChannelConflictsPage({ searchParams }: PageProps) 
         <SummaryCard label="已忽略" value={String(data.summary.ignoredCount)} />
       </section>
 
-      <form action="/dashboard/channel-conflicts" className="grid gap-3 rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200 md:grid-cols-[1fr_180px_180px_auto]">
+      <form action="/dashboard/channel-conflicts" className="grid gap-3 rounded-lg bg-[var(--dashboard-panel)] p-4 shadow-sm ring-1 ring-slate-200 md:grid-cols-[1fr_180px_180px_auto]">
         <input
-          className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-blue-400"
+          className="h-10 rounded-md border border-[var(--dashboard-line)] px-3 text-sm outline-none focus:border-[#e86f51]"
           defaultValue={data.filters.q}
           name="q"
           placeholder="搜索摘要、订单号、客户、经销商"
         />
-        <select className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400" defaultValue={data.filters.type ?? ""} name="type">
+        <select className="h-10 rounded-md border border-[var(--dashboard-line)] bg-[var(--dashboard-panel)] px-3 text-sm outline-none focus:border-[#e86f51]" defaultValue={data.filters.type ?? ""} name="type">
           <option value="">全部类型</option>
           {conflictTypes.map((type) => (
             <option key={type} value={type}>
@@ -52,7 +52,7 @@ export default async function ChannelConflictsPage({ searchParams }: PageProps) 
             </option>
           ))}
         </select>
-        <select className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400" defaultValue={data.filters.status ?? ""} name="status">
+        <select className="h-10 rounded-md border border-[var(--dashboard-line)] bg-[var(--dashboard-panel)] px-3 text-sm outline-none focus:border-[#e86f51]" defaultValue={data.filters.status ?? ""} name="status">
           <option value="">全部状态</option>
           {conflictStatuses.map((status) => (
             <option key={status} value={status}>
@@ -60,17 +60,17 @@ export default async function ChannelConflictsPage({ searchParams }: PageProps) 
             </option>
           ))}
         </select>
-        <button className="h-10 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700" type="submit">
+        <button className="h-10 rounded-md bg-[#e86f51] px-4 text-sm font-medium text-white hover:bg-[#cf5638]" type="submit">
           筛选
         </button>
       </form>
 
       <ChannelConflictForm options={options} />
 
-      <section className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
+      <section className="overflow-hidden rounded-lg bg-[var(--dashboard-panel)] shadow-sm ring-1 ring-slate-200">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1480px] text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500">
+            <thead className="bg-[var(--dashboard-control)] text-slate-500">
               <tr>
                 <th className="px-4 py-3 font-medium">冲突</th>
                 <th className="px-4 py-3 font-medium">状态</th>
@@ -85,7 +85,7 @@ export default async function ChannelConflictsPage({ searchParams }: PageProps) 
             </thead>
             <tbody>
               {data.items.map((conflict) => (
-                <tr className="border-t border-slate-100 align-top hover:bg-slate-50" key={conflict.id}>
+                <tr className="border-t border-slate-100 align-top hover:bg-[var(--dashboard-control)]" key={conflict.id}>
                   <td className="max-w-80 px-4 py-4">
                     <span className={`rounded-full px-2 py-1 text-xs ${channelConflictTypeClasses[conflict.type]}`}>{channelConflictTypeLabels[conflict.type]}</span>
                     <p className="mt-2 font-medium text-slate-900">{conflict.summary}</p>
@@ -158,9 +158,9 @@ export default async function ChannelConflictsPage({ searchParams }: PageProps) 
 
 function SummaryCard({ label, value, tone = "slate" }: { label: string; value: string; tone?: "slate" | "blue" | "amber" | "emerald" }) {
   const color =
-    tone === "blue" ? "text-blue-700" : tone === "amber" ? "text-amber-700" : tone === "emerald" ? "text-emerald-700" : "text-slate-900";
+    tone === "blue" ? "text-[#b9472d]" : tone === "amber" ? "text-amber-700" : tone === "emerald" ? "text-emerald-700" : "text-slate-900";
   return (
-    <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
+    <div className="rounded-lg bg-[var(--dashboard-panel)] p-4 shadow-sm ring-1 ring-slate-200">
       <p className="text-sm text-slate-500">{label}</p>
       <p className={`mt-2 text-2xl font-bold ${color}`}>{value}</p>
     </div>

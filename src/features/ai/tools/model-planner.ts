@@ -37,8 +37,62 @@ type ModelPlannerResult = {
   error?: string;
 };
 
-const TOP_TOOL_LIMIT = 10;
+export const AI_PLANNER_CORE_TOOL_LIMIT = 18;
+export const AI_PLANNER_EXPANDED_TOOL_LIMIT = 32;
 const MIN_MODEL_CONFIDENCE = 0.45;
+
+type ToolCandidateRule = {
+  pattern: RegExp;
+  toolNames: string[];
+  reason: string;
+  roles?: AiToolContext["role"][];
+};
+
+type DomainRule = {
+  pattern: RegExp;
+  matchTool: RegExp;
+  reason: string;
+};
+
+const forcedToolCandidateRules: ToolCandidateRule[] = [
+  { pattern: /购物车/, roles: ["ADMIN", "SALESPERSON"], toolNames: ["admin_customer_cart_summary"], reason: "强规则:客户购物车" },
+  { pattern: /购物车/, roles: ["CONSUMER"], toolNames: ["shop_cart_summary"], reason: "强规则:我的购物车" },
+  { pattern: /优惠券|可用券|券包/, roles: ["ADMIN", "SALESPERSON"], toolNames: ["admin_customer_coupon_summary"], reason: "强规则:客户优惠券" },
+  { pattern: /优惠券|可用券|券包/, roles: ["CONSUMER"], toolNames: ["shop_coupon_summary"], reason: "强规则:我的优惠券" },
+  { pattern: /待接订单|待接单|新订单/, roles: ["ADMIN", "SALESPERSON"], toolNames: ["admin_dealer_incoming_orders"], reason: "强规则:经销商待接单" },
+  { pattern: /待接订单|待接单|新订单/, roles: ["DEALER"], toolNames: ["dealer_incoming_orders"], reason: "强规则:我的待接单" },
+  { pattern: /经销商.*(?:结算|佣金|账款)|门店.*(?:结算|佣金|账款)|结算|佣金/, roles: ["ADMIN", "FINANCE"], toolNames: ["admin_dealer_settlement_summary"], reason: "强规则:经销商结算" },
+  { pattern: /结算|佣金/, roles: ["DEALER"], toolNames: ["dealer_settlement_summary"], reason: "强规则:我的结算" },
+  { pattern: /经销商.*(?:库存|上报库存)|门店.*(?:库存|上报库存)/, roles: ["ADMIN", "SALESPERSON", "WAREHOUSE"], toolNames: ["admin_dealer_stock_summary"], reason: "强规则:经销商库存" },
+  { pattern: /上报库存|报库存/, roles: ["DEALER"], toolNames: ["dealer_report_stock"], reason: "强规则:上报库存" },
+  { pattern: /推广|推广码|扫码|线索转化/, roles: ["ADMIN", "SALESPERSON"], toolNames: ["admin_dealer_promotion_summary", "channel_pipeline_summary"], reason: "强规则:渠道推广" },
+  { pattern: /推广|推广码|扫码|线索转化/, roles: ["DEALER"], toolNames: ["dealer_promotion_summary"], reason: "强规则:我的推广" },
+  { pattern: /(?:客户|用户|会员).*(?:账户|账号|资料|地址|积分|概况)|(?:账户|账号|资料|地址|积分|概况).*(?:客户|用户|会员)/, roles: ["ADMIN", "SALESPERSON", "FINANCE"], toolNames: ["admin_customer_account_summary", "search_customers"], reason: "强规则:客户账户" },
+  { pattern: /(?:客户|用户|会员).*(?:订单|下单记录|配送状态)|(?:订单|下单记录|配送状态).*(?:客户|用户|会员)/, roles: ["ADMIN", "SALESPERSON", "WAREHOUSE", "FINANCE"], toolNames: ["admin_customer_orders", "order_summary"], reason: "强规则:客户订单" },
+  { pattern: /(?:客户|用户|会员).*(?:欠款|待付款|应收|账款|未付款)|(?:欠款|待付款|应收|账款|未付款).*(?:客户|用户|会员)/, roles: ["ADMIN", "SALESPERSON", "FINANCE"], toolNames: ["admin_customer_receivables", "finance_summary"], reason: "强规则:客户应收" },
+  { pattern: /最近.*(?:订单|单子)|(?:订单|单子|下单记录).*(?:最近|今天|本月|有哪些|多少|状态)/, toolNames: ["order_summary"], reason: "强规则:订单摘要" },
+  { pattern: /(?:客户|用户|会员).*(?:总数|数量|多少|几个|统计|排行)|(?:一共|总共|共有|总计).*(?:客户|用户|会员)/, toolNames: ["customer_analytics_summary"], reason: "强规则:客户统计" },
+  { pattern: /(?:库存|商品).*(?:总量|最多|低库存|缺货|预警)|(?:低库存|缺货|预警|库存最多)/, toolNames: ["product_operations_summary"], reason: "强规则:商品库存经营" },
+  { pattern: /销售员|业务员|业绩|绩效|转化|销售排名/, toolNames: ["salesperson_performance"], reason: "强规则:销售业绩" },
+  { pattern: /配送|发货|送达|物流/, toolNames: ["delivery_summary"], reason: "强规则:配送" },
+  { pattern: /财务|应收|欠款|回款|收款|账龄/, toolNames: ["finance_summary", "finance_statement_summary"], reason: "强规则:财务" },
+  { pattern: /开票|发票|普票|专票|税号/, toolNames: ["receipts_issue_invoice", "finance_statement_summary"], reason: "强规则:票据" },
+  { pattern: /采购|供应商|进货|到货/, toolNames: ["purchase_supplier_summary"], reason: "强规则:采购供应商" },
+  { pattern: /微信|公众号|小程序|模板消息|菜单/, toolNames: ["wechat_ecosystem_summary"], reason: "强规则:微信生态" },
+  { pattern: /操作日志|审计|AI 日志|谁操作/, toolNames: ["audit_log_summary"], reason: "强规则:日志" },
+  { pattern: /上线|发布|部署|就绪|还差什么/, toolNames: ["system_launch_readiness"], reason: "强规则:上线检查" },
+];
+
+const domainCandidateRules: DomainRule[] = [
+  { pattern: /订单|单子|下单|支付|配送状态/, matchTool: /order|delivery|customer_orders/, reason: "领域:订单" },
+  { pattern: /客户|用户|会员|手机号|标签|地址|欠款|购物车|优惠券/, matchTool: /customer|shop_|finance/, reason: "领域:客户" },
+  { pattern: /商品|产品|SKU|价格|售价|库存|品牌|分类|素材/, matchTool: /product|inventory|warehouse|search_products/, reason: "领域:商品库存" },
+  { pattern: /经销商|门店|渠道|线索|询价|报价|推广|冲突|待接单|结算|佣金/, matchTool: /dealer|channel|lead|inquiry|quote|promoter/, reason: "领域:渠道经销商" },
+  { pattern: /财务|应收|欠款|回款|收款|发票|票据|对账/, matchTool: /finance|receipt|invoice|payment|receivable/, reason: "领域:财务" },
+  { pattern: /员工|账号|密码|权限|系统设置|配置/, matchTool: /settings|system/, reason: "领域:设置" },
+  { pattern: /微信|公众号|小程序|模板消息|菜单/, matchTool: /wechat/, reason: "领域:微信" },
+  { pattern: /在哪|哪里|入口|打开|进入|跳转|页面|菜单|怎么|如何/, matchTool: /navigate_to_feature|feature_help/, reason: "领域:功能导航" },
+];
 
 const slotLabelMap: Record<string, string> = {
   productQuery: "商品名或 SKU",
@@ -119,14 +173,42 @@ function scoreTool(message: string, tool: AiToolDefinition, index: number): Rank
   return { tool, score, reasons: reasons.slice(0, 4) };
 }
 
+function pushReason(reasons: string[], reason: string) {
+  if (!reasons.includes(reason)) reasons.unshift(reason);
+  return reasons.slice(0, 5);
+}
+
+function roleMatchesRule(rule: ToolCandidateRule, role: AiToolContext["role"]) {
+  return !rule.roles || rule.roles.includes(role);
+}
+
 export function rankAiToolsForMessage(message: string, context: AiToolContext, tools: readonly AiToolDefinition[]) {
   const rankedCapabilities = rankAgentCapabilitiesForMessage(message, context);
   const bestCapability = rankedCapabilities[0];
   const boostNavigation = shouldBoostNavigationTools(message);
   const preferRead = shouldPreferReadTools(message);
+  const forcedToolReasons = new Map<string, string[]>();
+  for (const rule of forcedToolCandidateRules) {
+    if (!roleMatchesRule(rule, context.role) || !rule.pattern.test(message)) continue;
+    for (const toolName of rule.toolNames) {
+      forcedToolReasons.set(toolName, [...(forcedToolReasons.get(toolName) ?? []), rule.reason]);
+    }
+  }
+  const matchedDomainRules = domainCandidateRules.filter((rule) => rule.pattern.test(message));
   return tools
     .map((tool, index) => {
       const ranked = scoreTool(message, tool, index);
+      const forcedReasons = forcedToolReasons.get(tool.name) ?? [];
+      if (forcedReasons.length) {
+        ranked.score += 120 + forcedReasons.length * 8;
+        ranked.reasons = pushReason(ranked.reasons, forcedReasons.join("、"));
+      }
+      for (const rule of matchedDomainRules) {
+        if (rule.matchTool.test(tool.name)) {
+          ranked.score += 14;
+          ranked.reasons = pushReason(ranked.reasons, rule.reason);
+        }
+      }
       if (isNavigationToolName(tool.name) && bestCapability && boostNavigation) {
         const boost = Math.min(bestCapability.score * (tool.name === "navigate_to_feature" ? 1.35 : 1.05), 35);
         ranked.score += boost;
@@ -154,8 +236,8 @@ function describeRankedTool(item: RankedAiTool) {
   return `- ${tool.name}｜${tool.title}｜${tool.riskLevel}｜${tool.description}｜${capabilities}｜${examples}｜${argumentHints}｜${reasons}`;
 }
 
-export function describeRankedAiToolsForPrompt(rankedTools: readonly RankedAiTool[]) {
-  return rankedTools.slice(0, TOP_TOOL_LIMIT).map(describeRankedTool).join("\n");
+export function describeRankedAiToolsForPrompt(rankedTools: readonly RankedAiTool[], limit = AI_PLANNER_CORE_TOOL_LIMIT) {
+  return rankedTools.slice(0, limit).map(describeRankedTool).join("\n");
 }
 
 function extractJsonObject(text: string) {
@@ -203,10 +285,12 @@ async function callModelPlanner(params: {
   message: string;
   context: AiToolContext;
   rankedTools: readonly RankedAiTool[];
+  toolLimit?: number;
   repair?: { rejectedPlan: AiToolPlan | null; error: string };
 }) {
-  const toolsText = describeRankedAiToolsForPrompt(params.rankedTools);
-  const toolNames = params.rankedTools.slice(0, TOP_TOOL_LIMIT).map((item) => item.tool.name).join(", ");
+  const toolLimit = params.toolLimit ?? AI_PLANNER_CORE_TOOL_LIMIT;
+  const toolsText = describeRankedAiToolsForPrompt(params.rankedTools, toolLimit);
+  const toolNames = params.rankedTools.slice(0, toolLimit).map((item) => item.tool.name).join(", ");
   const rankedCapabilities = rankAgentCapabilitiesForMessage(params.message, params.context);
   const capabilitiesText = describeRankedAgentCapabilitiesForPrompt(rankedCapabilities);
   const repairText = params.repair
@@ -223,7 +307,8 @@ async function callModelPlanner(params: {
       `只规划一个最匹配的工具。READ 用于查询；WRITE/HIGH_RISK 只会生成确认卡，不会直接写库。` +
       `${describeAssistantIntentPolicyForPrompt()}` +
       `如果用户是在问某功能在哪、怎么打开、某页面能做什么，优先使用 navigate_to_feature 或 feature_help，并把 args.capabilityId 设置为全站能力候选 id。` +
-      `关键边界：客户“买了什么/买过什么/购买记录”是购买历史查询；“一共有多少客户/哪个客户消费最高”是客户统计分析；“我要下单/帮客户开单/要 N 箱”才是下单或开单；库存总量、库存最多、低库存属于商品经营查询，不是经销商上报库存。`,
+      `关键边界：后台“最近有哪些订单/订单情况/待支付订单”是 order_summary；客户/用户/会员“有多少/总数/消费最高”是 customer_analytics_summary；客户“买了什么/买过什么/购买记录”是购买历史查询；“我要下单/帮客户开单/要 N 箱”才是下单或开单；库存总量、库存最多、低库存属于商品经营查询，不是经销商上报库存。` +
+      `管理员代查指定客户购物车/优惠券/订单/欠款/账户用 admin_customer_* 工具；管理员代查指定经销商待接单/结算/库存/推广用 admin_dealer_* 工具。`,
     messages: [
       {
         role: "user",
@@ -239,7 +324,7 @@ export async function planWithModelV2(message: string, context: AiToolContext, t
   if (!hasAiProvider()) return { plan: null, rankedTools, rankedCapabilities, missingSlots: [], error: "AI provider 未配置" };
 
   try {
-    const rawText = await callModelPlanner({ message, context, rankedTools });
+    const rawText = await callModelPlanner({ message, context, rankedTools, toolLimit: AI_PLANNER_CORE_TOOL_LIMIT });
     const parsed = extractJsonObject(rawText);
     if (!parsed) return { plan: null, rankedTools, rankedCapabilities, missingSlots: [], rawText, error: "provider 未返回可解析 JSON" };
     const { plan, missingSlots } = asPlan(parsed, rankedTools);
@@ -261,7 +346,7 @@ export async function repairModelPlan(
   if (!hasAiProvider()) return { plan: null, rankedTools, rankedCapabilities, missingSlots: [], error: "AI provider 未配置" };
 
   try {
-    const rawText = await callModelPlanner({ message, context, rankedTools, repair: { rejectedPlan, error } });
+    const rawText = await callModelPlanner({ message, context, rankedTools, toolLimit: AI_PLANNER_EXPANDED_TOOL_LIMIT, repair: { rejectedPlan, error } });
     const parsed = extractJsonObject(rawText);
     if (!parsed) return { plan: null, rankedTools, rankedCapabilities, missingSlots: [], rawText, error: "provider 修复未返回可解析 JSON" };
     const { plan, missingSlots } = asPlan(parsed, rankedTools);

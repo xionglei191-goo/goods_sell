@@ -12,7 +12,7 @@ const channelSteps = [
 export default function ShopChannelPage() {
   return (
     <div className="space-y-6">
-      <section className="rounded-lg bg-white p-6 shadow-sm ring-1 ring-stone-200">
+      <section className="shop-block-card p-6">
         <p className="text-sm font-medium text-[#dc2626]">经销商/业务员入口</p>
         <h1 className="mt-2 text-3xl font-bold text-stone-950">平台不抢小单，帮助渠道沉淀客户</h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">

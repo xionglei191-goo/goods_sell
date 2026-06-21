@@ -23,10 +23,10 @@ export default async function LeadsPage({ searchParams }: PageProps) {
         <SummaryCard label="已转化" value={String(data.summary.convertedCount)} tone="emerald" />
       </section>
 
-      <section className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
+      <section className="overflow-hidden rounded-lg bg-[var(--dashboard-panel)] shadow-sm ring-1 ring-slate-200">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1100px] text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500">
+            <thead className="bg-[var(--dashboard-control)] text-slate-500">
               <tr>
                 <th className="px-4 py-3 font-medium">客户</th>
                 <th className="px-4 py-3 font-medium">场景</th>
@@ -41,7 +41,7 @@ export default async function LeadsPage({ searchParams }: PageProps) {
             </thead>
             <tbody>
               {data.items.map((lead) => (
-                <tr className="border-t border-slate-100 hover:bg-slate-50" key={lead.id}>
+                <tr className="border-t border-slate-100 hover:bg-[var(--dashboard-control)]" key={lead.id}>
                   <td className="px-4 py-3">
                     <p className="font-medium text-slate-900">{lead.name}</p>
                     <p className="mt-1 text-xs text-slate-500">{lead.phone}</p>
@@ -74,9 +74,9 @@ export default async function LeadsPage({ searchParams }: PageProps) {
 }
 
 function SummaryCard({ label, value, tone = "slate" }: { label: string; value: string; tone?: "slate" | "blue" | "emerald" }) {
-  const color = tone === "blue" ? "text-blue-700" : tone === "emerald" ? "text-emerald-700" : "text-slate-900";
+  const color = tone === "blue" ? "text-[#b9472d]" : tone === "emerald" ? "text-emerald-700" : "text-slate-900";
   return (
-    <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
+    <div className="rounded-lg bg-[var(--dashboard-panel)] p-4 shadow-sm ring-1 ring-slate-200">
       <p className="text-sm text-slate-500">{label}</p>
       <p className={`mt-2 text-2xl font-bold ${color}`}>{value}</p>
     </div>

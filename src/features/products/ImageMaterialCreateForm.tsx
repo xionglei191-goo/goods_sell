@@ -50,7 +50,7 @@ export function ImageMaterialCreateForm({ products }: ImageMaterialCreateFormPro
   }
 
   return (
-    <form className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200" encType="multipart/form-data" onSubmit={submit} ref={formRef}>
+    <form className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-sm ring-1 ring-slate-200" encType="multipart/form-data" onSubmit={submit} ref={formRef}>
       <div className="flex items-center gap-2">
         <ImagePlus className="h-5 w-5 text-slate-500" />
         <h2 className="text-lg font-semibold text-slate-900">新增图片素材</h2>
@@ -89,7 +89,7 @@ export function ImageMaterialCreateForm({ products }: ImageMaterialCreateFormPro
           <span className="mb-2 block text-sm font-medium text-slate-700">上传图片</span>
           <input
             accept="image/jpeg,image/png,image/webp,image/gif"
-            className="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200"
+            className="block w-full rounded-md border border-slate-300 bg-[var(--dashboard-panel)] px-3 py-2 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-[var(--dashboard-transaction-soft)] file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-[var(--dashboard-line)]"
             disabled={isPending}
             name="imageFile"
             type="file"

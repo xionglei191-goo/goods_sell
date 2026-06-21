@@ -136,7 +136,7 @@ export function AiChatClient({ initialMessages }: AiChatClientProps) {
   }
 
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-10rem)] max-w-3xl flex-col overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-stone-200">
+    <div className="shop-block-card mx-auto flex min-h-[calc(100vh-10rem)] max-w-3xl flex-col overflow-hidden">
       <div className="border-b border-stone-100 px-4 py-3">
         <h1 className="text-xl font-bold text-stone-950">AI 选品与询价助手</h1>
         <p className="mt-1 text-sm text-stone-500">宴席配酒、企业团购、门店补货、新品试饮先由小启梳理需求</p>
@@ -148,7 +148,7 @@ export function AiChatClient({ initialMessages }: AiChatClientProps) {
 
       <div className="flex-1 space-y-4 overflow-x-hidden overflow-y-auto px-4 py-5">
         {messages.length === 0 ? (
-          <div className="rounded-lg bg-stone-50 p-4">
+          <div className="rounded-lg bg-[var(--shop-card-alt)] p-4">
             <div className="flex items-start gap-3">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-100 text-[#dc2626]">
                 <Bot className="h-4 w-4" />
@@ -163,7 +163,7 @@ export function AiChatClient({ initialMessages }: AiChatClientProps) {
                 const Icon = scene.icon;
                 return (
                   <button
-                    className="group rounded-lg bg-white p-3 text-left shadow-sm ring-1 ring-stone-200 transition hover:-translate-y-0.5 hover:ring-red-200"
+                    className="group shop-block-card p-3 text-left transition hover:-translate-y-0.5"
                     key={scene.title}
                     onClick={() => send(scene.value)}
                     type="button"
@@ -184,16 +184,16 @@ export function AiChatClient({ initialMessages }: AiChatClientProps) {
           return (
             <div className={cn("flex gap-2", isUser ? "justify-end" : "justify-start")} key={message.id}>
               {!isUser ? (
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-600">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-50 text-[#dc2626]">
                   <Bot className="h-4 w-4" />
                 </span>
               ) : null}
-              <div className={cn("min-w-0 max-w-[78%] break-words rounded-lg px-3 py-2 text-sm leading-6 [overflow-wrap:anywhere]", isUser ? "bg-blue-600 text-white" : "bg-stone-100 text-stone-800")}>
+              <div className={cn("min-w-0 max-w-[78%] break-words rounded-lg px-3 py-2 text-sm leading-6 [overflow-wrap:anywhere]", isUser ? "bg-[#dc2626] text-white" : "bg-[var(--shop-card-alt)] text-stone-800")}>
                 {message.content || "正在输入..."}
                 {!isUser && suggestions[message.id] ? <SuggestionCard suggestion={suggestions[message.id]} /> : null}
               </div>
               {isUser ? (
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-50 text-[#dc2626]">
                   <UserRound className="h-4 w-4" />
                 </span>
               ) : null}
@@ -237,7 +237,7 @@ export function AiChatClient({ initialMessages }: AiChatClientProps) {
 
 function SuggestionCard({ suggestion }: { suggestion: ChannelAiSuggestion }) {
   return (
-    <div className="mt-3 min-w-0 max-w-full overflow-hidden rounded-md bg-white p-3 text-stone-800 shadow-sm ring-1 ring-stone-200">
+    <div className="shop-block-card mt-3 min-w-0 max-w-full overflow-hidden p-3 text-stone-800">
       <p className="break-words font-semibold text-stone-950 [overflow-wrap:anywhere]">{suggestion.title}</p>
       <p className="mt-1 break-words text-xs leading-5 text-stone-500 [overflow-wrap:anywhere]">{suggestion.summary}</p>
       {suggestion.details.length > 0 ? (

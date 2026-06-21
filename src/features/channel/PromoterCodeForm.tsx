@@ -62,11 +62,11 @@ export function PromoterCodeForm({ options }: PromoterCodeFormProps) {
   }
 
   return (
-    <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
+    <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-sm ring-1 ring-slate-200">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="grid flex-1 gap-3 md:grid-cols-5">
           <select
-            className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400"
+            className="h-10 rounded-md border border-[var(--dashboard-line)] bg-[var(--dashboard-panel)] px-3 text-sm outline-none focus:border-[#e86f51]"
             onChange={(event) => updateOwnerType(event.target.value as PromoterOwnerType)}
             value={form.ownerType}
           >
@@ -77,7 +77,7 @@ export function PromoterCodeForm({ options }: PromoterCodeFormProps) {
             ))}
           </select>
           <select
-            className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400 md:col-span-2"
+            className="h-10 rounded-md border border-[var(--dashboard-line)] bg-[var(--dashboard-panel)] px-3 text-sm outline-none focus:border-[#e86f51] md:col-span-2"
             disabled={ownerOptions.length === 0}
             onChange={(event) => setForm((current) => ({ ...current, ownerId: event.target.value }))}
             value={ownerId}
@@ -90,19 +90,19 @@ export function PromoterCodeForm({ options }: PromoterCodeFormProps) {
             ))}
           </select>
           <input
-            className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-blue-400"
+            className="h-10 rounded-md border border-[var(--dashboard-line)] px-3 text-sm outline-none focus:border-[#e86f51]"
             onChange={(event) => setForm((current) => ({ ...current, label: event.target.value }))}
             placeholder="推广码名称"
             value={form.label}
           />
           <input
-            className="h-10 rounded-md border border-slate-200 px-3 text-sm uppercase outline-none focus:border-blue-400"
+            className="h-10 rounded-md border border-[var(--dashboard-line)] px-3 text-sm uppercase outline-none focus:border-[#e86f51]"
             onChange={(event) => setForm((current) => ({ ...current, code: event.target.value }))}
             placeholder="自定义码，可选"
             value={form.code}
           />
           <select
-            className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400 md:col-span-2"
+            className="h-10 rounded-md border border-[var(--dashboard-line)] bg-[var(--dashboard-panel)] px-3 text-sm outline-none focus:border-[#e86f51] md:col-span-2"
             onChange={(event) => setForm((current) => ({ ...current, scene: event.target.value as "" | LeadScene }))}
             value={form.scene}
           >

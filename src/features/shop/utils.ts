@@ -40,11 +40,11 @@ export const orderStatusClasses: Record<OrderStatus, string> = {
   PENDING_PAYMENT: "bg-amber-50 text-amber-700",
   PAID: "bg-red-50 text-red-700",
   CONFIRMED: "bg-red-50 text-red-700",
-  SHIPPING: "bg-blue-50 text-blue-700",
+  SHIPPING: "bg-[var(--dashboard-transaction-soft)] text-[#b9472d]",
   DELIVERED: "bg-emerald-50 text-emerald-700",
   COMPLETED: "bg-neutral-100 text-neutral-700",
   CANCELLED: "bg-neutral-100 text-neutral-500",
-  REFUNDING: "bg-purple-50 text-purple-700",
+  REFUNDING: "bg-purple-50 text-[#b9472d]",
   REFUNDED: "bg-neutral-100 text-neutral-500",
 };
 

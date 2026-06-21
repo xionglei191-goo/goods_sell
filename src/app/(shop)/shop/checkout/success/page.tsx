@@ -16,7 +16,7 @@ export default async function CheckoutSuccessPage({ searchParams }: CheckoutSucc
 
   if (type === "inquiry") {
     return (
-      <div className="mx-auto max-w-md rounded-lg bg-white px-5 py-12 text-center shadow-sm ring-1 ring-stone-200">
+      <div className="shop-block-card mx-auto max-w-md px-5 py-12 text-center">
         <ClipboardCheck className="mx-auto h-16 w-16 text-emerald-600" />
         <h1 className="mt-5 text-2xl font-bold text-stone-950">询价已提交</h1>
         <p className="mt-2 text-sm leading-6 text-stone-500">业务员会根据库存、价格、配送和开票要求尽快联系确认报价。</p>

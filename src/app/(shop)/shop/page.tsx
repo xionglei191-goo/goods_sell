@@ -75,7 +75,7 @@ export default async function ShopPage() {
         {sceneCards.map((card) => {
           const Icon = card.icon;
           return (
-            <Link className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-stone-200 transition hover:-translate-y-0.5 hover:shadow-md" href={card.href} key={card.href}>
+            <Link className="shop-block-card p-4 transition hover:-translate-y-0.5 hover:shadow-md" href={card.href} key={card.href}>
               <span className="flex h-11 w-11 items-center justify-center rounded-full bg-red-50 text-[#dc2626]">
                 <Icon className="h-5 w-5" />
               </span>
@@ -88,7 +88,7 @@ export default async function ShopPage() {
 
       <HeroCarousel banners={data.banners} />
 
-      <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-stone-200">
+      <section className="shop-block-card p-4">
         <div className="flex items-start gap-3">
           <Gift className="mt-0.5 h-5 w-5 text-[#dc2626]" />
           <div>

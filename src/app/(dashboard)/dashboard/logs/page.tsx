@@ -52,7 +52,7 @@ export default async function LogsPage({ searchParams }: LogsPageProps) {
                   <td className="px-4 py-3">
                     <details>
                       <summary className="cursor-pointer text-orange-700">JSON</summary>
-                      <pre className="mt-2 max-h-64 w-[360px] overflow-auto rounded-md bg-slate-950 p-3 text-xs text-slate-100">{JSON.stringify({ before: log.before, after: log.after }, null, 2)}</pre>
+                      <pre className="mt-2 max-h-64 w-[360px] overflow-auto rounded-md bg-[#3f2b20] p-3 text-xs text-slate-100">{JSON.stringify({ before: log.before, after: log.after }, null, 2)}</pre>
                     </details>
                   </td>
                 </tr>

@@ -6,7 +6,7 @@ const extensions = new Set([".ts", ".tsx", ".css"]);
 
 const banned = [
   { pattern: /focus:(?:border|ring)-blue/g, label: "blue focus state" },
-  { pattern: /\bbg-white\b/g, label: "solid white block background" },
+  { pattern: /\bbg-white(?!\/)\b/g, label: "solid white block background" },
   { pattern: /\bbg-slate-(?:50|100|200|800|900|950)\b/g, label: "slate block background" },
   { pattern: /\bborder-neutral-200\b/g, label: "neutral border block" },
   { pattern: /\bborder-slate-200\b/g, label: "slate border block" },

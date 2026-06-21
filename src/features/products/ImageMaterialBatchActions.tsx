@@ -57,14 +57,14 @@ export function ImageMaterialBatchActions({ materials }: ImageMaterialBatchActio
 
   if (selectableMaterials.length === 0) {
     return (
-      <section className="rounded-lg bg-white p-5 text-sm text-slate-500 shadow-sm ring-1 ring-slate-200">
+      <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 text-sm text-slate-500 shadow-sm ring-1 ring-slate-200">
         当前筛选结果没有可批量处理的素材。
       </section>
     );
   }
 
   return (
-    <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
+    <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-sm ring-1 ring-slate-200">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-slate-900">批量处理</h2>
@@ -91,7 +91,7 @@ export function ImageMaterialBatchActions({ materials }: ImageMaterialBatchActio
 
       <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         {selectableMaterials.map((material) => (
-          <label className="flex items-start gap-3 rounded-md border border-slate-200 p-3 text-sm hover:bg-slate-50" key={material.id}>
+          <label className="flex items-start gap-3 rounded-md border border-[var(--dashboard-line)] p-3 text-sm hover:bg-[var(--dashboard-control)]" key={material.id}>
             <input checked={selected.includes(material.id)} className="mt-1 h-4 w-4 rounded border-slate-300" onChange={() => toggle(material.id)} type="checkbox" />
             <span className="min-w-0">
               <span className="block truncate font-medium text-slate-900">{material.productName}</span>

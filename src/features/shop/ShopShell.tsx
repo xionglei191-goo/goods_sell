@@ -68,7 +68,7 @@ export function ShopShell({ user, cartCount, children }: ShopShellProps) {
           <form className="relative min-w-0 flex-1" onSubmit={submitSearch}>
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
             <input
-              className="h-10 w-full rounded-full border border-stone-200 bg-white pl-9 pr-4 text-sm outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-100"
+              className="shop-form-input h-10 rounded-full pl-9 pr-4"
               onChange={(event) => setQuery(event.target.value)}
               placeholder="搜索酒水、食品、饮料"
               value={query}
@@ -114,7 +114,7 @@ export function ShopShell({ user, cartCount, children }: ShopShellProps) {
 
       <main className="mx-auto max-w-6xl px-4 py-5 md:py-8">{children}</main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-stone-200 bg-white md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-orange-100 bg-[var(--shop-card)] md:hidden">
         <div className="grid grid-cols-4">
           {tabs.map((tab) => {
             const href = tab.href === "/shop/account" ? accountHref : tab.href;

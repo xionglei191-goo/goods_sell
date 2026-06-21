@@ -1,4 +1,5 @@
 import { getWechatFeatureStatus } from "@/features/wechat/config";
+import { getLaunchReadinessReport } from "@/features/system/launch-readiness";
 import { prisma } from "@/lib/prisma";
 
 export const businessConfigDefaults = [
@@ -53,6 +54,7 @@ export async function getSettingsData() {
       amap: Boolean(process.env.AMAP_KEY),
       tax: Boolean(process.env.TAX_PROVIDER && process.env.TAX_PROVIDER !== "MOCK"),
     },
+    launchReadiness: getLaunchReadinessReport(),
   };
 }
 

@@ -126,6 +126,27 @@ function parseSalespersonName(message: string) {
   return after?.[1] ?? "";
 }
 
+function cleanLookupQuery(message: string, words: RegExp) {
+  return message
+    .replace(words, "")
+    .replace(/^(帮我|请|麻烦|查询|查一下|查|看看|看一下|代查)\s*/g, "")
+    .replace(/(一下|情况|怎么样|有多少|多少|有哪些|里有什么|是什么|最近|本月|这个月|今天|今日|当前|还|呢|吗)/g, "")
+    .replace(/[，。,.！!？?]/g, "")
+    .trim();
+}
+
+function parseAdminCustomerQuery(message: string) {
+  const phone = parsePhone(message);
+  if (phone) return phone;
+  return cleanLookupQuery(message, /客户|用户|会员|账户|账号|资料|地址|积分|购物车|优惠券|可用券|券包|订单|下单记录|配送状态|欠款|待付款|应收|账款|未付款|帮|开单|下单|要货|草稿|给/g);
+}
+
+function parseAdminDealerQuery(message: string) {
+  const phone = parsePhone(message);
+  if (phone) return phone;
+  return cleanLookupQuery(message, /经销商|门店|推广效果|推广码|线索|转化|待接订单|待接单|新订单|结算|佣金|账款|库存|上报库存|查|查询|代查/g);
+}
+
 function isSalespersonStatsIntent(message: string) {
   return (
     /业绩|绩效|转化|成交|销售结果/.test(message)
@@ -272,12 +293,45 @@ function parseTags(message: string) {
 }
 
 function isCustomerAnalyticsIntent(message: string) {
-  return /(?:一共|总共|共有|总计|现在|目前).{0,6}(?:多少|几个).{0,4}客户|客户.{0,4}(?:总数|数量|总量|统计|分布|排行)|(?:哪个|哪位|谁).{0,6}(?:消费|购买金额|成交金额).{0,4}(?:最高|最多)|(?:消费|购买金额|成交金额).{0,4}(?:最高|最多).{0,6}客户/.test(message);
+  return /(?:一共|总共|共有|总计|现在|目前|我又|我有).{0,8}(?:多少|几个).{0,4}(?:客户|用户|会员)|(?:客户|用户|会员).{0,4}(?:总数|数量|总量|统计|分布|排行)|(?:哪个|哪位|谁).{0,6}(?:消费|购买金额|成交金额).{0,4}(?:最高|最多)|(?:消费|购买金额|成交金额).{0,4}(?:最高|最多).{0,6}(?:客户|用户|会员)/.test(message);
 }
 
 function customerAnalyticsArgs(message: string) {
   const period = /今天|今日/.test(message) ? "day" : /本周|这周|近7天|近 7 天/.test(message) ? "week" : /本月|这个月|当月/.test(message) ? "month" : "all";
   return { period, limit: /排行|排名|前/.test(message) ? 8 : 5 };
+}
+
+function orderSummaryArgs(message: string) {
+  const period = /全部|累计|所有|历史/.test(message)
+    ? "all"
+    : /今天|今日/.test(message)
+      ? "day"
+      : /本周|这周|近7天|近 7 天/.test(message)
+        ? "week"
+        : "month";
+  const status =
+    /待支付|未付款/.test(message)
+      ? "PENDING_PAYMENT"
+      : /已支付/.test(message)
+        ? "PAID"
+        : /已确认/.test(message)
+          ? "CONFIRMED"
+          : /配送中|物流中/.test(message)
+            ? "SHIPPING"
+            : /已送达/.test(message)
+              ? "DELIVERED"
+              : /已完成/.test(message)
+                ? "COMPLETED"
+                : /取消|已取消/.test(message)
+                  ? "CANCELLED"
+                  : "";
+  const query = message
+    .replace(/最近|今天|今日|本周|这周|近7天|近 7 天|本月|这个月|当月|全部|累计|所有|历史/g, "")
+    .replace(/有哪些|有什么|多少|几个|查询|查一下|看看|订单|单子/g, "")
+    .replace(/待支付|未付款|已支付|已确认|配送中|物流中|已送达|已完成|取消|已取消/g, "")
+    .replace(/[，。,.！!？?]/g, "")
+    .trim();
+  return { period, status, query, limit: /最近/.test(message) ? 8 : 10 };
 }
 
 function parseOrderAction(message: string) {
@@ -430,6 +484,33 @@ function planStaff(message: string, tools: readonly AiToolDefinition[]): AiToolP
   if (/经销商.*政策|政策.*经销商/.test(message)) {
     return toolPlan(tools, "admin_update_dealer_policy", { dealerQuery: message.replace(/经销商|政策|修改|调整/g, "").trim() }, "修改经销商政策");
   }
+  if (/(客户|用户|会员|张|李|王|赵|陈|刘|周|吴|郑|孙|139\d{8}|138\d{8}|137\d{8}|136\d{8}|135\d{8}).*(购物车)/.test(message)) {
+    return toolPlan(tools, "admin_customer_cart_summary", { customerQuery: parseAdminCustomerQuery(message), limit: 8 }, "客户购物车代查");
+  }
+  if (/(客户|用户|会员|张|李|王|赵|陈|刘|周|吴|郑|孙|139\d{8}|138\d{8}|137\d{8}|136\d{8}|135\d{8}).*(优惠券|可用券|券包)/.test(message)) {
+    return toolPlan(tools, "admin_customer_coupon_summary", { customerQuery: parseAdminCustomerQuery(message), limit: 8 }, "客户优惠券代查");
+  }
+  if (/(客户|用户|会员|张|李|王|赵|陈|刘|周|吴|郑|孙|139\d{8}|138\d{8}|137\d{8}|136\d{8}|135\d{8}).*(欠款|待付款|应收|账款|未付款)/.test(message)) {
+    return toolPlan(tools, "admin_customer_receivables", { customerQuery: parseAdminCustomerQuery(message), limit: 20 }, "客户待付款代查");
+  }
+  if (/(客户|用户|会员|张|李|王|赵|陈|刘|周|吴|郑|孙|139\d{8}|138\d{8}|137\d{8}|136\d{8}|135\d{8}).*(订单|下单记录|配送状态)/.test(message)) {
+    return toolPlan(tools, "admin_customer_orders", { customerQuery: parseAdminCustomerQuery(message), limit: 8 }, "客户订单代查");
+  }
+  if (/(客户|用户|会员|张|李|王|赵|陈|刘|周|吴|郑|孙|139\d{8}|138\d{8}|137\d{8}|136\d{8}|135\d{8}).*(账户|账号|资料|地址|积分|概况)/.test(message)) {
+    return toolPlan(tools, "admin_customer_account_summary", { customerQuery: parseAdminCustomerQuery(message), limit: 8 }, "客户账户代查");
+  }
+  if (/(经销商|门店|便利店|商行|烟酒|超市).*(待接订单|待接单|新订单)/.test(message)) {
+    return toolPlan(tools, "admin_dealer_incoming_orders", { dealerQuery: parseAdminDealerQuery(message), limit: 8 }, "经销商待接订单代查");
+  }
+  if (/(经销商|门店|便利店|商行|烟酒|超市).*(结算|佣金|账款)/.test(message)) {
+    return toolPlan(tools, "admin_dealer_settlement_summary", { dealerQuery: parseAdminDealerQuery(message), limit: 8 }, "经销商结算代查");
+  }
+  if (/(经销商|门店|便利店|商行|烟酒|超市).*(库存|上报库存)/.test(message)) {
+    return toolPlan(tools, "admin_dealer_stock_summary", { dealerQuery: parseAdminDealerQuery(message), limit: 8 }, "经销商库存代查");
+  }
+  if (/(经销商|门店|便利店|商行|烟酒|超市).*(推广|推广码|线索|转化)/.test(message)) {
+    return toolPlan(tools, "admin_dealer_promotion_summary", { dealerQuery: parseAdminDealerQuery(message), period: /今天|今日/.test(message) ? "day" : "month", limit: 8 }, "经销商推广代查");
+  }
   if (/创建优惠券|新增优惠券/.test(message)) {
     const amount = Number(message.match(/(?:减|优惠|面额)\s*(\d+(?:\.\d+)?)/)?.[1] ?? 0);
     const threshold = Number(message.match(/满\s*(\d+(?:\.\d+)?)/)?.[1] ?? 0);
@@ -445,6 +526,9 @@ function planStaff(message: string, tools: readonly AiToolDefinition[]): AiToolP
   }
   if (/配送|发货|送达|物流/.test(message)) {
     return toolPlan(tools, "delivery_summary", {}, "配送查询");
+  }
+  if (/订单|单子|下单记录/.test(message)) {
+    return toolPlan(tools, "order_summary", orderSummaryArgs(message), "订单摘要查询");
   }
   if (isCustomerAnalyticsIntent(message)) {
     return toolPlan(tools, "customer_analytics_summary", customerAnalyticsArgs(message), "客户统计分析");

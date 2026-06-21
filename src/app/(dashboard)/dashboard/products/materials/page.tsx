@@ -45,8 +45,8 @@ const licenseStatusLabels: Record<ImageMaterialLicenseStatus, string> = {
 };
 
 const licenseStatusClasses: Record<ImageMaterialLicenseStatus, string> = {
-  PENDING: "bg-slate-100 text-slate-600",
-  AUTHORIZED: "bg-blue-50 text-blue-700",
+  PENDING: "bg-[var(--dashboard-transaction-soft)] text-slate-600",
+  AUTHORIZED: "bg-[var(--dashboard-transaction-soft)] text-[#b9472d]",
   BRAND_PROVIDED: "bg-indigo-50 text-indigo-700",
   SUPPLIER_PROVIDED: "bg-cyan-50 text-cyan-700",
   OWNED: "bg-emerald-50 text-emerald-700",
@@ -146,7 +146,7 @@ export default async function ProductImageMaterialsPage({ searchParams }: Produc
       <ImageMaterialBulkImportForm products={data.productOptions} />
       <ImageMaterialBatchActions materials={visibleMaterials} />
 
-      <section className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
+      <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-sm ring-1 ring-slate-200">
         <div className="flex items-center gap-2">
           <Filter className="h-5 w-5 text-slate-500" />
           <h2 className="text-lg font-semibold text-slate-900">筛选</h2>
@@ -169,7 +169,7 @@ export default async function ProductImageMaterialsPage({ searchParams }: Produc
               </option>
             ))}
           </select>
-          <label className="flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700">
+          <label className="flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-[var(--dashboard-panel)] px-3 text-sm text-slate-700">
             <input className="h-4 w-4 rounded border-slate-300" defaultChecked={filters.missingOnly} name="missingOnly" type="checkbox" value="1" />
             缺主图
           </label>
@@ -184,10 +184,10 @@ export default async function ProductImageMaterialsPage({ searchParams }: Produc
 
       <section className="space-y-4">
         {data.items.length === 0 ? (
-          <div className="rounded-lg bg-white p-8 text-center text-sm text-slate-500 shadow-sm ring-1 ring-slate-200">暂无匹配的商品素材记录</div>
+          <div className="rounded-lg bg-[var(--dashboard-panel)] p-8 text-center text-sm text-slate-500 shadow-sm ring-1 ring-slate-200">暂无匹配的商品素材记录</div>
         ) : null}
         {data.items.map((product) => (
-          <article className="rounded-lg bg-white shadow-sm ring-1 ring-slate-200" key={product.id}>
+          <article className="rounded-lg bg-[var(--dashboard-panel)] shadow-sm ring-1 ring-slate-200" key={product.id}>
             <div className="grid gap-5 p-5 lg:grid-cols-[96px_1fr_auto]">
               <ProductArt categoryName={product.category} className="h-24 w-24 rounded-lg" imageUrl={product.currentImageUrl} name={product.name} />
               <div>
@@ -224,7 +224,7 @@ export default async function ProductImageMaterialsPage({ searchParams }: Produc
         ))}
       </section>
 
-      <div className="flex items-center justify-between rounded-lg bg-white px-4 py-3 text-sm text-slate-500 shadow-sm ring-1 ring-slate-200">
+      <div className="flex items-center justify-between rounded-lg bg-[var(--dashboard-panel)] px-4 py-3 text-sm text-slate-500 shadow-sm ring-1 ring-slate-200">
         <span>
           共 {data.total} 个商品，第 {data.page} / {totalPages} 页
         </span>
@@ -243,14 +243,14 @@ export default async function ProductImageMaterialsPage({ searchParams }: Produc
 
 function StatCard({ icon: Icon, label, value, tone = "blue" }: { icon: LucideIcon; label: string; value: number; tone?: "blue" | "green" | "amber" | "red" }) {
   const toneClasses = {
-    blue: "bg-blue-50 text-blue-700",
+    blue: "bg-[var(--dashboard-transaction-soft)] text-[#b9472d]",
     green: "bg-emerald-50 text-emerald-700",
     amber: "bg-amber-50 text-amber-700",
     red: "bg-red-50 text-red-700",
   };
 
   return (
-    <div className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200">
+    <div className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-sm ring-1 ring-slate-200">
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-sm text-slate-500">{label}</p>
@@ -268,7 +268,7 @@ function MaterialRow({ material }: { material: ProductImageMaterialItem }) {
   return (
     <div className="grid gap-4 px-5 py-4 lg:grid-cols-[88px_1fr_auto]">
       <a
-        className="block h-24 w-24 rounded-lg bg-slate-100 bg-cover bg-center ring-1 ring-slate-200"
+        className="block h-24 w-24 rounded-lg bg-[var(--dashboard-transaction-soft)] bg-cover bg-center ring-1 ring-slate-200"
         href={material.previewUrl}
         rel="noreferrer"
         style={previewStyle(material.previewUrl)}
