@@ -1,8 +1,10 @@
 "use client";
 
 import { Download } from "lucide-react";
+import { useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { logReportExport } from "@/features/reports/actions";
 
 type PaymentRow = {
   id: string;
@@ -16,7 +18,13 @@ type PaymentRow = {
 };
 
 export function ExportPaymentsButton({ payments }: { payments: PaymentRow[] }) {
+  const [, startTransition] = useTransition();
+
   function exportCsv() {
+    startTransition(() => {
+      void logReportExport({ report: "receipts", rowCount: payments.length });
+    });
+
     const rows = [
       ["订单号", "客户", "类型", "金额", "方式", "状态", "收付时间"],
       ...payments.map((payment) => [payment.orderNo, payment.customerName, payment.type, payment.amount.toFixed(2), payment.method, payment.status, payment.paidAt ?? ""]),

@@ -94,7 +94,7 @@ export function ShopShell({ user, cartCount, children }: ShopShellProps) {
 
           {user ? (
             <div className="hidden items-center gap-2 md:flex">
-              <Link className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-900 text-sm font-semibold text-white" href={accountHref}>
+              <Link className="flex h-10 w-10 items-center justify-center rounded-full bg-[#dc2626] text-sm font-semibold text-white shadow-sm shadow-red-900/10" href={accountHref}>
                 {user.name?.slice(0, 1) ?? "我"}
               </Link>
               <Button onClick={() => signOut({ callbackUrl: "/shop" })} variant="outline">

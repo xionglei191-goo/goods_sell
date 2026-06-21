@@ -168,16 +168,19 @@ type AgentCapability = {
 
 | 分组 | 代表 tools |
 |------|------------|
-| 客户服务 | `search_products`、`customer_context`、`customer_submit_order`、`customer_orders`、`customer_receivables` |
-| 商城账户 | `shop_account_summary`、`shop_cart_summary`、`shop_coupon_summary` |
+| 消费者身份工具 | `search_products`、`customer_context`、`customer_submit_order`、`customer_orders`、`customer_receivables` |
+| 消费者商城账户 | `shop_account_summary`、`shop_cart_summary`、`shop_coupon_summary` |
 | 经营查询 | `business_overview`、`salesperson_performance`、`search_customers`、`customer_purchase_history`、`product_operations_summary`、`finance_summary`、`delivery_summary`、`channel_summary` |
 | 缺口模块查询 | `purchase_supplier_summary`、`product_catalog_summary`、`inventory_records_summary`、`wechat_ecosystem_summary`、`audit_log_summary`、`finance_statement_summary`、`channel_pipeline_summary`、`dealer_promotion_summary` |
 | 管理操作 | `admin_update_product_price`、`order_status_action`、`inventory_stock_in`、`finance_register_payment`、`settings_save_business_config` |
-| 经销商 | `dealer_incoming_orders`、`dealer_report_stock`、`dealer_accept_routing`、`dealer_reject_routing` |
+| Admin 客户代查等价工具 | `admin_customer_account_summary`、`admin_customer_cart_summary`、`admin_customer_coupon_summary`、`admin_customer_orders`、`admin_customer_receivables`、`admin_customer_order_draft` |
+| Admin 经销商代查等价工具 | `admin_dealer_incoming_orders`、`admin_dealer_settlement_summary`、`admin_dealer_stock_summary`、`admin_dealer_promotion_summary` |
+| 经销商身份工具 | `dealer_incoming_orders`、`dealer_report_stock`、`dealer_settlement_summary`、`dealer_promotion_summary`、`dealer_accept_routing`、`dealer_reject_routing` |
 | 营销与系统 | `marketing_create_coupon`、`marketing_issue_coupon`、`marketing_create_product_push`、`system_launch_readiness` |
 | 全站入口 | `navigate_to_feature`、`feature_help` |
 
 执行约定：
+- admin 不直接混用消费者或经销商身份工具；代查客户/经销商数据必须使用带对象参数的 `admin_customer_*`、`admin_dealer_*` 等价工具。
 - 固定高频词条由 `intent-templates.ts` 维护，并通过 `/api/ai/quick-prompts` 按角色返回。
 - AI Assistant 规划顺序为固定词条、本地高置信规则、真实 AI provider、计划校验、executor 执行。
 - `READ` 查询直接执行。

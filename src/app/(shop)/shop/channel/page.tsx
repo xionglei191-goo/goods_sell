@@ -30,13 +30,13 @@ export default function ShopChannelPage() {
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2">
-        <Link className="rounded-lg bg-red-700 p-5 text-white shadow-sm transition hover:bg-red-800" href="/dealer/incoming">
+        <Link className="rounded-lg bg-gradient-to-br from-[#dc2626] to-[#ff6b00] p-5 text-white shadow-sm transition hover:-translate-y-0.5" href="/dealer/incoming">
           <p className="text-lg font-semibold">我是经销商</p>
           <p className="mt-2 text-sm text-white/80">查看待接订单和结算中心</p>
         </Link>
-        <Link className="rounded-lg bg-stone-900 p-5 text-white shadow-sm transition hover:bg-black" href="/dashboard/promoters">
-          <p className="text-lg font-semibold">我是业务员/管理员</p>
-          <p className="mt-2 text-sm text-white/75">进入后台管理推广码和线索</p>
+        <Link className="rounded-lg border border-orange-200 bg-[#fff4e8] p-5 text-[#4a130c] shadow-sm transition hover:-translate-y-0.5 hover:bg-[#ffe9d6]" href="/dashboard/promoters">
+          <p className="text-lg font-semibold text-[#b91c1c]">我是业务员/管理员</p>
+          <p className="mt-2 text-sm text-[#7a3a25]">进入后台管理推广码和线索</p>
         </Link>
       </section>
     </div>

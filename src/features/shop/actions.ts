@@ -8,6 +8,7 @@ import { auth } from "@/auth";
 import { routeOrderById } from "@/features/orders/routing";
 import { sendOrderStatusTemplate } from "@/features/wechat/official";
 import { SHOP_PRODUCTS_CACHE_TAG } from "@/features/shop/cache";
+import { logAction } from "@/features/logs/audit";
 import {
   addToCartSchema,
   addressSchema,
@@ -53,6 +54,27 @@ function authError(path: string): ActionResult {
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "操作失败，请稍后重试";
+}
+
+async function logShopAction(input: {
+  action: string;
+  targetType: string;
+  targetId?: string | null;
+  targetName?: string | null;
+  before?: unknown;
+  after?: unknown;
+  summary: string;
+}) {
+  await logAction({
+    module: "商城",
+    action: input.action,
+    targetType: input.targetType,
+    targetId: input.targetId,
+    targetName: input.targetName,
+    before: input.before,
+    after: input.after,
+    summary: input.summary,
+  });
 }
 
 function revalidateShopPaths() {
@@ -278,6 +300,12 @@ export async function saveAddress(input: AddressInput, addressId?: string): Prom
 
   try {
     const result = await prisma.$transaction(async (tx) => {
+      const before = addressId
+        ? await tx.address.findFirst({
+            where: { id: addressId, customerId },
+            select: { id: true, name: true, phone: true, province: true, city: true, district: true, detail: true, isDefault: true },
+          })
+        : null;
       const addressCount = await tx.address.count({ where: { customerId } });
       const shouldDefault = Boolean(parsed.data.isDefault) || addressCount === 0;
 
@@ -303,10 +331,10 @@ export async function saveAddress(input: AddressInput, addressId?: string): Prom
           throw new Error("地址不存在");
         }
 
-        return { id: addressId };
+        return { id: addressId, before };
       }
 
-      return tx.address.create({
+      const created = await tx.address.create({
         data: {
           customerId,
           name: parsed.data.name,
@@ -319,8 +347,26 @@ export async function saveAddress(input: AddressInput, addressId?: string): Prom
         },
         select: { id: true },
       });
+      return { id: created.id, before: null };
     });
 
+    await logShopAction({
+      action: addressId ? "更新收货地址" : "新增收货地址",
+      targetType: "Address",
+      targetId: result.id,
+      targetName: parsed.data.name,
+      before: result.before,
+      after: {
+        name: parsed.data.name,
+        phone: parsed.data.phone,
+        province: "湖南省",
+        city: "湘潭市",
+        district: parsed.data.district,
+        detail: parsed.data.detail,
+        isDefault: Boolean(parsed.data.isDefault),
+      },
+      summary: `${addressId ? "更新" : "新增"}商城收货地址 ${parsed.data.name}`,
+    });
     revalidatePath("/shop/checkout");
     revalidatePath("/shop/account/addresses");
     return { success: true, message: addressId ? "地址已更新" : "地址已新增", data: { addressId: result.id } };
@@ -336,10 +382,23 @@ export async function setDefaultAddress(addressId: string): Promise<ActionResult
   }
 
   try {
+    const address = await prisma.address.findFirst({
+      where: { id: addressId, customerId },
+      select: { id: true, name: true, phone: true, province: true, city: true, district: true, detail: true, isDefault: true },
+    });
     await prisma.$transaction([
       prisma.address.updateMany({ where: { customerId }, data: { isDefault: false } }),
       prisma.address.updateMany({ where: { id: addressId, customerId }, data: { isDefault: true } }),
     ]);
+    await logShopAction({
+      action: "设置默认收货地址",
+      targetType: "Address",
+      targetId: addressId,
+      targetName: address?.name ?? addressId,
+      before: address,
+      after: { isDefault: true },
+      summary: `设置商城默认收货地址 ${address?.name ?? addressId}`,
+    });
     revalidatePath("/shop/checkout");
     revalidatePath("/shop/account/addresses");
     return { success: true, message: "默认地址已更新" };
@@ -355,12 +414,24 @@ export async function deleteAddress(addressId: string): Promise<ActionResult> {
   }
 
   try {
+    const address = await prisma.address.findFirst({
+      where: { id: addressId, customerId },
+      select: { id: true, name: true, phone: true, province: true, city: true, district: true, detail: true, isDefault: true },
+    });
     const orderCount = await prisma.order.count({ where: { addressId, customerId } });
     if (orderCount > 0) {
       return { success: false, error: { code: "ADDRESS_IN_USE", message: "该地址已有订单使用，无法删除" } };
     }
 
     await prisma.address.deleteMany({ where: { id: addressId, customerId } });
+    await logShopAction({
+      action: "删除收货地址",
+      targetType: "Address",
+      targetId: addressId,
+      targetName: address?.name ?? addressId,
+      before: address,
+      summary: `删除商城收货地址 ${address?.name ?? addressId}`,
+    });
     revalidatePath("/shop/checkout");
     revalidatePath("/shop/account/addresses");
     return { success: true, message: "地址已删除" };
@@ -648,11 +719,39 @@ export async function submitOrder(input: CheckoutInput): Promise<ActionResult<Ch
     if (result.kind === "ORDER") {
       await routeOrderById(result.orderId);
       await sendOrderStatusTemplate(result.orderId, "paid");
+      await logShopAction({
+        action: "提交商城订单",
+        targetType: "Order",
+        targetId: result.orderId,
+        targetName: result.orderNo,
+        after: {
+          orderNo: result.orderNo,
+          checkoutMode: parsed.data.checkoutMode,
+          payMethod: parsed.data.payMethod,
+          cartItemIds: parsed.data.cartItemIds,
+          customerCouponId: parsed.data.customerCouponId ?? null,
+        },
+        summary: `商城客户提交订单 ${result.orderNo}`,
+      });
       revalidatePath(`/shop/checkout/success`);
       revalidateShopPaths();
       return { success: true, message: "支付成功，订单已生成", data: result };
     }
 
+    await logShopAction({
+      action: "提交商城询价",
+      targetType: "Inquiry",
+      targetId: result.inquiryId,
+      targetName: result.inquiryNo,
+      after: {
+        inquiryNo: result.inquiryNo,
+        leadId: result.leadId,
+        checkoutMode: parsed.data.checkoutMode,
+        payMethod: parsed.data.payMethod,
+        cartItemIds: parsed.data.cartItemIds,
+      },
+      summary: `商城客户提交询价 ${result.inquiryNo}`,
+    });
     revalidateShopPaths();
     revalidatePath("/dashboard/leads");
     revalidatePath("/dashboard/inquiries");
@@ -671,7 +770,7 @@ export async function cancelOrder(orderId: string): Promise<ActionResult> {
 
   try {
     const operatorId = await getStockOperatorId();
-    await prisma.$transaction(async (tx) => {
+    const cancelled = await prisma.$transaction(async (tx) => {
       const order = await tx.order.findFirst({
         where: { id: orderId, customerId },
         include: { customerCoupons: true, items: { include: { product: true } } },
@@ -728,11 +827,21 @@ export async function cancelOrder(orderId: string): Promise<ActionResult> {
         where: { id: order.id },
         data: { status: "CANCELLED" },
       });
+      return { id: order.id, orderNo: order.orderNo, previousStatus: order.status };
     });
 
     revalidateShopPaths();
     revalidatePath(`/shop/my-orders/${orderId}`);
     await sendOrderStatusTemplate(orderId, "cancelled");
+    await logShopAction({
+      action: "取消商城订单",
+      targetType: "Order",
+      targetId: cancelled.id,
+      targetName: cancelled.orderNo,
+      before: { status: cancelled.previousStatus },
+      after: { status: "CANCELLED" },
+      summary: `商城客户取消订单 ${cancelled.orderNo}`,
+    });
     return { success: true, message: "订单已取消，库存已回滚" };
   } catch (error) {
     return { success: false, error: { code: "CANCEL_ORDER_FAILED", message: getErrorMessage(error) } };
@@ -746,18 +855,32 @@ export async function confirmOrder(orderId: string): Promise<ActionResult> {
   }
 
   try {
-    const result = await prisma.order.updateMany({
-      where: { id: orderId, customerId, status: { in: ["SHIPPING", "DELIVERED"] } },
-      data: { status: "COMPLETED" },
+    const completed = await prisma.$transaction(async (tx) => {
+      const order = await tx.order.findFirst({
+        where: { id: orderId, customerId, status: { in: ["SHIPPING", "DELIVERED"] } },
+        select: { id: true, orderNo: true, status: true },
+      });
+      if (!order) return null;
+      await tx.order.update({ where: { id: order.id }, data: { status: "COMPLETED" } });
+      return order;
     });
 
-    if (result.count === 0) {
+    if (!completed) {
       return { success: false, error: { code: "ORDER_STATUS_INVALID", message: "当前订单无法确认收货" } };
     }
 
     revalidateShopPaths();
     revalidatePath(`/shop/my-orders/${orderId}`);
     await sendOrderStatusTemplate(orderId, "completed");
+    await logShopAction({
+      action: "确认商城收货",
+      targetType: "Order",
+      targetId: completed.id,
+      targetName: completed.orderNo,
+      before: { status: completed.status },
+      after: { status: "COMPLETED" },
+      summary: `商城客户确认收货 ${completed.orderNo}`,
+    });
     return { success: true, message: "已确认收货" };
   } catch (error) {
     return { success: false, error: { code: "CONFIRM_ORDER_FAILED", message: getErrorMessage(error) } };
@@ -778,7 +901,7 @@ export async function updateProfile(input: ProfileInput): Promise<ActionResult> 
   try {
     const customer = await prisma.customer.findUniqueOrThrow({
       where: { id: customerId },
-      select: { password: true },
+      select: { name: true, password: true },
     });
     const nextData: { name: string; password?: string } = { name: parsed.data.name };
 
@@ -794,6 +917,15 @@ export async function updateProfile(input: ProfileInput): Promise<ActionResult> 
     await prisma.customer.update({
       where: { id: customerId },
       data: nextData,
+    });
+    await logShopAction({
+      action: "更新商城个人资料",
+      targetType: "Customer",
+      targetId: customerId,
+      targetName: parsed.data.name,
+      before: { name: customer.name, passwordChanged: false },
+      after: { name: parsed.data.name, passwordChanged: Boolean(parsed.data.newPassword) },
+      summary: `商城客户更新个人资料 ${parsed.data.name}`,
     });
     revalidatePath("/shop/account");
     revalidatePath("/shop/account/profile");

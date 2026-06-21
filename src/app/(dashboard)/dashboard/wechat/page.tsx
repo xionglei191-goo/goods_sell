@@ -1,4 +1,5 @@
 import { CheckCircle2, MessageSquareText, Send, Share2, Smartphone, WalletCards } from "lucide-react";
+import Link from "next/link";
 
 import { OfficialMenuButton } from "@/features/wechat/OfficialMenuButton";
 import { getWechatDashboardData } from "@/features/wechat/queries";
@@ -63,6 +64,13 @@ export default async function WechatDashboardPage() {
           ))}
         </div>
         <p className="mt-4 text-xs text-neutral-500">支付回调地址：{data.status.notifyUrl}</p>
+        <p className="mt-2 text-xs text-neutral-500">
+          正式上线口径以{" "}
+          <Link className="font-semibold text-orange-700 hover:text-red-700" href="/dashboard/settings#launch-readiness">
+            上线检查中心
+          </Link>{" "}
+          为准；本页用于确认微信生态程序入口、模拟边界和日志流是否可用。
+        </p>
       </section>
 
       <div className="grid gap-5 xl:grid-cols-2">

@@ -30,10 +30,10 @@ export default async function GroupBuyScenePage({ searchParams }: PageProps) {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-lg bg-stone-900 p-6 text-white">
-        <p className="text-sm text-white/70">企业团购与送礼</p>
-        <h1 className="mt-2 text-3xl font-bold">福利采购、节礼和商务送礼询价</h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-white/80">
+      <section className="rounded-lg border border-orange-200 bg-[linear-gradient(135deg,#fff4e8_0%,#ffe1c2_54%,#ff9b2f_100%)] p-6 shadow-[var(--surface-raised-shadow)]">
+        <p className="inline-flex rounded-full bg-[#dc2626]/10 px-3 py-1 text-sm font-semibold text-[#b91c1c]">企业团购与送礼</p>
+        <h1 className="mt-3 max-w-3xl text-3xl font-bold text-[#4a130c]">福利采购、节礼和商务送礼询价</h1>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-[#7a3a25]">
           面向企业福利、节日礼盒、商务拜访和单位采购，先记录预算、包装、开票和配送批次，再由公司统一报价。
         </p>
       </section>

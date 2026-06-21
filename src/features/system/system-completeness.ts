@@ -248,11 +248,10 @@ export function getSystemCompletenessReport(): SystemCompletenessReport {
       },
       audit: {
         dimension: "审计",
-        ready: hasAudit("src/features/shop/actions.ts") || includes("src/features/shop/actions.ts", "checkout"),
-        severityWhenMissing: "WARNING",
-        summary: "商城下单链路至少应能通过订单记录追溯，关键写操作建议同步写入操作日志。",
+        ready: hasAudit("src/features/shop/actions.ts") && includesAll("src/features/shop/actions.ts", ["提交商城订单", "取消商城订单", "确认商城收货", "更新商城个人资料"]),
+        summary: "商城下单、取消、确认收货、地址和个人资料等客户关键行为必须写入操作日志。",
         evidence: ["src/features/shop/actions.ts", "src/features/logs/audit.ts"],
-        action: "为购物车、结算或订单创建补齐必要审计记录。",
+        action: "为商城下单、取消、确认收货、地址和资料变更补齐 logAction。",
       },
       exception: {
         dimension: "异常处理",
@@ -378,7 +377,7 @@ export function getSystemCompletenessReport(): SystemCompletenessReport {
       entry: {
         dimension: "真实入口",
         ready: has("src/app/(dashboard)/dashboard/settings/page.tsx") && includes("src/app/(dashboard)/dashboard/settings/page.tsx", "PermissionPolicyPanel"),
-        summary: "管理员应在设置中心看到权限策略和审计入口。",
+        summary: "管理员应在设置中心看到固定角色权限矩阵、策略说明和审计入口。",
         evidence: ["src/app/(dashboard)/dashboard/settings/page.tsx"],
         action: "补齐权限策略可视化面板。",
         href: "/dashboard/settings#permission-policy",
@@ -392,8 +391,8 @@ export function getSystemCompletenessReport(): SystemCompletenessReport {
       },
       permission: {
         dimension: "权限",
-        ready: includesAll("src/features/auth/permissions.ts", ["permissionRoles", "canAccessPath", "roleHasPermission"]),
-        summary: "权限体系必须有统一的角色、路由和权限判断函数。",
+        ready: includesAll("src/features/auth/permissions.ts", ["permissionRoles", "canAccessPath", "roleHasPermission"]) && includes("src/app/(dashboard)/dashboard/settings/page.tsx", "固定角色矩阵"),
+        summary: "权限体系采用固定角色矩阵，统一角色、路由、字段和 AI 工具判断；当前不提供运营后台动态改权限。",
         evidence: ["src/features/auth/permissions.ts"],
         action: "补齐统一权限判断和路由矩阵。",
       },
@@ -783,10 +782,14 @@ export function getSystemCompletenessReport(): SystemCompletenessReport {
       },
       audit: {
         dimension: "审计",
-        ready: has("src/features/logs/audit.ts"),
+        ready:
+          includesAll("src/features/reports/actions.ts", ["logReportExport", "logAction", "导出订单报表", "导出票据报表", "导出财务对账单"]) &&
+          includes("src/features/orders/ExportOrdersButton.tsx", "logReportExport") &&
+          includes("src/features/receipts/ExportPaymentsButton.tsx", "logReportExport") &&
+          includes("src/features/finance/StatementTools.tsx", "logReportExport"),
         severityWhenMissing: "TODO",
-        summary: "报表多为只读查询，导出或敏感财务查看建议纳入日志策略。",
-        evidence: ["src/features/logs/audit.ts", "src/features/receipts/ExportPaymentsButton.tsx"],
+        summary: "报表多为只读查询，但订单、票据和财务对账单导出必须写入审计，避免敏感数据批量导出不可追溯。",
+        evidence: ["src/features/reports/actions.ts", "src/features/orders/ExportOrdersButton.tsx", "src/features/receipts/ExportPaymentsButton.tsx", "src/features/finance/StatementTools.tsx"],
         action: "为敏感报表导出补齐审计记录。",
       },
       exception: {

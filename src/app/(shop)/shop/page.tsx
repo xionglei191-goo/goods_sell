@@ -53,18 +53,20 @@ export default async function ShopPage() {
 
   return (
     <div className="space-y-8">
-      <section className="rounded-lg bg-stone-950 p-6 text-white">
-        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
+      <section className="relative overflow-hidden rounded-lg border border-orange-200 bg-[linear-gradient(135deg,#fff3e9_0%,#ffe5d3_42%,#ffb25a_100%)] p-6 shadow-[var(--surface-raised-shadow)]">
+        <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-[#dc2626]/12" />
+        <div className="pointer-events-none absolute bottom-0 right-10 h-32 w-48 -rotate-12 rounded-2xl bg-[#ff7a1a]/18" />
+        <div className="relative grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
           <div>
-            <p className="text-sm text-white/65">湘潭区域总代供货</p>
-            <h1 className="mt-3 text-3xl font-bold leading-tight sm:text-4xl">酒水饮料供应与智能订货平台</h1>
-            <p className="mt-4 max-w-2xl text-sm leading-7 text-white/78">
+            <p className="inline-flex rounded-full bg-[#dc2626]/10 px-3 py-1 text-sm font-semibold text-[#b91c1c]">湘潭区域总代供货</p>
+            <h1 className="mt-4 max-w-3xl text-3xl font-bold leading-tight text-[#4a130c] sm:text-4xl">酒水饮料供应与智能订货平台</h1>
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-[#7a3a25]">
               面向宴席客户、企业团购、门店补货、下游经销商和普通散客。小额订单优先就近经销商履约，大额团购和企业采购由公司或业务员统一报价。
             </p>
           </div>
-          <div className="rounded-lg bg-white/8 p-4 ring-1 ring-white/15">
-            <p className="text-sm font-medium text-white">渠道保护机制</p>
-            <p className="mt-2 text-sm leading-6 text-white/75">
+          <div className="rounded-lg border border-orange-200 bg-[#fff8ee]/82 p-4 shadow-sm">
+            <p className="text-sm font-semibold text-[#b91c1c]">渠道保护机制</p>
+            <p className="mt-2 text-sm leading-6 text-[#7a3a25]">
               平台不抢经销商小单；客户通过业务员或门店二维码进入后，线索来源会被记录，后续分单、报价、配送和复购都可追踪。
             </p>
           </div>

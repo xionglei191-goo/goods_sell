@@ -1,17 +1,26 @@
 "use client";
 
 import { Download, Printer } from "lucide-react";
+import { useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { logReportExport } from "@/features/reports/actions";
 
 type StatementToolsProps = {
   filename: string;
+  rowCount: number;
 };
 
-export function StatementTools({ filename }: StatementToolsProps) {
+export function StatementTools({ filename, rowCount }: StatementToolsProps) {
+  const [, startTransition] = useTransition();
+
   function exportHtml() {
     const printable = document.querySelector("[data-statement]");
     if (!printable) return;
+    startTransition(() => {
+      void logReportExport({ report: "statements", rowCount });
+    });
+
     const blob = new Blob([`<!doctype html><meta charset="utf-8">${printable.outerHTML}`], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");

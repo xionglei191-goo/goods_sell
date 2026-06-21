@@ -183,8 +183,8 @@ export function DealerMap({ data, amapKey, amapSecurityCode }: DealerMapProps) {
         const circle = new AMap.Circle({
           center: [dealer.longitude, dealer.latitude],
           radius: dealer.serviceRadius,
-          strokeColor: dealer.isAccepting ? "#d8001b" : "#64748b",
-          fillColor: dealer.isAccepting ? "#fecaca" : "#cbd5e1",
+          strokeColor: dealer.isAccepting ? "#d8001b" : "#b45309",
+          fillColor: dealer.isAccepting ? "#fecaca" : "#ffedd5",
           fillOpacity: 0.22,
         });
         circle.setMap(map);
@@ -236,17 +236,20 @@ export function DealerMap({ data, amapKey, amapSecurityCode }: DealerMapProps) {
       </div>
 
       <section className="table-shell">
-        <div className="border-b border-neutral-100 px-4 py-3">
+        <div className="border-b px-4 py-3" style={{ borderColor: "var(--dashboard-line)" }}>
           <h2 className="font-semibold text-neutral-950">湘潭经销商地图</h2>
           <p className="mt-1 text-sm text-neutral-500">
             {amapKey ? "已配置高德地图 Key，加载 JS API 2.0 展示经销商与热力订单。" : "当前未配置高德地图 Key，展示本地坐标示意图。"}
             {amapKey && !amapSecurityCode ? " 如使用新申请 Key，请同步配置安全密钥。" : null}
           </p>
+          <p className="mt-2 text-xs text-orange-700">
+            {loadState === "loaded" ? "当前为真实地图模式。" : "当前为暖色本地降级模式，调度数据仍来自系统数据库。"}
+          </p>
         </div>
         <div className="relative h-[560px] bg-[var(--dashboard-control)]" ref={mapRef}>
           {loadState !== "loaded" ? (
             <div className="absolute inset-0 overflow-hidden bg-[linear-gradient(90deg,rgba(232,111,81,0.16)_1px,transparent_1px),linear-gradient(rgba(232,111,81,0.12)_1px,transparent_1px)] bg-[size:48px_48px]">
-              {loadState === "loading" ? <div className="absolute left-4 top-4 rounded-md border bg-[var(--dashboard-panel)] px-3 py-2 text-sm text-neutral-600 shadow-[var(--surface-raised-shadow)]" style={{ borderColor: "var(--dashboard-line)" }}>正在加载高德地图...</div> : null}
+              {loadState === "loading" ? <div className="absolute left-4 top-4 rounded-md border bg-[var(--dashboard-panel)] px-3 py-2 text-sm text-orange-700 shadow-[var(--surface-raised-shadow)]" style={{ borderColor: "var(--dashboard-line)" }}>正在加载高德地图...</div> : null}
               {loadState === "error" ? (
                 <div className="absolute left-4 top-4 z-10 max-w-[calc(100%-2rem)] rounded-md bg-orange-50 px-3 py-2 text-sm text-orange-700 shadow-sm ring-1 ring-orange-100">{loadError ?? AMAP_LOAD_ERROR_MESSAGE}</div>
               ) : null}

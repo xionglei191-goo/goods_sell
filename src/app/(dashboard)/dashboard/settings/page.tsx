@@ -95,7 +95,7 @@ function PermissionPolicyPanel() {
             <h2 className="font-semibold text-neutral-950">权限策略</h2>
           </div>
           <p className="mt-1 text-sm text-neutral-500">
-            后台权限采用固定角色矩阵，页面路由、菜单过滤、AI 工具和 server action 均按同一套角色权限校验。
+            当前采用固定角色矩阵，不在后台动态编辑权限；页面路由、菜单过滤、AI 工具和 server action 均按同一套角色权限校验。
           </p>
         </div>
         <Button asChild variant="outline">
@@ -104,9 +104,9 @@ function PermissionPolicyPanel() {
       </div>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-3">
-        <PolicyNote title="管理员专属" text="系统设置、操作日志、微信生态、经销商审核和商品维护仅管理员拥有。" />
-        <PolicyNote title="字段隔离" text="财务与成本字段按角色拆分，非授权角色不能通过页面或 AI 工具读取。" />
-        <PolicyNote title="二次确认" text="写操作和高风险 AI 工具必须生成确认卡，不允许直接绕过权限执行。" />
+        <PolicyNote title="固定角色矩阵" text="角色与权限由代码统一维护，避免运营误改导致越权；如需调整角色边界，按发版流程评审。" />
+        <PolicyNote title="字段隔离" text="财务与成本字段按角色拆分，非授权角色不能通过页面、路由或 AI 工具读取。" />
+        <PolicyNote title="审计与确认" text="员工账号、业务参数、写操作和高风险 AI 工具均需要审计；AI 写操作必须先生成确认卡。" />
       </div>
 
       <div className="mt-5 overflow-x-auto rounded-md border border-[var(--dashboard-line)]">
@@ -190,7 +190,7 @@ function SystemCompletenessPanel({ report }: { report: Awaited<ReturnType<typeof
       </div>
 
       <div className="mt-4 rounded-md border border-orange-100 bg-[#fff8f3] px-3 py-2 text-xs text-neutral-600">
-        检查时间：{new Date(report.checkedAt).toLocaleString("zh-CN", { hour12: false })}
+        检查时间：{new Date(report.checkedAt).toLocaleString("zh-CN", { hour12: false })}。此处只反映程序完整度，不能替代真实角色浏览器验收和运营签收。
       </div>
 
       <div className="mt-5 grid gap-4 xl:grid-cols-2">
@@ -407,7 +407,7 @@ function LaunchReadinessPanel({ report }: { report: Awaited<ReturnType<typeof ge
             <h2 className="font-semibold text-neutral-950">上线检查中心</h2>
           </div>
           <p className="mt-1 text-sm text-neutral-500">
-            当前按正式公开上线口径检查；敏感密钥仅显示变量名，不显示实际值。
+            当前按正式公开上线口径检查；敏感密钥仅显示变量名，不显示实际值。这里检查外部硬配置，不作为程序功能未完成的借口。
           </p>
         </div>
         <div className="grid grid-cols-3 gap-2 text-center text-sm">

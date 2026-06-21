@@ -20,7 +20,7 @@ export default async function StatementsPage({ searchParams }: StatementsPagePro
           <h1 className="text-2xl font-semibold text-neutral-950">对账单</h1>
           <p className="mt-1 text-sm text-neutral-500">期初 + 本期发生 - 本期收款 = 期末</p>
         </div>
-        <StatementTools filename={filename} />
+        <StatementTools filename={filename} rowCount={data.rows.length} />
       </div>
 
       <form className="grid gap-3 surface-panel p-4 print:hidden md:grid-cols-[1fr_180px_180px_120px]">

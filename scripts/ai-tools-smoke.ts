@@ -33,11 +33,23 @@ function main() {
   const names = new Set(aiTools.map((item) => item.name));
   assert(aiTools.length >= 47, "AI tools 数量不足");
   assert(names.size === aiTools.length, "AI tool 名称必须唯一");
+  assert(!canRoleUseTool("ADMIN", "customer_submit_order"), "管理员不应混用消费者专属下单工具");
+  assert(!canRoleUseTool("ADMIN", "dealer_accept_routing"), "管理员不应混用经销商专属接单工具");
 
   assert(canRoleUseTool("CONSUMER", "customer_submit_order"), "客户应可使用 AI 下单工具");
   assert(!canRoleUseTool("CONSUMER", "business_overview"), "客户不能查看经营总览");
   assert(canRoleUseTool("ADMIN", "admin_update_product_price"), "管理员应可调价");
   assert(canRoleUseTool("ADMIN", "admin_create_customer"), "管理员应可新增客户");
+  assert(canRoleUseTool("ADMIN", "admin_customer_cart_summary"), "管理员应通过等价工具代查客户购物车");
+  assert(canRoleUseTool("ADMIN", "admin_customer_coupon_summary"), "管理员应通过等价工具代查客户优惠券");
+  assert(canRoleUseTool("ADMIN", "admin_customer_orders"), "管理员应通过等价工具代查客户订单");
+  assert(canRoleUseTool("ADMIN", "admin_customer_receivables"), "管理员应通过等价工具代查客户待付款");
+  assert(canRoleUseTool("ADMIN", "admin_customer_account_summary"), "管理员应通过等价工具代查客户账户");
+  assert(canRoleUseTool("ADMIN", "admin_customer_order_draft"), "管理员应通过等价工具生成客户开单草稿");
+  assert(canRoleUseTool("ADMIN", "admin_dealer_incoming_orders"), "管理员应通过等价工具代查经销商待接订单");
+  assert(canRoleUseTool("ADMIN", "admin_dealer_settlement_summary"), "管理员应通过等价工具代查经销商结算");
+  assert(canRoleUseTool("ADMIN", "admin_dealer_stock_summary"), "管理员应通过等价工具代查经销商库存");
+  assert(canRoleUseTool("ADMIN", "admin_dealer_promotion_summary"), "管理员应通过等价工具代查经销商推广");
   assert(canRoleUseTool("ADMIN", "customer_purchase_history"), "管理员应可查询客户购买历史");
   assert(canRoleUseTool("ADMIN", "customer_analytics_summary"), "管理员应可查询客户统计分析");
   assert(canRoleUseTool("ADMIN", "purchase_supplier_summary"), "管理员应可查询采购与供应商摘要");
@@ -147,6 +159,14 @@ function main() {
   assert(planRankedReadToolFallback("供应商管理现在有多少家", context("ADMIN"), aiTools)?.toolName === "purchase_supplier_summary", "provider 不可用时供应商数据问法应有本地语义 READ 兜底");
   assert(planRankedReadToolFallback("我的购物车里有什么", context("CONSUMER"), aiTools.filter((item) => canRoleUseTool("CONSUMER", item.name)))?.toolName === "shop_cart_summary", "provider 不可用时购物车问法应有本地语义 READ 兜底");
   assert(planRankedReadToolFallback("微信生态现在怎么样", context("ADMIN"), aiTools)?.toolName === "wechat_ecosystem_summary", "provider 不可用时微信生态问法应有本地语义 READ 兜底");
+
+  const adminCustomerCartPlan = planAiToolCall("张阿姨购物车里有什么", context("ADMIN"), aiTools);
+  assert(adminCustomerCartPlan?.toolName === "admin_customer_cart_summary", "管理员代查客户购物车应命中 admin 等价工具");
+  assert(adminCustomerCartPlan.args.customerQuery === "张阿姨", "管理员代查客户购物车应提取客户名称");
+
+  const adminDealerIncomingPlan = planAiToolCall("莲城便利店待接订单有哪些", context("ADMIN"), aiTools);
+  assert(adminDealerIncomingPlan?.toolName === "admin_dealer_incoming_orders", "管理员代查经销商待接订单应命中 admin 等价工具");
+  assert(adminDealerIncomingPlan.args.dealerQuery === "莲城便利店", "管理员代查经销商待接订单应提取门店名称");
 
   const adminPlan = planAiToolCall("这个月张军业绩怎么样", context("ADMIN"), aiTools);
   assert(adminPlan?.toolName === "salesperson_performance", "管理员查询业绩应命中销售员业绩工具");

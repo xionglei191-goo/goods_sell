@@ -1,10 +1,12 @@
 "use client";
 
 import { Download } from "lucide-react";
+import { useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import type { OrderListItem } from "@/features/orders/types";
 import { formatCurrency, formatDateTime, orderStatusLabels, orderTypeLabels, routingTypeLabels } from "@/features/orders/utils";
+import { logReportExport } from "@/features/reports/actions";
 
 type ExportOrdersButtonProps = {
   orders: OrderListItem[];
@@ -15,7 +17,13 @@ function escapeCsv(value: string | number) {
 }
 
 export function ExportOrdersButton({ orders }: ExportOrdersButtonProps) {
+  const [, startTransition] = useTransition();
+
   function exportCsv() {
+    startTransition(() => {
+      void logReportExport({ report: "orders", rowCount: orders.length });
+    });
+
     const header = ["订单号", "客户", "手机号", "类型", "金额", "支付状态", "订单状态", "分单类型", "创建时间"];
     const rows = orders.map((order) => [
       order.orderNo,
@@ -41,7 +49,7 @@ export function ExportOrdersButton({ orders }: ExportOrdersButtonProps) {
   return (
     <Button onClick={exportCsv} variant="outline">
       <Download className="h-4 w-4" />
-      导出 Excel
+      导出 CSV
     </Button>
   );
 }
