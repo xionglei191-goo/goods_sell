@@ -37,7 +37,7 @@ export default async function ChannelConflictsPage({ searchParams }: PageProps) 
         <SummaryCard label="已忽略" value={String(data.summary.ignoredCount)} />
       </section>
 
-      <form action="/dashboard/channel-conflicts" className="grid gap-3 rounded-lg bg-[var(--dashboard-panel)] p-4 shadow-sm ring-1 ring-slate-200 md:grid-cols-[1fr_180px_180px_auto]">
+      <form action="/dashboard/channel-conflicts" className="grid gap-3 rounded-lg bg-[var(--dashboard-panel)] p-4 shadow-[var(--surface-raised-shadow)] ring-1 ring-[var(--dashboard-line)] md:grid-cols-[1fr_180px_180px_auto]">
         <input
           className="h-10 rounded-md border border-[var(--dashboard-line)] px-3 text-sm outline-none focus:border-[#e86f51]"
           defaultValue={data.filters.q}
@@ -67,7 +67,7 @@ export default async function ChannelConflictsPage({ searchParams }: PageProps) 
 
       <ChannelConflictForm options={options} />
 
-      <section className="overflow-hidden rounded-lg bg-[var(--dashboard-panel)] shadow-sm ring-1 ring-slate-200">
+      <section className="overflow-hidden rounded-lg bg-[var(--dashboard-panel)] shadow-[var(--surface-raised-shadow)] ring-1 ring-[var(--dashboard-line)]">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1480px] text-left text-sm">
             <thead className="bg-[var(--dashboard-control)] text-slate-500">
@@ -160,7 +160,7 @@ function SummaryCard({ label, value, tone = "slate" }: { label: string; value: s
   const color =
     tone === "blue" ? "text-[#b9472d]" : tone === "amber" ? "text-amber-700" : tone === "emerald" ? "text-emerald-700" : "text-slate-900";
   return (
-    <div className="rounded-lg bg-[var(--dashboard-panel)] p-4 shadow-sm ring-1 ring-slate-200">
+    <div className="rounded-lg bg-[var(--dashboard-panel)] p-4 shadow-[var(--surface-raised-shadow)] ring-1 ring-[var(--dashboard-line)]">
       <p className="text-sm text-slate-500">{label}</p>
       <p className={`mt-2 text-2xl font-bold ${color}`}>{value}</p>
     </div>

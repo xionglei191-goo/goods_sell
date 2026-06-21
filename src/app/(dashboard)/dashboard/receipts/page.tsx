@@ -28,7 +28,7 @@ export default async function ReceiptsPage({ searchParams }: ReceiptsPageProps) 
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-neutral-950">票据记录</h1>
-        <p className="mt-1 text-sm text-neutral-500">收付款单据、电子发票和税控接口 Mock 开票。</p>
+        <p className="mt-1 text-sm text-neutral-500">收付款单据、电子发票和税控接口状态。</p>
       </div>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

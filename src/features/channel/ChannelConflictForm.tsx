@@ -54,7 +54,7 @@ export function ChannelConflictForm({ options }: ChannelConflictFormProps) {
   }
 
   return (
-    <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-sm ring-1 ring-slate-200">
+    <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-[var(--surface-raised-shadow)] ring-1 ring-[var(--dashboard-line)]">
       <div className="flex items-center gap-2 text-sm font-medium text-slate-900">
         <AlertTriangle className="h-4 w-4 text-amber-600" />
         记录渠道冲突

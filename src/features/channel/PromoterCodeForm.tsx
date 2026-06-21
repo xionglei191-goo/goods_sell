@@ -62,7 +62,7 @@ export function PromoterCodeForm({ options }: PromoterCodeFormProps) {
   }
 
   return (
-    <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-sm ring-1 ring-slate-200">
+    <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-[var(--surface-raised-shadow)] ring-1 ring-[var(--dashboard-line)]">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="grid flex-1 gap-3 md:grid-cols-5">
           <select

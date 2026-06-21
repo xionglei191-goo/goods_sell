@@ -121,7 +121,7 @@ function routeRuleMatches(pathname: string, rule: RouteRule) {
 }
 
 export function isPublicPath(pathname: string) {
-  if (pathname === "/" || pathname === "/login" || pathname === "/register" || pathname === "/forbidden") {
+  if (pathname === "/" || pathname === "/login" || pathname === "/register" || pathname === "/terms" || pathname === "/privacy" || pathname === "/forbidden") {
     return true;
   }
 

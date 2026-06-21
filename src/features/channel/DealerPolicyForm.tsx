@@ -71,7 +71,7 @@ export function DealerPolicyForm({ data }: DealerPolicyFormProps) {
   }
 
   return (
-    <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-sm ring-1 ring-slate-200">
+    <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-[var(--surface-raised-shadow)] ring-1 ring-[var(--dashboard-line)]">
       <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">

@@ -100,7 +100,7 @@ export function ImageMaterialBulkImportForm({ products }: ImageMaterialBulkImpor
   }
 
   return (
-    <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-sm ring-1 ring-slate-200">
+    <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-[var(--surface-raised-shadow)] ring-1 ring-[var(--dashboard-line)]">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-2">
           <FileSpreadsheet className="h-5 w-5 text-slate-500" />

@@ -57,14 +57,14 @@ export function ImageMaterialBatchActions({ materials }: ImageMaterialBatchActio
 
   if (selectableMaterials.length === 0) {
     return (
-      <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 text-sm text-slate-500 shadow-sm ring-1 ring-slate-200">
+      <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 text-sm text-slate-500 shadow-[var(--surface-raised-shadow)] ring-1 ring-[var(--dashboard-line)]">
         当前筛选结果没有可批量处理的素材。
       </section>
     );
   }
 
   return (
-    <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-sm ring-1 ring-slate-200">
+    <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-[var(--surface-raised-shadow)] ring-1 ring-[var(--dashboard-line)]">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-slate-900">批量处理</h2>

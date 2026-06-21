@@ -52,21 +52,22 @@ function buildTrendBuckets(period: Period) {
 export async function getSalesReport(searchParams: SearchParams) {
   const period = normalizePeriod(firstParam(searchParams.period));
   const start = getPeriodStart(period);
-  const orders = await prisma.order.findMany({
-    where: {
-      parentId: null,
-      status: { in: ["PAID", "CONFIRMED", "SHIPPING", "DELIVERED", "COMPLETED"] },
-      createdAt: { gte: start },
-    },
-    include: {
-      customer: { include: { salesPerson: { select: { id: true, name: true } } } },
-      salesPerson: { select: { id: true, name: true } },
-      items: true,
-    },
-    orderBy: { createdAt: "asc" },
-  });
-
   const trend = buildTrendBuckets(period);
+  try {
+    const orders = await prisma.order.findMany({
+      where: {
+        parentId: null,
+        status: { in: ["PAID", "CONFIRMED", "SHIPPING", "DELIVERED", "COMPLETED"] },
+        createdAt: { gte: start },
+      },
+      include: {
+        customer: { include: { salesPerson: { select: { id: true, name: true } } } },
+        salesPerson: { select: { id: true, name: true } },
+        items: true,
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
   const trendMap = new Map(trend.map((bucket) => [bucket.label, bucket]));
   const productMap = new Map<string, { name: string; sales: number; quantity: number }>();
   const customerMap = new Map<string, { name: string; sales: number; orders: number }>();
@@ -115,4 +116,20 @@ export async function getSalesReport(searchParams: SearchParams) {
     customerRanks: Array.from(customerMap.values()).sort((a, b) => b.sales - a.sales).slice(0, 10),
     salespersonRanks: Array.from(salespersonMap.values()).sort((a, b) => b.sales - a.sales).slice(0, 10),
   };
+  } catch (error) {
+    return {
+      period,
+      summary: {
+        totalSales: 0,
+        orderCount: 0,
+        avgOrderAmount: 0,
+        customerCount: 0,
+      },
+      trend,
+      topProducts: [],
+      customerRanks: [],
+      salespersonRanks: [],
+      error: error instanceof Error ? error.message : "销售报表查询失败",
+    };
+  }
 }

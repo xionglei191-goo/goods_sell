@@ -140,7 +140,7 @@ function fallbackProducts(): ShopProduct[] {
     unit: "件",
     spec: null,
     imageUrl: product.imageUrl,
-    description: "演示商品数据。连接数据库后将展示完整商城商品。",
+    description: "基础商品数据。连接数据库后将展示完整商城商品。",
     retailPrice: product.retailPrice,
     stock: product.stock,
     salesCount: Math.max(1, 120 - index * 12),

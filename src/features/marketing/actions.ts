@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { getSessionUser, requireDashboardPermission } from "@/features/auth/guards";
 import { customerSegmentLabels, evaluateCustomerSegment } from "@/features/customers/segmentation";
+import { logAction } from "@/features/logs/audit";
 import type { ActionResult } from "@/features/orders/types";
 import { toMoney } from "@/features/orders/utils";
 import { prisma } from "@/lib/prisma";
@@ -141,7 +142,7 @@ export async function createCoupon(input: CouponInput): Promise<ActionResult> {
     startsAt.setHours(0, 0, 0, 0);
     endsAt.setHours(23, 59, 59, 999);
 
-    await prisma.coupon.create({
+    const coupon = await prisma.coupon.create({
       data: {
         name: parsed.data.name,
         type: parsed.data.type,
@@ -152,6 +153,15 @@ export async function createCoupon(input: CouponInput): Promise<ActionResult> {
         startsAt,
         endsAt,
       },
+    });
+    await logAction({
+      module: "营销",
+      action: "创建优惠券",
+      targetType: "Coupon",
+      targetId: coupon.id,
+      targetName: coupon.name,
+      after: coupon,
+      summary: `创建优惠券 ${coupon.name}`,
     });
     revalidatePath("/dashboard/marketing/coupons");
     revalidatePath("/dashboard/marketing/operations");
@@ -194,6 +204,15 @@ export async function issueCouponByTag(couponId: string, tag: string): Promise<A
       prisma.coupon.update({ where: { id: couponId }, data: { issuedQuantity: { increment: selected.length } } }),
     ]);
 
+    await logAction({
+      module: "营销",
+      action: "按标签发券",
+      targetType: "Coupon",
+      targetId: coupon.id,
+      targetName: coupon.name,
+      after: { couponId, tag, count: selected.length },
+      summary: `向 ${tag} 发放 ${selected.length} 张优惠券`,
+    });
     revalidatePath("/dashboard/marketing/coupons");
     revalidatePath("/dashboard/marketing/operations");
     revalidatePath("/shop/coupons");
@@ -290,6 +309,15 @@ export async function createProductPush(input: CreateProductPushInput): Promise<
       }),
     });
 
+    await logAction({
+      module: "营销",
+      action: "创建新品推送",
+      targetType: "ProductPush",
+      targetId: product.id,
+      targetName: product.name,
+      after: { productId: product.id, targetTag: parsed.data.targetTag, count: selected.length },
+      summary: `为 ${parsed.data.targetTag} 生成 ${selected.length} 条新品推送`,
+    });
     revalidatePath("/dashboard/product-pushes");
     revalidatePath("/dashboard/marketing/operations");
     return { success: true, message: `已生成 ${selected.length} 条新品推送`, data: { count: selected.length } };
@@ -332,6 +360,15 @@ export async function recordProductPushEvent(input: ProductPushEventInput): Prom
       data,
     });
 
+    await logAction({
+      module: "营销",
+      action: "记录新品推送事件",
+      targetType: "ProductPush",
+      targetId: parsed.data.id,
+      targetName: eventItem.label,
+      after: { event: parsed.data.event, status: data.status },
+      summary: `记录新品推送事件：${eventItem.label}`,
+    });
     revalidatePath("/dashboard/product-pushes");
     revalidatePath("/dashboard/marketing/operations");
     return { success: true, message: eventItem.label };

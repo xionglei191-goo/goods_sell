@@ -40,7 +40,7 @@ export default async function DealerPromotionPage() {
         <StatCard icon={ShoppingBag} label="成交" value={String(data.summary.convertedOrders)} tone="red" />
       </section>
 
-      <section className="rounded-lg bg-[var(--dashboard-panel)] p-4 shadow-sm ring-1 ring-slate-200">
+      <section className="dealer-card p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="font-semibold text-slate-900">场景码</h2>
@@ -62,9 +62,9 @@ export default async function DealerPromotionPage() {
       {data.codes.length > 0 ? (
         <section className="space-y-3">
           {data.codes.map((code) => (
-            <article className="rounded-lg bg-[var(--dashboard-panel)] p-4 shadow-sm ring-1 ring-slate-200" key={code.id}>
+            <article className="dealer-card p-4" key={code.id}>
               <div className="flex flex-col gap-4 sm:flex-row">
-                <div className="mx-auto h-44 w-44 shrink-0 rounded-lg bg-[var(--dashboard-panel)] bg-contain bg-center bg-no-repeat ring-1 ring-slate-200" style={qrStyle(code.primaryUrl)} />
+                <div className="mx-auto h-44 w-44 shrink-0 rounded-lg border border-[var(--dashboard-line)] bg-[var(--dashboard-panel)] bg-contain bg-center bg-no-repeat" style={qrStyle(code.primaryUrl)} />
                 <div className="min-w-0 flex-1 space-y-3">
                   <div>
                     <div className="flex items-center gap-2">
@@ -94,11 +94,11 @@ export default async function DealerPromotionPage() {
           ))}
         </section>
       ) : (
-        <div className="rounded-lg bg-[var(--dashboard-panel)] px-4 py-12 text-center text-sm text-slate-500 shadow-sm ring-1 ring-slate-200">暂无推广码</div>
+        <div className="dealer-empty-state">暂无推广码</div>
       )}
 
       {data.primaryLinks.length > 0 ? (
-        <section className="rounded-lg bg-[var(--dashboard-panel)] p-4 shadow-sm ring-1 ring-slate-200">
+        <section className="dealer-card p-4">
           <h2 className="font-semibold text-slate-900">快捷链接</h2>
           <div className="mt-3 space-y-2">
             {data.primaryLinks.map((link) => (
@@ -119,7 +119,7 @@ export default async function DealerPromotionPage() {
           </Link>
         </div>
         {data.recentLeads.map((lead) => (
-          <article className="rounded-lg bg-[var(--dashboard-panel)] p-4 shadow-sm ring-1 ring-slate-200" key={lead.id}>
+          <article className="dealer-card p-4" key={lead.id}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="font-semibold text-slate-900">{lead.name}</p>
@@ -130,7 +130,7 @@ export default async function DealerPromotionPage() {
             <p className="mt-3 text-sm text-slate-600">{lead.inquiryNo} · {lead.budget}</p>
           </article>
         ))}
-        {data.recentLeads.length === 0 ? <div className="rounded-lg bg-[var(--dashboard-panel)] px-4 py-10 text-center text-sm text-slate-500 shadow-sm ring-1 ring-slate-200">暂无线索</div> : null}
+        {data.recentLeads.length === 0 ? <div className="dealer-empty-state">暂无线索</div> : null}
       </section>
     </div>
   );
@@ -139,7 +139,7 @@ export default async function DealerPromotionPage() {
 function StatCard({ icon: Icon, label, value, tone = "slate" }: { icon: typeof QrCode; label: string; value: string; tone?: "slate" | "blue" | "emerald" | "red" }) {
   const color = tone === "blue" ? "text-[#b9472d]" : tone === "emerald" ? "text-emerald-700" : tone === "red" ? "text-red-700" : "text-slate-900";
   return (
-    <div className="rounded-lg bg-[var(--dashboard-panel)] p-4 shadow-sm ring-1 ring-slate-200">
+    <div className="dealer-card p-4">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm text-slate-500">{label}</p>
         <Icon className="h-4 w-4 text-slate-400" />

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireDashboardPermission } from "@/features/auth/guards";
+import { logAction } from "@/features/logs/audit";
 import { createOfficialMenu } from "@/features/wechat/official";
 
 export async function syncOfficialMenu() {
@@ -14,6 +15,13 @@ export async function syncOfficialMenu() {
 
   try {
     const result = await createOfficialMenu();
+    await logAction({
+      module: "微信生态",
+      action: "同步公众号菜单",
+      targetType: "WechatOfficialMenu",
+      after: { mocked: result.mocked },
+      summary: result.mocked ? "写入模拟公众号菜单日志" : "同步公众号菜单",
+    });
     revalidatePath("/dashboard/wechat");
     return {
       success: true as const,

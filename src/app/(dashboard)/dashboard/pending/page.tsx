@@ -135,7 +135,7 @@ function SummaryCard({
   };
 
   return (
-    <Link className="block rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-sm ring-1 ring-slate-200 transition hover:-translate-y-0.5 hover:shadow-md" href={href}>
+    <Link className="block rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-[var(--surface-raised-shadow)] ring-1 ring-[var(--dashboard-line)] transition hover:-translate-y-0.5 hover:shadow-md" href={href}>
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-sm text-slate-500">{label}</p>
@@ -178,7 +178,7 @@ function EmptyRow({ colSpan }: { colSpan: number }) {
 
 function PendingOrdersTable({ orders }: { orders: PendingOrder[] }) {
   return (
-    <section className="overflow-hidden rounded-lg bg-[var(--dashboard-panel)] shadow-sm ring-1 ring-slate-200">
+    <section className="overflow-hidden rounded-lg bg-[var(--dashboard-panel)] shadow-[var(--surface-raised-shadow)] ring-1 ring-[var(--dashboard-line)]">
       <SectionHeader actionHref="/dashboard/orders?status=PAID" actionLabel="查看订单" icon={ShoppingCart} title="待确认订单" />
       <div className="overflow-x-auto">
         <table className="w-full min-w-[840px] text-left text-sm">
@@ -219,7 +219,7 @@ function PendingOrdersTable({ orders }: { orders: PendingOrder[] }) {
 
 function LowStockTable({ products }: { products: LowStockProduct[] }) {
   return (
-    <section className="overflow-hidden rounded-lg bg-[var(--dashboard-panel)] shadow-sm ring-1 ring-slate-200">
+    <section className="overflow-hidden rounded-lg bg-[var(--dashboard-panel)] shadow-[var(--surface-raised-shadow)] ring-1 ring-[var(--dashboard-line)]">
       <SectionHeader actionHref="/dashboard/inventory" actionLabel="查看库存" icon={AlertTriangle} title="库存预警" />
       <div className="overflow-x-auto">
         <table className="w-full min-w-[760px] text-left text-sm">
@@ -252,7 +252,7 @@ function LowStockTable({ products }: { products: LowStockProduct[] }) {
 
 function OverduePaymentsTable({ payments }: { payments: OverduePayment[] }) {
   return (
-    <section className="overflow-hidden rounded-lg bg-[var(--dashboard-panel)] shadow-sm ring-1 ring-slate-200">
+    <section className="overflow-hidden rounded-lg bg-[var(--dashboard-panel)] shadow-[var(--surface-raised-shadow)] ring-1 ring-[var(--dashboard-line)]">
       <SectionHeader actionHref="/dashboard/finance/receivable" actionLabel="查看应收" icon={Banknote} title="逾期应收" />
       <div className="overflow-x-auto">
         <table className="w-full min-w-[760px] text-left text-sm">

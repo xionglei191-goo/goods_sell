@@ -146,7 +146,7 @@ export default async function ProductImageMaterialsPage({ searchParams }: Produc
       <ImageMaterialBulkImportForm products={data.productOptions} />
       <ImageMaterialBatchActions materials={visibleMaterials} />
 
-      <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-sm ring-1 ring-slate-200">
+      <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-[var(--surface-raised-shadow)] ring-1 ring-[var(--dashboard-line)]">
         <div className="flex items-center gap-2">
           <Filter className="h-5 w-5 text-slate-500" />
           <h2 className="text-lg font-semibold text-slate-900">筛选</h2>
@@ -184,10 +184,10 @@ export default async function ProductImageMaterialsPage({ searchParams }: Produc
 
       <section className="space-y-4">
         {data.items.length === 0 ? (
-          <div className="rounded-lg bg-[var(--dashboard-panel)] p-8 text-center text-sm text-slate-500 shadow-sm ring-1 ring-slate-200">暂无匹配的商品素材记录</div>
+          <div className="empty-state p-8">暂无匹配的商品素材记录</div>
         ) : null}
         {data.items.map((product) => (
-          <article className="rounded-lg bg-[var(--dashboard-panel)] shadow-sm ring-1 ring-slate-200" key={product.id}>
+          <article className="surface-panel overflow-hidden" key={product.id}>
             <div className="grid gap-5 p-5 lg:grid-cols-[96px_1fr_auto]">
               <ProductArt categoryName={product.category} className="h-24 w-24 rounded-lg" imageUrl={product.currentImageUrl} name={product.name} />
               <div>
@@ -211,7 +211,7 @@ export default async function ProductImageMaterialsPage({ searchParams }: Produc
 
             <div className="border-t border-slate-100">
               {product.materials.length === 0 ? (
-                <div className="px-5 py-6 text-sm text-slate-500">当前商品暂无素材记录</div>
+                <div className="px-5 py-6 text-sm text-neutral-500">当前商品暂无素材记录</div>
               ) : (
                 <div className="divide-y divide-slate-100">
                   {product.materials.map((material) => (
@@ -224,7 +224,7 @@ export default async function ProductImageMaterialsPage({ searchParams }: Produc
         ))}
       </section>
 
-      <div className="flex items-center justify-between rounded-lg bg-[var(--dashboard-panel)] px-4 py-3 text-sm text-slate-500 shadow-sm ring-1 ring-slate-200">
+      <div className="flex items-center justify-between rounded-lg bg-[var(--dashboard-panel)] px-4 py-3 text-sm text-slate-500 shadow-[var(--surface-raised-shadow)] ring-1 ring-[var(--dashboard-line)]">
         <span>
           共 {data.total} 个商品，第 {data.page} / {totalPages} 页
         </span>
@@ -250,7 +250,7 @@ function StatCard({ icon: Icon, label, value, tone = "blue" }: { icon: LucideIco
   };
 
   return (
-    <div className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-sm ring-1 ring-slate-200">
+    <div className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-[var(--surface-raised-shadow)] ring-1 ring-[var(--dashboard-line)]">
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-sm text-slate-500">{label}</p>
@@ -268,7 +268,7 @@ function MaterialRow({ material }: { material: ProductImageMaterialItem }) {
   return (
     <div className="grid gap-4 px-5 py-4 lg:grid-cols-[88px_1fr_auto]">
       <a
-        className="block h-24 w-24 rounded-lg bg-[var(--dashboard-transaction-soft)] bg-cover bg-center ring-1 ring-slate-200"
+        className="block h-24 w-24 rounded-lg bg-[var(--dashboard-transaction-soft)] bg-cover bg-center ring-1 ring-[var(--dashboard-line)]"
         href={material.previewUrl}
         rel="noreferrer"
         style={previewStyle(material.previewUrl)}

@@ -87,11 +87,11 @@ const roleHints: Record<AppRole, string> = {
 };
 
 function roleLabel(role: AppRole | null) {
-  return role ? roleLabels[role] : "未登录";
+  return role ? roleLabels[role] : "识别中";
 }
 
 function roleHint(role: AppRole | null) {
-  return role ? roleHints[role] : "登录后会按账号角色自动切换可用能力";
+  return role ? roleHints[role] : "正在识别当前账号角色和可用能力";
 }
 
 function parseSseChunk(buffer: string) {

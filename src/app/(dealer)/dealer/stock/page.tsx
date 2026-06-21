@@ -24,7 +24,7 @@ export default async function DealerStockPage() {
 
       <section className="space-y-3">
         {data.rows.map((row) => (
-          <article className="rounded-lg bg-[var(--dashboard-panel)] p-4 shadow-sm ring-1 ring-slate-200" key={row.productId}>
+          <article className="dealer-card p-4" key={row.productId}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="font-semibold text-slate-900">{row.name}</p>
@@ -47,7 +47,7 @@ export default async function DealerStockPage() {
             </div>
           </article>
         ))}
-        {data.rows.length === 0 ? <div className="rounded-lg bg-[var(--dashboard-panel)] px-4 py-12 text-center text-sm text-slate-500 shadow-sm ring-1 ring-slate-200">暂无可上报商品</div> : null}
+        {data.rows.length === 0 ? <div className="dealer-empty-state">暂无可上报商品</div> : null}
       </section>
     </div>
   );
@@ -56,7 +56,7 @@ export default async function DealerStockPage() {
 function StatCard({ icon: Icon, label, value, tone = "slate" }: { icon: typeof Boxes; label: string; value: string; tone?: "slate" | "blue" | "amber" | "emerald" }) {
   const color = tone === "blue" ? "text-[#b9472d]" : tone === "amber" ? "text-amber-700" : tone === "emerald" ? "text-emerald-700" : "text-slate-900";
   return (
-    <div className="rounded-lg bg-[var(--dashboard-panel)] p-4 shadow-sm ring-1 ring-slate-200">
+    <div className="dealer-card p-4">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm text-slate-500">{label}</p>
         <Icon className="h-4 w-4 text-slate-400" />

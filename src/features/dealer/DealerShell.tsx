@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardList, Home, LogOut, ReceiptText } from "lucide-react";
+import { ClipboardList, Home, LogOut, Megaphone, PackageSearch, ReceiptText } from "lucide-react";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -20,6 +20,8 @@ type DealerShellProps = {
 const tabs = [
   { href: "/dealer/incoming", label: "待接", icon: Home },
   { href: "/dealer/my-orders", label: "订单", icon: ClipboardList },
+  { href: "/dealer/stock", label: "库存", icon: PackageSearch },
+  { href: "/dealer/promotion", label: "推广", icon: Megaphone },
   { href: "/dealer/settlement", label: "结算", icon: ReceiptText },
 ];
 
@@ -42,7 +44,7 @@ export function DealerShell({ dealer, children }: DealerShellProps) {
       <main className="mx-auto max-w-3xl px-4 py-5">{children}</main>
       <AiFloatingBubble contextLabel="经销商 AI 助手" />
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t bg-[var(--dashboard-panel)]" style={{ borderColor: "var(--dashboard-line)" }}>
-        <div className="mx-auto grid max-w-3xl grid-cols-3">
+        <div className="mx-auto grid max-w-3xl grid-cols-5">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const active = pathname.startsWith(tab.href);

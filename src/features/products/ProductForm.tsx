@@ -186,7 +186,9 @@ export function ProductForm({ brands, categories, product }: ProductFormProps) {
         </div>
       </div>
 
-      <div className="rounded-md border border-dashed border-[#e5cdbc] bg-[var(--dashboard-control)] p-5 text-sm text-neutral-500">暂无图片，后续接入图片上传。</div>
+      <div className="empty-state border-dashed p-5 text-left">
+        暂无图片。商品主图请在“商品素材”页维护，保存基础资料后可继续上传和审核素材。
+      </div>
 
       {message ? <p className="rounded-md bg-orange-50 px-3 py-2 text-sm text-orange-700">{message}</p> : null}
 

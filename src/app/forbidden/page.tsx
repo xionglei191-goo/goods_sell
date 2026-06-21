@@ -24,7 +24,7 @@ export default async function ForbiddenPage({ searchParams }: ForbiddenPageProps
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[var(--dashboard-control)] px-4 py-10">
-      <section className="w-full max-w-lg rounded-lg bg-[var(--dashboard-panel)] p-8 shadow-sm ring-1 ring-slate-200">
+      <section className="w-full max-w-lg rounded-lg bg-[var(--dashboard-panel)] p-8 shadow-[var(--surface-raised-shadow)] ring-1 ring-[var(--dashboard-line)]">
         <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-md bg-amber-100 text-lg font-bold text-amber-700">
           403
         </div>

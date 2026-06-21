@@ -80,6 +80,8 @@ const forcedToolCandidateRules: ToolCandidateRule[] = [
   { pattern: /采购|供应商|进货|到货/, toolNames: ["purchase_supplier_summary"], reason: "强规则:采购供应商" },
   { pattern: /微信|公众号|小程序|模板消息|菜单/, toolNames: ["wechat_ecosystem_summary"], reason: "强规则:微信生态" },
   { pattern: /操作日志|审计|AI 日志|谁操作/, toolNames: ["audit_log_summary"], reason: "强规则:日志" },
+  { pattern: /运营验收|业务签收|运营接手|真实支付|小程序体验版|备份恢复演练|账号权限复核|价格复核|库存盘点/, toolNames: ["system_operational_acceptance"], reason: "强规则:运营验收检查" },
+  { pattern: /完整度|全系统检查|全系统.*完善|系统.*没完善|功能缺口|程序.*没做完|开发.*没完成/, toolNames: ["system_completeness_audit"], reason: "强规则:全系统程序完整度检查" },
   { pattern: /上线|发布|部署|就绪|还差什么/, toolNames: ["system_launch_readiness"], reason: "强规则:上线检查" },
 ];
 
@@ -188,10 +190,12 @@ export function rankAiToolsForMessage(message: string, context: AiToolContext, t
   const boostNavigation = shouldBoostNavigationTools(message);
   const preferRead = shouldPreferReadTools(message);
   const forcedToolReasons = new Map<string, string[]>();
-  for (const rule of forcedToolCandidateRules) {
-    if (!roleMatchesRule(rule, context.role) || !rule.pattern.test(message)) continue;
-    for (const toolName of rule.toolNames) {
-      forcedToolReasons.set(toolName, [...(forcedToolReasons.get(toolName) ?? []), rule.reason]);
+  if (!boostNavigation) {
+    for (const rule of forcedToolCandidateRules) {
+      if (!roleMatchesRule(rule, context.role) || !rule.pattern.test(message)) continue;
+      for (const toolName of rule.toolNames) {
+        forcedToolReasons.set(toolName, [...(forcedToolReasons.get(toolName) ?? []), rule.reason]);
+      }
     }
   }
   const matchedDomainRules = domainCandidateRules.filter((rule) => rule.pattern.test(message));

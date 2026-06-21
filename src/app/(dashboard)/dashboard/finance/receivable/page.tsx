@@ -53,6 +53,13 @@ export default async function ReceivablePage() {
                   </td>
                 </tr>
               ))}
+              {data.rows.length === 0 ? (
+                <tr>
+                  <td className="px-4 py-10 text-center text-sm text-neutral-500" colSpan={5}>
+                    当前暂无应收账款
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>

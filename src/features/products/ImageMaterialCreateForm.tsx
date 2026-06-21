@@ -50,7 +50,7 @@ export function ImageMaterialCreateForm({ products }: ImageMaterialCreateFormPro
   }
 
   return (
-    <form className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-sm ring-1 ring-slate-200" encType="multipart/form-data" onSubmit={submit} ref={formRef}>
+    <form className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-[var(--surface-raised-shadow)] ring-1 ring-[var(--dashboard-line)]" encType="multipart/form-data" onSubmit={submit} ref={formRef}>
       <div className="flex items-center gap-2">
         <ImagePlus className="h-5 w-5 text-slate-500" />
         <h2 className="text-lg font-semibold text-slate-900">新增图片素材</h2>

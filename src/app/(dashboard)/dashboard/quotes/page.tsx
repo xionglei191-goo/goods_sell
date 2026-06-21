@@ -28,7 +28,7 @@ export default async function QuotesPage({ searchParams }: PageProps) {
 
       <QuoteCreateForm options={options} />
 
-      <section className="overflow-hidden rounded-lg bg-[var(--dashboard-panel)] shadow-sm ring-1 ring-slate-200">
+      <section className="overflow-hidden rounded-lg bg-[var(--dashboard-panel)] shadow-[var(--surface-raised-shadow)] ring-1 ring-[var(--dashboard-line)]">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1240px] text-left text-sm">
             <thead className="bg-[var(--dashboard-control)] text-slate-500">
@@ -95,7 +95,7 @@ export default async function QuotesPage({ searchParams }: PageProps) {
 function SummaryCard({ label, value, tone = "slate" }: { label: string; value: string; tone?: "slate" | "blue" | "emerald" | "purple" }) {
   const color = tone === "blue" ? "text-[#b9472d]" : tone === "emerald" ? "text-emerald-700" : tone === "purple" ? "text-[#b9472d]" : "text-slate-900";
   return (
-    <div className="rounded-lg bg-[var(--dashboard-panel)] p-4 shadow-sm ring-1 ring-slate-200">
+    <div className="rounded-lg bg-[var(--dashboard-panel)] p-4 shadow-[var(--surface-raised-shadow)] ring-1 ring-[var(--dashboard-line)]">
       <p className="text-sm text-slate-500">{label}</p>
       <p className={`mt-2 text-2xl font-bold ${color}`}>{value}</p>
     </div>

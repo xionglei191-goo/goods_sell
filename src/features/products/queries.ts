@@ -264,7 +264,7 @@ export async function getProductDetail(id: string): Promise<ProductDetail | null
       wholesalePrice: Math.max(demo.retailPrice - 30, 1),
       memberPrice: Math.max(demo.retailPrice - 10, 1),
       safeStock: 24,
-      description: "演示产品数据。数据库连接后将展示真实产品信息。",
+      description: "基础产品数据。数据库连接后将展示真实产品信息。",
     };
   }
 }

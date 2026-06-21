@@ -61,7 +61,7 @@ export function InvoiceForm({ orders }: { orders: InvoiceableOrder[] }) {
         <input className="form-input" onChange={(event) => setBuyerName(event.target.value)} placeholder="购方名称" value={buyerName} />
         <input className="form-input md:col-span-2" onChange={(event) => setBuyerTaxNo(event.target.value)} placeholder="购方税号（可选）" value={buyerTaxNo} />
       </div>
-      {selected ? <p className="mt-3 text-sm text-neutral-500">开票金额：{formatCurrency(selected.amount)}，未配置税控时自动生成 Mock 发票号。</p> : <p className="mt-3 text-sm text-neutral-500">暂无待开票订单。</p>}
+      {selected ? <p className="mt-3 text-sm text-neutral-500">开票金额：{formatCurrency(selected.amount)}；税控未完成真实配置时会生成测试发票号。</p> : <p className="mt-3 text-sm text-neutral-500">暂无待开票订单。</p>}
       <Button className="mt-4 bg-orange-500 text-white hover:bg-orange-600" disabled={!orderId || isPending} onClick={submit} type="button">
         <FilePlus2 className="h-4 w-4" />
         {isPending ? "开票中" : "开具发票"}

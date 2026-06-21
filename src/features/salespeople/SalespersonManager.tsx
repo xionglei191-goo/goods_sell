@@ -66,7 +66,7 @@ export function SalespersonManager({ filters: initialFilters, salespeople }: Sal
 
   return (
     <div className="space-y-5">
-      <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-sm ring-1 ring-slate-200">
+      <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-[var(--surface-raised-shadow)] ring-1 ring-[var(--dashboard-line)]">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="grid flex-1 gap-3 md:grid-cols-3">
             <input
@@ -96,7 +96,7 @@ export function SalespersonManager({ filters: initialFilters, salespeople }: Sal
         {message ? <p className="mt-3 text-sm text-slate-600">{message}</p> : null}
       </section>
 
-      <section className="grid gap-3 rounded-lg bg-[var(--dashboard-panel)] p-4 shadow-sm ring-1 ring-slate-200 md:grid-cols-[1.5fr_1fr]">
+      <section className="grid gap-3 rounded-lg bg-[var(--dashboard-panel)] p-4 shadow-[var(--surface-raised-shadow)] ring-1 ring-[var(--dashboard-line)] md:grid-cols-[1.5fr_1fr]">
         <label className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
@@ -117,7 +117,7 @@ export function SalespersonManager({ filters: initialFilters, salespeople }: Sal
         </select>
       </section>
 
-      <section className="overflow-hidden rounded-lg bg-[var(--dashboard-panel)] shadow-sm ring-1 ring-slate-200">
+      <section className="overflow-hidden rounded-lg bg-[var(--dashboard-panel)] shadow-[var(--surface-raised-shadow)] ring-1 ring-[var(--dashboard-line)]">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1500px] text-left text-sm">
             <thead className="bg-[var(--dashboard-control)] text-slate-500">

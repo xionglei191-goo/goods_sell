@@ -59,7 +59,7 @@ export function DealerPilotBinder({ data }: DealerPilotBinderProps) {
   }
 
   return (
-    <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-sm ring-1 ring-slate-200">
+    <section className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-[var(--surface-raised-shadow)] ring-1 ring-[var(--dashboard-line)]">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
         <div className="grid gap-3 xl:w-80">
           <select

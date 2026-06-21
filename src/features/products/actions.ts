@@ -137,12 +137,14 @@ export async function createCategory(input: CategoryInput): Promise<ActionResult
 
   try {
     await requireProductWrite();
-    await prisma.category.create({
+    const category = await prisma.category.create({
       data: {
         name: parsed.data.name,
         parentId: parsed.data.parentId || null,
       },
+      select: { id: true, name: true, parentId: true },
     });
+    await logAction({ module: "商品", action: "创建分类", targetType: "Category", targetId: category.id, targetName: category.name, after: category, summary: `创建分类 ${category.name}` });
     revalidateProductCache();
     revalidatePath("/dashboard/products/categories");
     return { success: true, message: "分类已创建" };
@@ -159,13 +161,16 @@ export async function updateCategory(id: string, input: CategoryInput): Promise<
 
   try {
     await requireProductWrite();
-    await prisma.category.update({
+    const before = await prisma.category.findUnique({ where: { id }, select: { id: true, name: true, parentId: true } });
+    const category = await prisma.category.update({
       where: { id },
       data: {
         name: parsed.data.name,
         parentId: parsed.data.parentId || null,
       },
+      select: { id: true, name: true, parentId: true },
     });
+    await logAction({ module: "商品", action: "更新分类", targetType: "Category", targetId: category.id, targetName: category.name, before, after: category, summary: `更新分类 ${category.name}` });
     revalidateProductCache();
     revalidatePath("/dashboard/products/categories");
     return { success: true, message: "分类已更新" };
@@ -177,6 +182,7 @@ export async function updateCategory(id: string, input: CategoryInput): Promise<
 export async function deleteCategory(id: string): Promise<ActionResult> {
   try {
     await requireProductWrite();
+    const category = await prisma.category.findUnique({ where: { id }, select: { id: true, name: true, parentId: true } });
     const [childrenCount, productCount] = await Promise.all([
       prisma.category.count({ where: { parentId: id } }),
       prisma.product.count({ where: { categoryId: id } }),
@@ -193,6 +199,7 @@ export async function deleteCategory(id: string): Promise<ActionResult> {
     }
 
     await prisma.category.delete({ where: { id } });
+    await logAction({ module: "商品", action: "删除分类", targetType: "Category", targetId: id, targetName: category?.name, before: category, summary: `删除分类 ${category?.name ?? id}` });
     revalidateProductCache();
     revalidatePath("/dashboard/products/categories");
     return { success: true, message: "分类已删除" };
@@ -209,12 +216,14 @@ export async function createBrand(input: BrandInput): Promise<ActionResult> {
 
   try {
     await requireProductWrite();
-    await prisma.brand.create({
+    const brand = await prisma.brand.create({
       data: {
         name: parsed.data.name,
         description: parsed.data.description || null,
       },
+      select: { id: true, name: true, description: true },
     });
+    await logAction({ module: "商品", action: "创建品牌", targetType: "Brand", targetId: brand.id, targetName: brand.name, after: brand, summary: `创建品牌 ${brand.name}` });
     revalidateProductCache();
     revalidatePath("/dashboard/products/brands");
     return { success: true, message: "品牌已创建" };
@@ -231,13 +240,16 @@ export async function updateBrand(id: string, input: BrandInput): Promise<Action
 
   try {
     await requireProductWrite();
-    await prisma.brand.update({
+    const before = await prisma.brand.findUnique({ where: { id }, select: { id: true, name: true, description: true } });
+    const brand = await prisma.brand.update({
       where: { id },
       data: {
         name: parsed.data.name,
         description: parsed.data.description || null,
       },
+      select: { id: true, name: true, description: true },
     });
+    await logAction({ module: "商品", action: "更新品牌", targetType: "Brand", targetId: brand.id, targetName: brand.name, before, after: brand, summary: `更新品牌 ${brand.name}` });
     revalidateProductCache();
     revalidatePath("/dashboard/products/brands");
     return { success: true, message: "品牌已更新" };
@@ -249,12 +261,14 @@ export async function updateBrand(id: string, input: BrandInput): Promise<Action
 export async function deleteBrand(id: string): Promise<ActionResult> {
   try {
     await requireProductWrite();
+    const brand = await prisma.brand.findUnique({ where: { id }, select: { id: true, name: true, description: true } });
     const productCount = await prisma.product.count({ where: { brandId: id } });
     if (productCount > 0) {
       return { success: false, error: { code: "BRAND_IN_USE", message: `该品牌下有 ${productCount} 个产品，无法删除` } };
     }
 
     await prisma.brand.delete({ where: { id } });
+    await logAction({ module: "商品", action: "删除品牌", targetType: "Brand", targetId: id, targetName: brand?.name, before: brand, summary: `删除品牌 ${brand?.name ?? id}` });
     revalidateProductCache();
     revalidatePath("/dashboard/products/brands");
     return { success: true, message: "品牌已删除" };

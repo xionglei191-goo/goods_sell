@@ -75,6 +75,13 @@ export default async function DeliveryPage({ searchParams }: DeliveryPageProps) 
                   </td>
                 </tr>
               ))}
+              {data.items.length === 0 ? (
+                <tr>
+                  <td className="px-4 py-10 text-center text-sm text-neutral-500" colSpan={7}>
+                    当前筛选条件下暂无配送单
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>

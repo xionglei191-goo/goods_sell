@@ -20,6 +20,10 @@ export const registerSchema = z
     consentAccepted: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
+    if (!data.consentAccepted) {
+      ctx.addIssue({ code: "custom", message: "请先阅读并同意服务协议和隐私政策", path: ["consentAccepted"] });
+    }
+
     if (data.password !== data.confirmPassword) {
       ctx.addIssue({ code: "custom", message: "两次输入的密码不一致", path: ["confirmPassword"] });
     }
@@ -33,9 +37,6 @@ export const registerSchema = z
       }
       if (!data.address) {
         ctx.addIssue({ code: "custom", message: "请填写门店地址", path: ["address"] });
-      }
-      if (!data.consentAccepted) {
-        ctx.addIssue({ code: "custom", message: "请确认申请信息和联系方式用于经销商审核", path: ["consentAccepted"] });
       }
     }
   });

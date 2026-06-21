@@ -42,7 +42,7 @@ export default async function DealerLeadsPage({ searchParams }: PageProps) {
       <nav className="flex gap-2 overflow-x-auto pb-1">
         {statusTabs.map((tab) => (
           <Link
-            className={activeStatus === tab.key ? "shrink-0 rounded-full bg-[#dc2626] px-4 py-2 text-sm font-medium text-white" : "shrink-0 rounded-full bg-[var(--dashboard-panel)] px-4 py-2 text-sm font-medium text-slate-600 ring-1 ring-slate-200"}
+            className={activeStatus === tab.key ? "shrink-0 rounded-full bg-[#dc2626] px-4 py-2 text-sm font-medium text-white" : "shrink-0 rounded-full border border-[var(--dashboard-line)] bg-[var(--dashboard-panel)] px-4 py-2 text-sm font-medium text-slate-600"}
             href={statusHref(tab.key)}
             key={tab.key}
           >
@@ -53,7 +53,7 @@ export default async function DealerLeadsPage({ searchParams }: PageProps) {
 
       <section className="space-y-3">
         {data.items.map((lead) => (
-          <article className="rounded-lg bg-[var(--dashboard-panel)] p-4 shadow-sm ring-1 ring-slate-200" key={lead.id}>
+          <article className="dealer-card p-4" key={lead.id}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="font-semibold text-slate-900">{lead.name}</p>
@@ -102,7 +102,7 @@ export default async function DealerLeadsPage({ searchParams }: PageProps) {
             <p className="mt-3 text-xs text-slate-400">{lead.createdAt}</p>
           </article>
         ))}
-        {data.items.length === 0 ? <div className="rounded-lg bg-[var(--dashboard-panel)] px-4 py-12 text-center text-sm text-slate-500 shadow-sm ring-1 ring-slate-200">暂无线索</div> : null}
+        {data.items.length === 0 ? <div className="dealer-empty-state">暂无线索</div> : null}
       </section>
     </div>
   );
@@ -111,7 +111,7 @@ export default async function DealerLeadsPage({ searchParams }: PageProps) {
 function SummaryCard({ label, value, tone = "slate" }: { label: string; value: string; tone?: "slate" | "blue" | "amber" | "emerald" }) {
   const color = tone === "blue" ? "text-[#b9472d]" : tone === "amber" ? "text-amber-700" : tone === "emerald" ? "text-emerald-700" : "text-slate-900";
   return (
-    <div className="rounded-lg bg-[var(--dashboard-panel)] p-4 shadow-sm ring-1 ring-slate-200">
+    <div className="dealer-card p-4">
       <p className="text-sm text-slate-500">{label}</p>
       <p className={`mt-2 text-2xl font-bold ${color}`}>{value}</p>
     </div>

@@ -416,6 +416,15 @@ export async function createQuote(input: unknown): Promise<ActionResult<{ quoteN
     revalidatePath("/dashboard/inquiries");
     revalidatePath("/dashboard/quotes");
     revalidatePath("/dashboard/leads");
+    await logAction({
+      module: "渠道经营",
+      action: "创建报价单",
+      targetType: "Quote",
+      targetId: result.quoteId,
+      targetName: result.quoteNo,
+      after: result,
+      summary: `创建报价单 ${result.quoteNo}`,
+    });
     return { success: true, message: `报价单 ${result.quoteNo} 已生成`, data: result };
   } catch (error) {
     return { success: false, error: { code: "CREATE_QUOTE_FAILED", message: getErrorMessage(error) } };
@@ -670,6 +679,15 @@ export async function createPromoterCode(input: unknown): Promise<ActionResult<{
       select: { id: true, code: true },
     });
 
+    await logAction({
+      module: "渠道经营",
+      action: "创建推广码",
+      targetType: "PromoterCode",
+      targetId: promoter.id,
+      targetName: promoter.code,
+      after: promoter,
+      summary: `创建推广码 ${promoter.code}`,
+    });
     revalidatePath("/dashboard/promoters");
     revalidatePath("/shop/channel");
     return { success: true, message: `推广码 ${promoter.code} 已生成`, data: promoter };
@@ -702,7 +720,11 @@ export async function updateDealerPolicy(input: unknown): Promise<ActionResult> 
       }
     }
 
-    await prisma.dealerPolicy.upsert({
+    const before = await prisma.dealerPolicy.findUnique({
+      where: { dealerId: parsed.data.dealerId },
+      select: { dealerId: true, minOrderAmount: true, maxOrderAmount: true, priceLevel: true, allowCrossZone: true, allowReject: true, rejectLimitPerDay: true, priority: true, brandIds: true, notes: true },
+    });
+    const policy = await prisma.dealerPolicy.upsert({
       where: { dealerId: parsed.data.dealerId },
       update: {
         minOrderAmount: toMoney(parsed.data.minOrderAmount),
@@ -727,8 +749,18 @@ export async function updateDealerPolicy(input: unknown): Promise<ActionResult> 
         brandIds: parsed.data.brandIds,
         notes: parsed.data.notes || null,
       },
+      select: { dealerId: true, minOrderAmount: true, maxOrderAmount: true, priceLevel: true, allowCrossZone: true, allowReject: true, rejectLimitPerDay: true, priority: true, brandIds: true, notes: true },
     });
 
+    await logAction({
+      module: "渠道经营",
+      action: "更新经销商政策",
+      targetType: "DealerPolicy",
+      targetId: parsed.data.dealerId,
+      before,
+      after: policy,
+      summary: `更新经销商 ${parsed.data.dealerId} 政策`,
+    });
     revalidatePath("/dashboard/dealers");
     revalidatePath(`/dashboard/dealers/${parsed.data.dealerId}/policy`);
     return { success: true, message: "经销商政策已保存" };

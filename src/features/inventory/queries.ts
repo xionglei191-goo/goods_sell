@@ -116,7 +116,7 @@ export async function getStockRecords(filters: { productId?: string; type?: Stoc
       beforeStock: product.stock - 20,
       afterStock: product.stock,
       operator: "系统管理员",
-      remark: "演示库存流水",
+      remark: "基础库存流水",
       createdAt: "2026/4/25 10:00",
     }));
   }

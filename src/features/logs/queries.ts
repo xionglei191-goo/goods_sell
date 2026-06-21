@@ -42,40 +42,53 @@ export async function getAuditLogData(searchParams: SearchParams) {
     ...(startDate || endDate ? { createdAt: { ...(startDate ? { gte: startDate } : {}), ...(endDate ? { lte: endDate } : {}) } } : {}),
   };
 
-  const [logs, total, modules] = await Promise.all([
-    prisma.auditLog.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    }),
-    prisma.auditLog.count({ where }),
-    prisma.auditLog.findMany({
-      distinct: ["module"],
-      select: { module: true },
-      orderBy: { module: "asc" },
-    }),
-  ]);
+  try {
+    const [logs, total, modules] = await Promise.all([
+      prisma.auditLog.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.auditLog.count({ where }),
+      prisma.auditLog.findMany({
+        distinct: ["module"],
+        select: { module: true },
+        orderBy: { module: "asc" },
+      }),
+    ]);
 
-  return {
-    filters: { ...filters, page },
-    total,
-    pageSize,
-    page,
-    pageCount: Math.max(1, Math.ceil(total / pageSize)),
-    modules: modules.map((item) => item.module),
-    logs: logs.map((log) => ({
-      id: log.id,
-      operatorName: log.operatorName ?? "系统",
-      module: log.module,
-      action: log.action,
-      targetType: log.targetType,
-      targetId: log.targetId,
-      targetName: log.targetName,
-      before: log.before,
-      after: log.after,
-      summary: log.summary,
-      createdAt: log.createdAt.toISOString(),
-    })),
-  };
+    return {
+      filters: { ...filters, page },
+      total,
+      pageSize,
+      page,
+      pageCount: Math.max(1, Math.ceil(total / pageSize)),
+      modules: modules.map((item) => item.module),
+      logs: logs.map((log) => ({
+        id: log.id,
+        operatorName: log.operatorName ?? "系统",
+        module: log.module,
+        action: log.action,
+        targetType: log.targetType,
+        targetId: log.targetId,
+        targetName: log.targetName,
+        before: log.before,
+        after: log.after,
+        summary: log.summary,
+        createdAt: log.createdAt.toISOString(),
+      })),
+    };
+  } catch (error) {
+    return {
+      filters: { ...filters, page },
+      total: 0,
+      pageSize,
+      page,
+      pageCount: 1,
+      modules: [],
+      logs: [],
+      error: error instanceof Error ? error.message : "日志查询失败",
+    };
+  }
 }

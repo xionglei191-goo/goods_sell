@@ -18,6 +18,8 @@ import { SHOP_PRODUCTS_CACHE_TAG } from "@/features/shop/cache";
 import { roleHasPermission } from "@/features/auth/permissions";
 import { logAction } from "@/features/logs/audit";
 import { getLaunchReadinessReport } from "@/features/system/launch-readiness";
+import { getOperationalAcceptanceReport } from "@/features/system/operational-acceptance";
+import { getSystemCompletenessReport } from "@/features/system/system-completeness";
 import {
   buildAgentCapabilityDetails,
   canUseAgentCapability,
@@ -2946,6 +2948,74 @@ export const aiTools: AiToolDefinition[] = [
     },
   },
   {
+    name: "system_completeness_audit",
+    title: "全系统完整度检查",
+    description: "检查程序自身是否完整：商城、后台、经销商端、AI、权限安全、订单库存、财务营销、微信地图和运维脚本。",
+    riskLevel: "READ",
+    access: { permission: "settings:manage" },
+    inputSchema: z.object({}),
+    handler: async () => {
+      const report = getSystemCompletenessReport();
+      const blockers = report.items.filter((item) => item.severity === "BLOCKER");
+      const warnings = report.items.filter((item) => item.severity === "WARNING");
+      const todos = report.items.filter((item) => item.severity === "TODO");
+      return {
+        title: "全系统完整度检查",
+        summary:
+          report.status === "READY"
+            ? "全系统完整度检查已通过。"
+            : `当前有 ${report.blockerCount} 个阻塞项、${report.warningCount} 个上线风险和 ${report.todoCount} 个待完善项；阻塞项必须先处理。`,
+        details: [
+          ...details([
+            ["状态", report.status],
+            ["已就绪", report.readyCount],
+            ["待完善", report.todoCount],
+            ["上线风险", report.warningCount],
+            ["阻塞项", report.blockerCount],
+          ]),
+          ...[...blockers, ...warnings, ...todos].slice(0, 12).map((item) => ({
+            label: `${item.severity}｜${item.label}`,
+            value: `${item.summary} 下一步：${item.action}`,
+          })),
+        ],
+        data: report,
+      };
+    },
+  },
+  {
+    name: "system_operational_acceptance",
+    title: "运营验收检查",
+    description: "检查上线运营是否可接手：业务签收、价格复核、库存盘点、账号权限复核、真实支付、微信、小程序、税控和备份恢复演练。",
+    riskLevel: "READ",
+    access: { permission: "settings:manage" },
+    inputSchema: z.object({}),
+    handler: async () => {
+      const report = getOperationalAcceptanceReport();
+      const blockers = report.items.filter((item) => item.severity === "BLOCKER");
+      const warnings = report.items.filter((item) => item.severity === "WARNING");
+      return {
+        title: "运营验收检查",
+        summary:
+          report.status === "READY"
+            ? "运营验收检查已通过。"
+            : `当前有 ${report.blockerCount} 个验收阻塞项、${report.warningCount} 个待签收项；这些属于运营接手和真实环境验收，不是程序完整度缺陷。`,
+        details: [
+          ...details([
+            ["状态", report.status],
+            ["已签收", report.readyCount],
+            ["待验收", report.warningCount],
+            ["阻塞项", report.blockerCount],
+          ]),
+          ...[...blockers, ...warnings].slice(0, 12).map((item) => ({
+            label: `${item.severity === "BLOCKER" ? "阻塞" : "待验收"}｜${item.label}`,
+            value: `${item.summary} 下一步：${item.action}`,
+          })),
+        ],
+        data: report,
+      };
+    },
+  },
+  {
     name: "admin_approve_dealer_application",
     title: "审核通过经销商",
     description: "管理员审核通过经销商申请并创建经销商档案。",
@@ -3789,6 +3859,16 @@ const aiToolSemanticMetadata: Record<string, AiToolSemanticMetadata> = {
   system_launch_readiness: {
     capabilities: ["上线检查", "发布检查", "部署配置", "还差什么", "就绪状态"],
     examples: ["现在上线还差什么配置", "发布前还有哪些阻塞项"],
+    argumentHints: "{}",
+  },
+  system_completeness_audit: {
+    capabilities: ["全系统完整度", "完整度检查", "上线前全系统检查", "系统还有哪些没完善", "功能缺口"],
+    examples: ["全系统完整度还有哪些问题", "上线前系统还有哪些没完善"],
+    argumentHints: "{}",
+  },
+  system_operational_acceptance: {
+    capabilities: ["运营验收", "业务签收", "真实支付验证", "小程序体验版", "备份恢复演练", "运营接手"],
+    examples: ["运营接手还差哪些验收", "业务签收和真实支付验证完成了吗"],
     argumentHints: "{}",
   },
   admin_approve_dealer_application: {

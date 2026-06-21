@@ -34,7 +34,7 @@ export function ProductPushForm({ products, targetTags }: ProductPushFormProps) 
   }
 
   return (
-    <form className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-sm ring-1 ring-slate-200" onSubmit={submit}>
+    <form className="rounded-lg bg-[var(--dashboard-panel)] p-5 shadow-[var(--surface-raised-shadow)] ring-1 ring-[var(--dashboard-line)]" onSubmit={submit}>
       <div>
         <h2 className="text-lg font-semibold text-slate-900">创建新品推送</h2>
         <p className="mt-1 text-sm text-slate-500">选择 1 款新品和目标人群，系统会生成匹配画像或客户分层的话术与推送记录。</p>

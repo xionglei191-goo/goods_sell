@@ -4,6 +4,7 @@ import { PurchaseStatus, StockType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
 import { requireDashboardPermission } from "@/features/auth/guards";
+import { logAction } from "@/features/logs/audit";
 import { purchaseOrderSchema, supplierSchema, type PurchaseOrderInput, type SupplierInput } from "@/features/purchase/schemas";
 import { prisma } from "@/lib/prisma";
 
@@ -34,14 +35,16 @@ export async function createSupplier(input: SupplierInput): Promise<ActionResult
 
   try {
     await requireDashboardPermission("purchase:manage", "无权限维护供应商");
-    await prisma.supplier.create({
+    const supplier = await prisma.supplier.create({
       data: {
         name: parsed.data.name,
         contactName: parsed.data.contactName || null,
         phone: parsed.data.phone || null,
         address: parsed.data.address || null,
       },
+      select: { id: true, name: true, contactName: true, phone: true },
     });
+    await logAction({ module: "采购", action: "创建供应商", targetType: "Supplier", targetId: supplier.id, targetName: supplier.name, after: supplier, summary: `创建供应商 ${supplier.name}` });
     revalidatePath("/dashboard/purchase/suppliers");
     return { success: true, message: "供应商已创建" };
   } catch (error) {
@@ -57,7 +60,8 @@ export async function updateSupplier(id: string, input: SupplierInput): Promise<
 
   try {
     await requireDashboardPermission("purchase:manage", "无权限维护供应商");
-    await prisma.supplier.update({
+    const before = await prisma.supplier.findUnique({ where: { id }, select: { id: true, name: true, contactName: true, phone: true } });
+    const supplier = await prisma.supplier.update({
       where: { id },
       data: {
         name: parsed.data.name,
@@ -65,7 +69,9 @@ export async function updateSupplier(id: string, input: SupplierInput): Promise<
         phone: parsed.data.phone || null,
         address: parsed.data.address || null,
       },
+      select: { id: true, name: true, contactName: true, phone: true },
     });
+    await logAction({ module: "采购", action: "更新供应商", targetType: "Supplier", targetId: supplier.id, targetName: supplier.name, before, after: supplier, summary: `更新供应商 ${supplier.name}` });
     revalidatePath("/dashboard/purchase/suppliers");
     return { success: true, message: "供应商已更新" };
   } catch (error) {
@@ -76,11 +82,13 @@ export async function updateSupplier(id: string, input: SupplierInput): Promise<
 export async function deleteSupplier(id: string): Promise<ActionResult> {
   try {
     await requireDashboardPermission("purchase:manage", "无权限维护供应商");
+    const supplier = await prisma.supplier.findUnique({ where: { id }, select: { id: true, name: true, contactName: true, phone: true } });
     const purchaseCount = await prisma.purchaseOrder.count({ where: { supplierId: id } });
     if (purchaseCount > 0) {
       return { success: false, error: { code: "SUPPLIER_IN_USE", message: `该供应商已有 ${purchaseCount} 张采购单，无法删除` } };
     }
     await prisma.supplier.delete({ where: { id } });
+    await logAction({ module: "采购", action: "删除供应商", targetType: "Supplier", targetId: id, targetName: supplier?.name, before: supplier, summary: `删除供应商 ${supplier?.name ?? id}` });
     revalidatePath("/dashboard/purchase/suppliers");
     return { success: true, message: "供应商已删除" };
   } catch (error) {
@@ -97,7 +105,7 @@ export async function createPurchaseOrder(input: PurchaseOrderInput): Promise<Ac
   try {
     const operatorId = await getOperatorId();
     const totalAmount = parsed.data.quantity * parsed.data.unitCost;
-    await prisma.purchaseOrder.create({
+    const purchase = await prisma.purchaseOrder.create({
       data: {
         purchaseNo: nextPurchaseNo(),
         supplierId: parsed.data.supplierId,
@@ -115,7 +123,9 @@ export async function createPurchaseOrder(input: PurchaseOrderInput): Promise<Ac
           },
         },
       },
+      select: { id: true, purchaseNo: true, status: true, totalAmount: true },
     });
+    await logAction({ module: "采购", action: "创建采购单", targetType: "PurchaseOrder", targetId: purchase.id, targetName: purchase.purchaseNo, after: purchase, summary: `创建采购单 ${purchase.purchaseNo}` });
     revalidatePath("/dashboard/purchase");
     return { success: true, message: "采购单已创建" };
   } catch (error) {
@@ -126,14 +136,17 @@ export async function createPurchaseOrder(input: PurchaseOrderInput): Promise<Ac
 export async function updatePurchaseStatus(id: string, status: PurchaseStatus): Promise<ActionResult> {
   try {
     await requireDashboardPermission("purchase:manage", "无权限更新采购状态");
-    await prisma.purchaseOrder.update({
+    const before = await prisma.purchaseOrder.findUnique({ where: { id }, select: { id: true, purchaseNo: true, status: true } });
+    const purchase = await prisma.purchaseOrder.update({
       where: { id },
       data: {
         status,
         submittedAt: status === "SUBMITTED" ? new Date() : undefined,
         completedAt: status === "COMPLETED" ? new Date() : undefined,
       },
+      select: { id: true, purchaseNo: true, status: true },
     });
+    await logAction({ module: "采购", action: "更新采购状态", targetType: "PurchaseOrder", targetId: purchase.id, targetName: purchase.purchaseNo, before, after: purchase, summary: `采购单 ${purchase.purchaseNo} 状态更新为 ${purchase.status}` });
     revalidatePath("/dashboard/purchase");
     return { success: true, message: "采购状态已更新" };
   } catch (error) {
@@ -144,7 +157,7 @@ export async function updatePurchaseStatus(id: string, status: PurchaseStatus): 
 export async function receivePurchaseOrder(id: string): Promise<ActionResult> {
   try {
     const operatorId = await getOperatorId();
-    await prisma.$transaction(async (tx) => {
+    const received = await prisma.$transaction(async (tx) => {
       const purchase = await tx.purchaseOrder.findUnique({
         where: { id },
         include: { items: true },
@@ -197,8 +210,10 @@ export async function receivePurchaseOrder(id: string): Promise<ActionResult> {
           completedAt: new Date(),
         },
       });
+      return { id: purchase.id, purchaseNo: purchase.purchaseNo, status: PurchaseStatus.COMPLETED };
     });
 
+    await logAction({ module: "采购", action: "采购收货", targetType: "PurchaseOrder", targetId: received.id, targetName: received.purchaseNo, after: received, summary: `采购单 ${received.purchaseNo} 收货完成` });
     revalidatePath("/dashboard/purchase");
     revalidatePath("/dashboard/inventory");
     revalidatePath("/dashboard/inventory/records");

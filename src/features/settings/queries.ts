@@ -1,5 +1,7 @@
 import { getWechatFeatureStatus } from "@/features/wechat/config";
 import { getLaunchReadinessReport } from "@/features/system/launch-readiness";
+import { getOperationalAcceptanceReport } from "@/features/system/operational-acceptance";
+import { getSystemCompletenessReport } from "@/features/system/system-completeness";
 import { prisma } from "@/lib/prisma";
 
 export const businessConfigDefaults = [
@@ -55,6 +57,8 @@ export async function getSettingsData() {
       tax: Boolean(process.env.TAX_PROVIDER && process.env.TAX_PROVIDER !== "MOCK"),
     },
     launchReadiness: getLaunchReadinessReport(),
+    systemCompleteness: getSystemCompletenessReport(),
+    operationalAcceptance: getOperationalAcceptanceReport(),
   };
 }
 

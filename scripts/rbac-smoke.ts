@@ -178,8 +178,18 @@ function main() {
     phone: "13800138001",
     password: "123456",
     confirmPassword: "123456",
+    consentAccepted: true,
   });
   assert(consumerRegistration.success, "消费者注册表单应通过校验");
+
+  const invalidConsumerRegistration = registerSchema.safeParse({
+    accountType: "CONSUMER",
+    name: "张三",
+    phone: "13800138003",
+    password: "123456",
+    confirmPassword: "123456",
+  });
+  assert(!invalidConsumerRegistration.success, "消费者未同意协议时注册应失败");
 
   const dealerRegistration = registerSchema.safeParse({
     accountType: "DEALER",

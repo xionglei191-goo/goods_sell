@@ -2,6 +2,8 @@ import { existsSync } from "fs";
 import { mkdtemp, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
+import { createHash, randomBytes } from "crypto";
+import { connect as connectTcp, type Socket } from "net";
 import { spawn, type ChildProcess } from "child_process";
 import { hash } from "bcryptjs";
 import { config } from "dotenv";
@@ -35,14 +37,147 @@ async function waitFor<T>(fn: () => Promise<T | null | undefined | false>, timeo
   throw new Error(`Timeout waiting for ${label}`);
 }
 
+class MinimalWebSocket {
+  private buffer = Buffer.alloc(0);
+  private connected = true;
+  onMessage?: (text: string) => void;
+
+  private constructor(private readonly socket: Socket) {
+    socket.on("data", (chunk) => this.readFrames(chunk));
+    socket.on("close", () => {
+      this.connected = false;
+    });
+  }
+
+  static async connect(webSocketDebuggerUrl: string) {
+    const url = new URL(webSocketDebuggerUrl);
+    const port = Number(url.port || 80);
+    const host = url.hostname;
+    const path = `${url.pathname}${url.search}`;
+    const key = randomBytes(16).toString("base64");
+    const socket = connectTcp({ host, port });
+
+    await new Promise<void>((resolve, reject) => {
+      socket.once("connect", resolve);
+      socket.once("error", reject);
+    });
+
+    socket.write(
+      [
+        `GET ${path} HTTP/1.1`,
+        `Host: ${host}:${port}`,
+        "Upgrade: websocket",
+        "Connection: Upgrade",
+        `Sec-WebSocket-Key: ${key}`,
+        "Sec-WebSocket-Version: 13",
+        "",
+        "",
+      ].join("\r\n"),
+    );
+
+    const initial = await new Promise<Buffer>((resolve, reject) => {
+      let handshakeBuffer = Buffer.alloc(0);
+      const onData = (chunk: Buffer) => {
+        handshakeBuffer = Buffer.concat([handshakeBuffer, chunk]);
+        const boundary = handshakeBuffer.indexOf("\r\n\r\n");
+        if (boundary === -1) return;
+        socket.off("data", onData);
+        socket.off("error", reject);
+        const header = handshakeBuffer.slice(0, boundary).toString("utf8");
+        if (!/^HTTP\/1\.1 101\b/.test(header)) {
+          reject(new Error(`CDP websocket handshake failed: ${header.split("\r\n")[0]}`));
+          return;
+        }
+        const accept = createHash("sha1")
+          .update(`${key}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`)
+          .digest("base64");
+        if (!header.toLowerCase().includes(`sec-websocket-accept: ${accept}`.toLowerCase())) {
+          reject(new Error("CDP websocket handshake accept header mismatch"));
+          return;
+        }
+        resolve(handshakeBuffer.slice(boundary + 4));
+      };
+      socket.on("data", onData);
+      socket.once("error", reject);
+    });
+
+    const ws = new MinimalWebSocket(socket);
+    if (initial.length > 0) ws.readFrames(initial);
+    return ws;
+  }
+
+  sendText(text: string) {
+    if (!this.connected) throw new Error("CDP websocket is closed");
+    const payload = Buffer.from(text);
+    const mask = randomBytes(4);
+    const lengthBytes =
+      payload.length < 126
+        ? Buffer.from([0x80 | payload.length])
+        : payload.length < 65536
+          ? Buffer.from([0x80 | 126, (payload.length >> 8) & 0xff, payload.length & 0xff])
+          : Buffer.from([0x80 | 127, 0, 0, 0, 0, (payload.length / 2 ** 24) & 0xff, (payload.length >> 16) & 0xff, (payload.length >> 8) & 0xff, payload.length & 0xff]);
+    const masked = Buffer.alloc(payload.length);
+    for (let index = 0; index < payload.length; index += 1) {
+      masked[index] = payload[index] ^ mask[index % 4];
+    }
+    this.socket.write(Buffer.concat([Buffer.from([0x81]), lengthBytes, mask, masked]));
+  }
+
+  close() {
+    this.connected = false;
+    this.socket.end();
+  }
+
+  private readFrames(chunk: Buffer) {
+    this.buffer = Buffer.concat([this.buffer, chunk]);
+    while (this.buffer.length >= 2) {
+      const first = this.buffer[0];
+      const second = this.buffer[1];
+      const opcode = first & 0x0f;
+      let offset = 2;
+      let length = second & 0x7f;
+      if (length === 126) {
+        if (this.buffer.length < offset + 2) return;
+        length = this.buffer.readUInt16BE(offset);
+        offset += 2;
+      } else if (length === 127) {
+        if (this.buffer.length < offset + 8) return;
+        const high = this.buffer.readUInt32BE(offset);
+        const low = this.buffer.readUInt32BE(offset + 4);
+        length = high * 2 ** 32 + low;
+        offset += 8;
+      }
+
+      const masked = Boolean(second & 0x80);
+      const maskLength = masked ? 4 : 0;
+      if (this.buffer.length < offset + maskLength + length) return;
+      const mask = masked ? this.buffer.slice(offset, offset + 4) : null;
+      offset += maskLength;
+      const payload = Buffer.from(this.buffer.slice(offset, offset + length));
+      this.buffer = this.buffer.slice(offset + length);
+
+      if (mask) {
+        for (let index = 0; index < payload.length; index += 1) {
+          payload[index] = payload[index] ^ mask[index % 4];
+        }
+      }
+      if (opcode === 0x8) {
+        this.close();
+        return;
+      }
+      if (opcode === 0x1) this.onMessage?.(payload.toString("utf8"));
+    }
+  }
+}
+
 class CdpClient {
   private nextId = 1;
   private pending = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void }>();
   readonly consoleErrors: string[] = [];
 
-  private constructor(private readonly ws: WebSocket) {
-    ws.addEventListener("message", (event) => {
-      const message = JSON.parse(String(event.data)) as { id?: number; method?: string; params?: unknown; result?: unknown; error?: { message?: string } };
+  private constructor(private readonly ws: MinimalWebSocket) {
+    ws.onMessage = (text) => {
+      const message = JSON.parse(text) as { id?: number; method?: string; params?: unknown; result?: unknown; error?: { message?: string } };
       if (message.id) {
         const waiter = this.pending.get(message.id);
         if (!waiter) return;
@@ -62,22 +197,17 @@ class CdpClient {
         const entry = (message.params as { entry?: { level?: string; text?: string } })?.entry;
         if (entry?.level === "error") this.consoleErrors.push(entry.text ?? "Log.entryAdded error");
       }
-    });
+    };
   }
 
   static async connect(webSocketDebuggerUrl: string) {
-    assert(globalThis.WebSocket, "Current Node runtime does not expose WebSocket");
-    const ws = new globalThis.WebSocket(webSocketDebuggerUrl);
-    await new Promise<void>((resolve, reject) => {
-      ws.addEventListener("open", () => resolve(), { once: true });
-      ws.addEventListener("error", () => reject(new Error("Failed to connect to browser CDP")), { once: true });
-    });
+    const ws = await MinimalWebSocket.connect(webSocketDebuggerUrl);
     return new CdpClient(ws);
   }
 
   send<T = unknown>(method: string, params: Record<string, unknown> = {}) {
     const id = this.nextId++;
-    this.ws.send(JSON.stringify({ id, method, params }));
+    this.ws.sendText(JSON.stringify({ id, method, params }));
     return new Promise<T>((resolve, reject) => {
       this.pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
     });
@@ -92,6 +222,12 @@ function chromePath() {
   const candidates = [
     "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
     "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/microsoft-edge",
+    "/usr/bin/microsoft-edge-stable",
   ];
   return candidates.find((candidate) => existsSync(candidate));
 }

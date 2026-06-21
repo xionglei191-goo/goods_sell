@@ -10,6 +10,7 @@ const banned = [
   { pattern: /\bbg-slate-(?:50|100|200|800|900|950)\b/g, label: "slate block background" },
   { pattern: /\bborder-neutral-200\b/g, label: "neutral border block" },
   { pattern: /\bborder-slate-200\b/g, label: "slate border block" },
+  { pattern: /\bring-slate-200\b/g, label: "slate ring block" },
 ];
 
 const allowRules = [

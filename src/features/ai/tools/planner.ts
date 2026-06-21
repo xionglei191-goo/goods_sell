@@ -403,6 +403,14 @@ function toolPlan(tools: readonly AiToolDefinition[], toolName: string, args: Re
 }
 
 function planStaff(message: string, tools: readonly AiToolDefinition[]): AiToolPlan | null {
+  if (/运营验收|业务签收|运营接手|真实支付|小程序体验版|备份恢复演练|账号权限复核|价格复核|库存盘点/.test(message) && hasTool(tools, "system_operational_acceptance")) {
+    return { toolName: "system_operational_acceptance", args: {}, reason: "运营验收检查" };
+  }
+
+  if (/完整度|全系统检查|全系统.*完善|系统.*没完善|功能缺口|程序.*没做完|开发.*没完成/.test(message) && hasTool(tools, "system_completeness_audit")) {
+    return { toolName: "system_completeness_audit", args: {}, reason: "全系统程序完整度检查" };
+  }
+
   if (/上线|发布|部署|就绪|还差|待决|配置检查|上线检查/.test(message)) {
     return { toolName: "system_launch_readiness", args: {}, reason: "上线就绪检查" };
   }
@@ -493,6 +501,9 @@ function planStaff(message: string, tools: readonly AiToolDefinition[]): AiToolP
   if (/(客户|用户|会员|张|李|王|赵|陈|刘|周|吴|郑|孙|139\d{8}|138\d{8}|137\d{8}|136\d{8}|135\d{8}).*(欠款|待付款|应收|账款|未付款)/.test(message)) {
     return toolPlan(tools, "admin_customer_receivables", { customerQuery: parseAdminCustomerQuery(message), limit: 20 }, "客户待付款代查");
   }
+  if (/哪些客户.*(?:配送|物流)|客户.*(?:配送订单|物流订单)/.test(message)) {
+    return toolPlan(tools, "delivery_summary", {}, "配送查询");
+  }
   if (/(客户|用户|会员|张|李|王|赵|陈|刘|周|吴|郑|孙|139\d{8}|138\d{8}|137\d{8}|136\d{8}|135\d{8}).*(订单|下单记录|配送状态)/.test(message)) {
     return toolPlan(tools, "admin_customer_orders", { customerQuery: parseAdminCustomerQuery(message), limit: 8 }, "客户订单代查");
   }
@@ -575,6 +586,7 @@ function detectCoreIntent(message: string): CoreIntent | null {
   if (isPurchaseHistoryIntent(message)) return "purchase_history";
   if (isPurchaseIntent(message)) return "purchase";
   if (/上线|发布|部署|就绪|还差|待决|配置检查|上线检查/.test(message)) return "readiness";
+  if (/完整度|全系统检查|全系统.*完善|系统.*没完善|功能缺口/.test(message)) return "readiness";
   if (/创建.*(?:员工|账号)|新增.*(?:员工|账号)/.test(message)) return "staff_create";
   if (/(禁用|停用|启用|恢复).*?(员工|账号)|(员工|账号).*?(禁用|停用|启用|恢复)/.test(message)) return "staff_status";
   if (/重置.*密码|密码.*重置|改.*密码/.test(message) && /员工|账号|1[3-9]\d{9}/.test(message)) return "staff_password";
@@ -603,7 +615,7 @@ function allowedToolsForIntent(intent: CoreIntent) {
     case "purchase_history":
       return new Set(["customer_purchase_history", "customer_orders"]);
     case "readiness":
-      return new Set(["system_launch_readiness"]);
+      return new Set(["system_launch_readiness", "system_completeness_audit", "system_operational_acceptance"]);
     case "payment":
       return new Set(["finance_register_payment"]);
     case "invoice":
